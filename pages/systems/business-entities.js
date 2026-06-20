@@ -1,0 +1,1548 @@
+/* Business entities system: focused company command center, entity cash, and family enterprise trust controls. */
+(function () {
+  if (window.__ledgerBusinessEntitiesV1840Loaded) return;
+  window.__ledgerBusinessEntitiesV1840Loaded = true;
+
+  function esc(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, function (ch) {
+      return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch];
+    });
+  }
+
+  function n(value, fallback) {
+    var num = Number(value);
+    return Number.isFinite(num) ? num : (fallback || 0);
+  }
+
+  function round(value) {
+    return Math.round(n(value));
+  }
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, n(value)));
+  }
+
+  function pct(value) {
+    return (n(value) * 100).toFixed(Math.abs(n(value)) >= .1 ? 1 : 0).replace(/\.0$/, "") + "%";
+  }
+
+  function stateNow() {
+    try { if (typeof state !== "undefined" && state) return state; } catch (e) {}
+    return window.state || {};
+  }
+
+  function financeNow() {
+    var s = stateNow();
+    if (!s.finance || typeof s.finance !== "object" || Array.isArray(s.finance)) s.finance = {};
+    return s.finance;
+  }
+
+  function moneyText(value) {
+    try { if (typeof money === "function") return money(round(value)); } catch (e) {}
+    return "$" + round(value).toLocaleString();
+  }
+
+  function compactMoney(value) {
+    value = round(value);
+    var abs = Math.abs(value);
+    var sign = value < 0 ? "-" : "";
+    if (abs >= 1000000000000) return sign + "$" + (abs / 1000000000000).toFixed(abs >= 10000000000000 ? 1 : 2).replace(/\.0+$/, "") + "T";
+    if (abs >= 1000000000) return sign + "$" + (abs / 1000000000).toFixed(abs >= 10000000000 ? 1 : 2).replace(/\.0+$/, "") + "B";
+    if (abs >= 1000000) return sign + "$" + (abs / 1000000).toFixed(abs >= 10000000 ? 1 : 2).replace(/\.0+$/, "") + "M";
+    if (abs >= 1000) return sign + "$" + (abs / 1000).toFixed(abs >= 10000 ? 1 : 2).replace(/\.0+$/, "") + "K";
+    return moneyText(value);
+  }
+
+  function signedMoney(value) {
+    value = round(value);
+    return (value >= 0 ? "+" : "-") + compactMoney(Math.abs(value));
+  }
+
+  function toast(message) {
+    try { if (typeof addToast === "function") return addToast(message); } catch (e) {}
+    try { if (typeof addLog === "function") return addLog(message, {}); } catch (e2) {}
+  }
+
+  function log(message, deltas) {
+    try { if (typeof addLog === "function") return addLog(message, deltas || {}); } catch (e) {}
+    return toast(message);
+  }
+
+  function saveRender(hubId) {
+    try { if (typeof save === "function") save(); } catch (e) {}
+    try {
+      if (typeof window.renderHubInPlaceV16 === "function") return window.renderHubInPlaceV16(hubId || "business");
+    } catch (e2) {}
+    try { if (typeof render === "function") render(); } catch (e3) {}
+  }
+
+  function safeId(value) {
+    return String(value == null ? "" : value).replace(/[^a-zA-Z0-9_-]/g, "_");
+  }
+
+  function readAmount(id, max) {
+    var raw = "";
+    try {
+      var el = document.getElementById(id);
+      raw = el ? String(el.value || "") : "";
+    } catch (e) {}
+    var value = round(raw.replace(/[^0-9.]/g, ""));
+    max = Math.max(0, round(max));
+    if (!value) return 0;
+    return Math.max(0, Math.min(value, max));
+  }
+
+  function amountFromMode(mode, max, inputId) {
+    max = Math.max(0, round(max));
+    if (mode === "all" || mode === "max") return max;
+    if (mode === "half") return Math.round(max * .5);
+    if (mode === "quarter") return Math.round(max * .25);
+    if (mode === "custom") return readAmount(inputId, max);
+    return Math.max(0, Math.min(max, round(mode)));
+  }
+
+  var STRUCTURES = {
+    soleprop: { name: "Sole Prop", cost: 0, minValue: 0, retain: 0, shield: 0, entityRate: 0, compliance: 0, desc: "Fast and simple. Little protection, most profit behaves personally." },
+    partnership: { name: "Partnership", cost: 900, minValue: 5000, retain: .1, shield: .1, entityRate: .02, compliance: 650, desc: "Shared ownership with light company reserves and light protection." },
+    llc: { name: "LLC", cost: 1200, minValue: 10000, retain: .65, shield: .35, entityRate: .07, compliance: 1200, desc: "Default serious business shell. Company cash can stay inside the firm." },
+    scorp: { name: "S-Corp", cost: 3500, minValue: 50000, retain: .52, shield: .45, entityRate: .05, compliance: 3000, desc: "Owner salary plus distributions. Good for profitable services." },
+    ccorp: { name: "C-Corp", cost: 8500, minValue: 150000, retain: .88, shield: .65, entityRate: .21, compliance: 8000, desc: "Company pays corporate tax first; owner is taxed on payouts." },
+    holding: { name: "Holding Co.", cost: 25000, minValue: 1000000, retain: .94, shield: .8, entityRate: .14, compliance: 18000, desc: "Advanced holding structure for large assets, subsidiaries, and succession." }
+  };
+
+  var OPS = {
+    manager: { name: "Operator", cost: 65000, note: "Less owner dependence and less failure pressure." },
+    bookkeeper: { name: "Bookkeeper", cost: 18000, note: "Cleaner books and lower entity tax leakage." },
+    sales: { name: "Sales Lead", cost: 42000, note: "Better growth and breakout chance." },
+    counsel: { name: "Business Counsel", cost: 30000, note: "Contracts, lawsuits, and protection." },
+    insurance: { name: "Insurance", cost: 12000, note: "Limits bad-year damage." }
+  };
+
+  var GOVERNANCE = {
+    informal: { name: "Informal", cost: 0, harmony: 0, readiness: 0, desc: "Cheap, weak rules." },
+    council: { name: "Family Council", cost: 12000, harmony: 10, readiness: 4, desc: "Yearly meetings and shared decisions." },
+    constitution: { name: "Family Constitution", cost: 45000, harmony: 16, readiness: 8, desc: "Written voting, roles, dividends, and dispute rules." },
+    advisory: { name: "Advisory Board", cost: 120000, harmony: 12, readiness: 18, desc: "Outside advisors professionalize the family enterprise." },
+    familyoffice: { name: "Family Office", cost: 300000, harmony: 22, readiness: 22, desc: "Full structure for trusts, taxes, business, and succession." }
+  };
+
+  var MISSIONS = {
+    dynasty: "Build a multi-generation business dynasty",
+    education: "Fund education and career launches for heirs",
+    income: "Create steady family income",
+    charity: "Build a public legacy and charity arm",
+    independence: "Protect heirs without making them dependent"
+  };
+
+  var DIVIDENDS = {
+    none: { name: "Manual", rate: 0 },
+    reinvest: { name: "Reinvest", rate: .01 },
+    balanced: { name: "Balanced", rate: .04 },
+    income: { name: "Family Income", rate: .08 }
+  };
+
+  var TRAINING = {
+    shadow: { name: "Shadowing", cost: 5000, readiness: 6, continuity: 5 },
+    school: { name: "Business School", cost: 25000, readiness: 14, continuity: 8 },
+    executive: { name: "Executive Rotation", cost: 90000, readiness: 24, continuity: 18 },
+    governance: { name: "Governance Bootcamp", cost: 35000, readiness: 10, continuity: 16 }
+  };
+
+  // Tangible per-business upgrades. Costs scale off the venture's own startup cost so a lawncare
+  // stand and a nightclub each have a proportionate upgrade path instead of one flat price list.
+  var ASSET_SLOTS = {
+    location: {
+      icon: "🏪",
+      label: "Location",
+      tiers: [
+        { name: "No Storefront", desc: "Working out of nowhere in particular.", incomeBonus: 0, riskCut: 0 },
+        { name: "Leased Spot", desc: "A real address customers can find.", costMult: .15, costMin: 300, incomeBonus: .04, riskCut: 0 },
+        { name: "Owned Location", desc: "No landlord, more reputation, steadier traffic.", costMult: .45, costMin: 1500, incomeBonus: .09, riskCut: .02 },
+        { name: "Flagship Location", desc: "A destination spot people plan trips around.", costMult: 1.1, costMin: 5000, incomeBonus: .15, riskCut: .04 }
+      ]
+    },
+    equipment: {
+      icon: "🛠️",
+      label: "Equipment",
+      tiers: [
+        { name: "Basic Tools", desc: "Whatever was cheapest to start with.", incomeBonus: 0, repBonus: 0 },
+        { name: "Pro Equipment", desc: "Faster, more reliable output.", costMult: .12, costMin: 250, incomeBonus: .05, repBonus: 0 },
+        { name: "Automated Systems", desc: "Less owner time per dollar earned.", costMult: .35, costMin: 1200, incomeBonus: .10, repBonus: .03 }
+      ]
+    },
+    staff: {
+      icon: "👥",
+      label: "Staff",
+      tiers: [
+        { name: "Solo", desc: "Just you.", incomeBonus: 0, riskCut: 0 },
+        { name: "Small Crew", desc: "A couple of reliable hires.", costMult: .20, costMin: 400, incomeBonus: .06, riskCut: .03 },
+        { name: "Full Team", desc: "Real coverage, real consistency.", costMult: .55, costMin: 2000, incomeBonus: .12, riskCut: .06 }
+      ]
+    }
+  };
+
+  // v18.36: cosmetic sector overlay on asset tier names. Same slots, same math —
+  // a nightclub's top Equipment reads "State-of-the-Art Sound System" instead of
+  // "Automated Systems," a SaaS company's Staff reads "Engineering Team." Indexed
+  // [sectorId][slotKey][tierIndex]; any gap falls back to the generic tier name.
+  var SECTOR_TIER_NAMES = {
+    food:       { location: ["Home Kitchen", "Leased Storefront", "Owned Restaurant", "Flagship Restaurant"], equipment: ["Hand-Me-Down Gear", "Commercial Kitchen", "Pro Kitchen Line"], staff: ["Just You", "Line Cooks", "Full Brigade"] },
+    nightlife:  { location: ["Pop-Up Nights", "Leased Venue", "Owned Club", "Destination Venue"], equipment: ["Borrowed Speakers", "Pro Sound Rig", "State-of-the-Art Sound System"], staff: ["Solo Promoter", "Door & Bar Crew", "Full Floor Team"] },
+    retail:     { location: ["Online Only", "Mall Kiosk", "Owned Storefront", "Flagship Store"], equipment: ["Basic POS", "Inventory System", "Automated Fulfillment"], staff: ["Solo", "Sales Floor", "Full Retail Team"] },
+    trades:     { location: ["Out of the Truck", "Leased Yard", "Owned Depot", "Regional Depot"], equipment: ["Basic Tools", "Pro Equipment", "Heavy Machinery"], staff: ["Solo", "Small Crew", "Full Crew"] },
+    media:      { location: ["Bedroom Setup", "Leased Office", "Owned Studio", "Flagship Studio"], equipment: ["Starter Kit", "Pro Gear", "Full Production Suite"], staff: ["Solo Creator", "Small Team", "Full Production Team"] },
+    tech:       { location: ["Garage", "Co-Working Desk", "Leased Office", "HQ Campus"], equipment: ["Laptop & Coffee", "Cloud Stack", "Automated Infrastructure"], staff: ["Solo Founder", "Small Team", "Engineering Team"] },
+    finance:    { location: ["Home Office", "Leased Suite", "Owned Office", "Tower Floor"], equipment: ["Spreadsheets", "Trading Terminal", "Quant Platform"], staff: ["Solo", "Small Desk", "Full Desk"] },
+    realestate: { location: ["Phone & Laptop", "Leased Office", "Owned Office", "Flagship Office"], equipment: ["Basic Tools", "Property Software", "Full Asset Platform"], staff: ["Solo", "Small Team", "Full Brokerage"] },
+    health:     { location: ["Rented Room", "Leased Suite", "Owned Clinic", "Flagship Clinic"], equipment: ["Basic Equipment", "Clinical Gear", "Advanced Diagnostics"], staff: ["Solo Practitioner", "Small Practice", "Full Medical Team"] },
+    logistics:  { location: ["One Van", "Leased Yard", "Owned Depot", "Regional Hub"], equipment: ["Basic Fleet", "Tracked Fleet", "Automated Fleet"], staff: ["Solo Driver", "Small Crew", "Full Operations Team"] }
+  };
+
+  function sectorIdForBusiness(b) {
+    if (!b) return null;
+    try {
+      var nm = (window.SECTOR_OF && window.SECTOR_OF[b.id]) || b.sector || b.category;
+      if (window.LEDGER_SECTORS && nm) {
+        var s = window.LEDGER_SECTORS.find(function (x) { return x.name === nm || x.id === nm; });
+        if (s) return s.id;
+      }
+    } catch (e) {}
+    return null;
+  }
+  window.sectorIdForBusinessV1851 = sectorIdForBusiness;
+
+  // Returns a sector-flavored tier name if one exists, else the generic name.
+  function tierLabel(b, slotKey, tierIndex, fallback) {
+    try {
+      var sid = sectorIdForBusiness(b);
+      var names = sid && SECTOR_TIER_NAMES[sid] && SECTOR_TIER_NAMES[sid][slotKey];
+      if (names && names[tierIndex]) return names[tierIndex];
+    } catch (e) {}
+    return fallback;
+  }
+
+  // One unique, flavorful action per venture type. costMult/costMin scale off that venture's own startup
+  // cost (same idiom as ASSET_SLOTS), rep/valueMult apply immediately, payoutMult pays a randomized cash bonus.
+  var VENTURE_ACTIONS = {
+    lawncare: { label: "Door-to-Door Flyers", icon: "📋", costMult: .3, costMin: 50, rep: 4, result: "Flyered the neighborhood for new lawns." },
+    resale: { label: "Flash Sale", icon: "🏷️", costMult: .2, costMin: 50, rep: 3, payoutMult: .08, result: "Ran a flash sale and moved old inventory." },
+    content: { label: "Collab Video", icon: "🎬", costMult: .5, costMin: 50, rep: 6, result: "Collabed with another creator for a reach boost." },
+    tutoringbiz: { label: "Referral Bonus", icon: "🌟", costMult: .4, costMin: 30, rep: 5, result: "Offered a referral bonus and picked up new students." },
+    contracting: { label: "Bid a Big Job", icon: "🏗️", costMult: .15, costMin: 500, rep: 5, payoutMult: .05, result: "Won a bigger contracting job." },
+    startup: { label: "Pitch Investors", icon: "💼", costMult: .1, costMin: 1000, rep: 8, valueMult: 1.06, result: "Pitched investors and raised the company's profile." },
+    foodtruck: { label: "Food Festival", icon: "🎪", costMult: .15, costMin: 800, rep: 6, payoutMult: .06, result: "Booked a slot at a local food festival." },
+    eventsecurity: { label: "Land a Venue Contract", icon: "🤝", costMult: .1, costMin: 1000, rep: 7, valueMult: 1.04, result: "Signed an ongoing contract with a venue." },
+    printshop: { label: "Local Business Expo", icon: "🖨️", costMult: .12, costMin: 600, rep: 5, payoutMult: .05, result: "Set up a booth at the business expo." },
+    sportsbar: { label: "Playoff Watch Party", icon: "🏈", costMult: .1, costMin: 1500, rep: 8, payoutMult: .07, result: "Hosted a packed playoff watch party." },
+    nightclub: { label: "Book a Headliner DJ", icon: "🎧", costMult: .08, costMin: 3000, rep: 10, payoutMult: .08, result: "Booked a headliner DJ for a sellout night." },
+    mediaagency: { label: "Land a Brand Deal", icon: "📰", costMult: .1, costMin: 2000, rep: 8, valueMult: 1.05, result: "Landed a major brand deal." },
+    aircraftcharter: { label: "Court a Corporate Client", icon: "✈️", costMult: .05, costMin: 5000, rep: 6, valueMult: 1.05, result: "Courted a corporate client for repeat charters." },
+    aircraftservices: { label: "Win a Fleet Contract", icon: "🛠️", costMult: .04, costMin: 8000, rep: 7, valueMult: 1.06, result: "Won a maintenance contract for a small fleet." },
+    cornerbar: { label: "Trivia Night Launch", icon: "🍻", costMult: .1, costMin: 600, rep: 5, payoutMult: .05, result: "Launched a weekly trivia night. Regulars love it." },
+    carwashchain: { label: "Loyalty Card Push", icon: "🚗", costMult: .08, costMin: 1000, rep: 6, payoutMult: .05, result: "Rolled out a loyalty card program." },
+    vendingroute: { label: "Add New Machines", icon: "🥤", costMult: .25, costMin: 500, rep: 4, valueMult: 1.05, result: "Added new machines to the route." },
+    logisticsfleet: { label: "Win a Retail Contract", icon: "🚐", costMult: .06, costMin: 4000, rep: 7, valueMult: 1.05, result: "Won a steady retail delivery contract." },
+    recordlabel: { label: "Sign a Rising Artist", icon: "🎵", costMult: .08, costMin: 2000, rep: 8, valueMult: 1.07, result: "Signed a rising artist with buzz." },
+    realestateholdco: { label: "Close a Flip", icon: "🏘️", costMult: .04, costMin: 5000, rep: 6, payoutMult: .06, result: "Closed a profitable flip." },
+    aircraftleasing: { label: "Lease to an Airline", icon: "🛩️", costMult: .02, costMin: 20000, rep: 6, valueMult: 1.05, result: "Signed a long-term lease with a regional airline." },
+    saascompany: { label: "Ship a Major Feature", icon: "💻", costMult: .06, costMin: 5000, rep: 8, valueMult: 1.08, result: "Shipped a major feature. Signups spiked." },
+    consultingfirm: { label: "Land a Fortune 500 Client", icon: "📊", costMult: .08, costMin: 3000, rep: 9, valueMult: 1.06, result: "Landed a marquee enterprise client." },
+    privateequity: { label: "Close a Buyout", icon: "💰", costMult: .03, costMin: 15000, rep: 7, valueMult: 1.07, result: "Closed a leveraged buyout." },
+    luxuryrealty: { label: "Sell a Trophy Property", icon: "🏰", costMult: .03, costMin: 8000, rep: 8, payoutMult: .06, result: "Sold a trophy property to a high-net-worth buyer." },
+    talentagency: { label: "Sign a Breakout Star", icon: "🌟", costMult: .06, costMin: 4000, rep: 9, valueMult: 1.07, result: "Signed a breakout star client." },
+    ecommercebrand: { label: "Go Viral on Social", icon: "📦", costMult: .07, costMin: 3000, rep: 7, payoutMult: .07, result: "A product went viral overnight." },
+    medicalpractice: { label: "Add a Specialist", icon: "🩺", costMult: .05, costMin: 6000, rep: 6, valueMult: 1.05, result: "Brought on a specialist, expanding services." },
+    filmstudio: { label: "Land a Distribution Deal", icon: "🎥", costMult: .03, costMin: 10000, rep: 9, valueMult: 1.08, result: "Landed a major distribution deal." },
+    hedgefund: { label: "Beat the Market", icon: "📈", costMult: .02, costMin: 20000, rep: 8, payoutMult: .08, result: "Posted returns that beat the market." },
+    hospitalitygroup: { label: "Host a Gala", icon: "🥂", costMult: .04, costMin: 8000, rep: 8, payoutMult: .06, result: "Hosted a gala that put the property on the map." }
+  };
+
+  // v18.36: extra result lines so running the same signature action year after
+  // year doesn't print identical log text. Merged onto VENTURE_ACTIONS as a
+  // `results` array; pickActionResult() rotates through them.
+  var ACTION_RESULT_VARIANTS = {
+    lawncare: ["Flyered the neighborhood for new lawns.", "Knocked doors all weekend and booked three new yards.", "Word of mouth from a tidy cul-de-sac brought in calls."],
+    resale: ["Ran a flash sale and moved old inventory.", "A weekend markdown cleared the back room.", "Bundled slow movers and they finally sold."],
+    content: ["Collabed with another creator for a reach boost.", "A cross-post sent the numbers up overnight.", "A guest feature pulled in a new audience."],
+    contracting: ["Won a bigger contracting job.", "Underbid a rival on a commercial build and won.", "A referral landed a steady multi-phase project."],
+    startup: ["Pitched investors and raised the company's profile.", "A demo day pitch got people talking.", "An angel intro turned into a warm term sheet."],
+    foodtruck: ["Booked a slot at a local food festival.", "Parked outside a sold-out concert and crushed it.", "A festival feature put a line at the window."],
+    nightclub: ["Booked a headliner DJ for a sellout night.", "A big-name guest set packed the floor.", "The DJ drew a line around the block."],
+    saascompany: ["Shipped a major feature. Signups spiked.", "A launch hit the front page of a tech forum.", "An integration unlocked a wave of new accounts."],
+    consultingfirm: ["Landed a marquee enterprise client.", "Won a competitive RFP against the big firms.", "A Fortune 500 logo signed a retainer."],
+    ecommercebrand: ["A product went viral overnight.", "An influencer unboxing sold out the SKU.", "A trend caught and orders flooded in."],
+    nightclubgroup: ["Hosted a packed playoff watch party.", "A themed night became the talk of the city."],
+    hedgefund: ["Posted returns that beat the market.", "A contrarian bet paid off big this quarter.", "Outperformed the index and LPs took notice."],
+    foodtruckfleet: ["Booked the whole fleet for a festival weekend.", "Catered a corporate campus all week."]
+  };
+  Object.keys(ACTION_RESULT_VARIANTS).forEach(function (id) {
+    if (VENTURE_ACTIONS[id]) VENTURE_ACTIONS[id].results = ACTION_RESULT_VARIANTS[id];
+  });
+  function pickActionResult(action) {
+    if (action && Array.isArray(action.results) && action.results.length) {
+      return action.results[Math.floor(Math.random() * action.results.length)];
+    }
+    return (action && action.result) || "Made a move to grow the business.";
+  }
+
+  var FOUNDER_PATHS = {
+    undecided: {
+      name: "Undecided Founder",
+      tag: "Explore first",
+      desc: "Keep the door open while you test companies, jobs, investing, and family plans.",
+      bonus: "No pressure bonus yet."
+    },
+    builder: {
+      name: "Company Builder",
+      tag: "Start from scratch",
+      desc: "Create one serious operating company, train a team, and grow it into your main story.",
+      bonus: "Better launch focus and stronger operations progress."
+    },
+    acquirer: {
+      name: "Acquisition Operator",
+      tag: "Buy and improve",
+      desc: "Use savings, loans, and deal skill to buy existing companies and professionalize them.",
+      bonus: "Acquisition requirements and entity planning matter more."
+    },
+    investor: {
+      name: "Founder Investor",
+      tag: "Capital allocator",
+      desc: "Build wealth through personal firm, outside managers, and minority business stakes.",
+      bonus: "Pairs with Investments and family trust planning."
+    },
+    family: {
+      name: "Family Enterprise",
+      tag: "Dynasty path",
+      desc: "Turn companies into trust-owned assets with successor training and governance.",
+      bonus: "Trust, Legal, and heir readiness become the long game."
+    }
+  };
+
+  function businessCatalog() {
+    try { if (typeof entrepreneurshipCatalog !== "undefined" && Array.isArray(entrepreneurshipCatalog)) return entrepreneurshipCatalog; } catch (e) {}
+    try { if (Array.isArray(window.entrepreneurshipCatalog)) return window.entrepreneurshipCatalog; } catch (e2) {}
+    return [];
+  }
+
+  function acquisitionCatalog() {
+    try { if (typeof V6_EXTRA_COMPANIES !== "undefined" && Array.isArray(V6_EXTRA_COMPANIES)) return V6_EXTRA_COMPANIES; } catch (e) {}
+    try { if (Array.isArray(window.V6_EXTRA_COMPANIES)) return window.V6_EXTRA_COMPANIES; } catch (e2) {}
+    return [];
+  }
+
+  function catalogFor(id, business) {
+    var lookup = String((business && business.baseId) || id);
+    return businessCatalog().concat(acquisitionCatalog()).find(function (v) { return String(v.id) === lookup || String(v.id) === String(id); }) || {};
+  }
+
+  function ensureBusiness(b) {
+    if (!b || typeof b !== "object") return b;
+    var v = catalogFor(b.id, b);
+    if (!b.id) b.id = "business_" + Math.random().toString(36).slice(2);
+    if (!b.name) b.name = v.name || String(b.id);
+    if (!b.category) b.category = v.category || "Business";
+    if (b.value == null) b.value = 0;
+    if (b.years == null) b.years = 0;
+    if (b.reputation == null) b.reputation = 10;
+    if (b.lastIncome == null) b.lastIncome = 0;
+    if (!b.stage) b.stage = "startup";
+    if (!b.entityType) b.entityType = n(b.value) >= 150000 ? "llc" : "soleprop";
+    if (b.retainedEarnings == null) b.retainedEarnings = Math.max(0, n(b.businessCash));
+    if (b.entityTaxDebt == null) b.entityTaxDebt = 0;
+    if (b.complianceDue == null) b.complianceDue = 0;
+    if (!b.ops || typeof b.ops !== "object") b.ops = {};
+    if (!Array.isArray(b.historyV1830)) b.historyV1830 = [];
+    if (!b.familyV1833 || typeof b.familyV1833 !== "object") b.familyV1833 = {};
+    var fam = b.familyV1833;
+    fam.trustPercent = clamp(fam.trustPercent == null ? 0 : fam.trustPercent, 0, 1);
+    if (!fam.successor) fam.successor = "none";
+    fam.readiness = clamp(fam.readiness == null ? 0 : fam.readiness, 0, 100);
+    fam.continuity = clamp(fam.continuity == null ? 0 : fam.continuity, 0, 100);
+    fam.board = !!fam.board;
+    if (!fam.dividendPolicy) fam.dividendPolicy = "balanced";
+    fam.trustLoan = Math.max(0, round(fam.trustLoan));
+    fam.trainingSpend = Math.max(0, round(fam.trainingSpend));
+    fam.totalTrustDividends = Math.max(0, round(fam.totalTrustDividends));
+    if (!Array.isArray(fam.history)) fam.history = [];
+    if (!b.assets || typeof b.assets !== "object") b.assets = {};
+    if (b.assets.location == null) b.assets.location = 0;
+    if (b.assets.equipment == null) b.assets.equipment = 0;
+    if (b.assets.staff == null) b.assets.staff = 0;
+    if (!Array.isArray(b.assetHistoryV1850)) b.assetHistoryV1850 = [];
+    if (!Array.isArray(b.eventHistoryV1850)) b.eventHistoryV1850 = [];
+    try { if (typeof window.ensureSectorMeterV1851 === "function") window.ensureSectorMeterV1851(b); } catch (e) {}
+    return b;
+  }
+
+  function ensureBusinessState() {
+    try { if (typeof ensureStateShape === "function") ensureStateShape(); } catch (e) {}
+    var s = stateNow();
+    if (!window.state && s) window.state = s;
+    if (!s.stats || typeof s.stats !== "object") s.stats = {};
+    if (!s.actionsTaken || typeof s.actionsTaken !== "object") s.actionsTaken = {};
+    var f = financeNow();
+    if (!Array.isArray(f.businesses)) f.businesses = [];
+    if (!f.incomeSources || typeof f.incomeSources !== "object") f.incomeSources = {};
+    if (!f.businessOfficeV1840 || typeof f.businessOfficeV1840 !== "object") f.businessOfficeV1840 = {};
+    if (!f.entrepreneurshipV1841 || typeof f.entrepreneurshipV1841 !== "object") f.entrepreneurshipV1841 = {};
+    var founder = f.entrepreneurshipV1841;
+    if (!FOUNDER_PATHS[founder.path]) founder.path = "undecided";
+    founder.years = Math.max(0, round(founder.years));
+    founder.thesis = String(founder.thesis || "");
+    founder.focus = String(founder.focus || "");
+    founder.ambition = clamp(founder.ambition == null ? 50 : founder.ambition, 0, 100);
+    if (!f.businessTaxV1830 || typeof f.businessTaxV1830 !== "object") f.businessTaxV1830 = { history: [], processedAges: {} };
+    if (!Array.isArray(f.businessTaxV1830.history)) f.businessTaxV1830.history = [];
+    if (!s.estateV1831 || typeof s.estateV1831 !== "object") s.estateV1831 = {};
+    var e = s.estateV1831;
+    if (!e.assets || typeof e.assets !== "object") e.assets = {};
+    e.assets.trustCash = Math.max(0, round(e.assets.trustCash));
+    if (!e.clauses || typeof e.clauses !== "object") e.clauses = {};
+    if (!e.familyEnterpriseV1833 || typeof e.familyEnterpriseV1833 !== "object") e.familyEnterpriseV1833 = {};
+    var fe = e.familyEnterpriseV1833;
+    if (!fe.governance) fe.governance = "informal";
+    if (!fe.mission) fe.mission = "dynasty";
+    fe.harmony = clamp(fe.harmony == null ? 50 : fe.harmony, 0, 100);
+    fe.readiness = clamp(fe.readiness == null ? 0 : fe.readiness, 0, 100);
+    fe.disputes = Math.max(0, round(fe.disputes));
+    fe.totalTrustDividends = Math.max(0, round(fe.totalTrustDividends));
+    fe.totalTrustLoans = Math.max(0, round(fe.totalTrustLoans));
+    fe.totalHeirTraining = Math.max(0, round(fe.totalHeirTraining));
+    if (!Array.isArray(fe.history)) fe.history = [];
+    if (f.familyTrustV1839 && f.familyTrustV1839.created && (!e.trustType || e.trustType === "none")) {
+      e.trustType = f.familyTrustV1839.plan || "family_trust";
+      e.hasWill = true;
+    }
+    f.businesses.forEach(ensureBusiness);
+    if (!f.businessOfficeV1840.focusId && f.businesses[0]) f.businessOfficeV1840.focusId = f.businesses[0].id;
+    if (f.businessOfficeV1840.focusId && !businessById(f.businessOfficeV1840.focusId)) {
+      f.businessOfficeV1840.focusId = f.businesses[0] ? f.businesses[0].id : "";
+    }
+    return s;
+  }
+
+  function businesses() {
+    return ensureBusinessState().finance.businesses || [];
+  }
+
+  function businessById(id) {
+    return (stateNow().finance && stateNow().finance.businesses || []).find(function (b) { return String(b.id) === String(id); }) || null;
+  }
+
+  function businessValue(b) {
+    ensureBusiness(b);
+    return Math.max(0, round(n(b.value) + n(b.retainedEarnings)));
+  }
+
+  function totalBusinessValue() {
+    return businesses().reduce(function (sum, b) { return sum + businessValue(b); }, 0);
+  }
+
+  function totalCompanyCash() {
+    return businesses().reduce(function (sum, b) { return sum + Math.max(0, n(b.retainedEarnings)); }, 0);
+  }
+
+  function totalEntityDebt() {
+    return businesses().reduce(function (sum, b) { return sum + Math.max(0, n(b.entityTaxDebt)); }, 0);
+  }
+
+  function totalCompliance() {
+    return businesses().reduce(function (sum, b) { return sum + Math.max(0, n(b.complianceDue)); }, 0);
+  }
+
+  function trustBusinessValue() {
+    return businesses().reduce(function (sum, b) {
+      ensureBusiness(b);
+      return sum + businessValue(b) * n(b.familyV1833.trustPercent);
+    }, 0);
+  }
+
+  function trustCash() {
+    var s = ensureBusinessState();
+    return Math.max(0, n((s.estateV1831.assets || {}).trustCash) + n((s.finance.familyTrustV1839 || {}).corpus));
+  }
+
+  function legalTrustActive() {
+    var s = ensureBusinessState();
+    return !!((s.finance.familyTrustV1839 && s.finance.familyTrustV1839.created) || (s.estateV1831.trustType && s.estateV1831.trustType !== "none"));
+  }
+
+  function addTrustCash(amount, eventName) {
+    var s = ensureBusinessState();
+    amount = Math.max(0, round(amount));
+    if (!amount) return;
+    if (s.finance.familyTrustV1839 && s.finance.familyTrustV1839.created) {
+      var trust = s.finance.familyTrustV1839;
+      trust.corpus = Math.max(0, round(n(trust.corpus) + amount));
+      if (!trust.sourceLedger || typeof trust.sourceLedger !== "object") trust.sourceLedger = {};
+      trust.sourceLedger.business = Math.max(0, round(n(trust.sourceLedger.business) + amount));
+      if (!Array.isArray(trust.history)) trust.history = [];
+      trust.history.unshift({ age: round(s.age), event: eventName || "Business trust cash", amount: amount });
+      trust.history = trust.history.slice(0, 8);
+    } else {
+      s.estateV1831.assets.trustCash = Math.max(0, round(n(s.estateV1831.assets.trustCash) + amount));
+    }
+  }
+
+  function takeTrustCash(amount) {
+    var s = ensureBusinessState();
+    amount = Math.max(0, round(amount));
+    var remaining = amount;
+    var estateCash = Math.max(0, n(s.estateV1831.assets.trustCash));
+    var fromEstate = Math.min(estateCash, remaining);
+    s.estateV1831.assets.trustCash = Math.max(0, round(estateCash - fromEstate));
+    remaining -= fromEstate;
+    var trust = s.finance.familyTrustV1839 || {};
+    if (remaining > 0 && trust.created) {
+      var fromLegal = Math.min(Math.max(0, n(trust.corpus)), remaining);
+      trust.corpus = Math.max(0, round(n(trust.corpus) - fromLegal));
+      remaining -= fromLegal;
+    }
+    return amount - remaining;
+  }
+
+  function enterpriseScore() {
+    var s = ensureBusinessState();
+    var fe = s.estateV1831.familyEnterpriseV1833;
+    var total = Math.max(1, totalBusinessValue());
+    var score = 0;
+    score += legalTrustActive() ? 18 : 0;
+    score += s.estateV1831.hasWill ? 8 : 0;
+    score += clamp(trustBusinessValue() / total, 0, 1) * 22;
+    score += clamp(fe.harmony, 0, 100) * .16;
+    score += clamp(fe.readiness + averageReadiness(), 0, 130) * .18;
+    score += fe.governance && fe.governance !== "informal" ? 12 : 0;
+    score += businesses().some(function (b) { return b.familyV1833 && b.familyV1833.board; }) ? 8 : 0;
+    score -= Math.min(18, n(fe.disputes) * 3);
+    fe.familyScore = Math.round(clamp(score, 0, 100));
+    return fe.familyScore;
+  }
+
+  function averageReadiness() {
+    var list = businesses().filter(function (b) {
+      return n(b.familyV1833 && b.familyV1833.trustPercent) > 0 || (b.familyV1833 && b.familyV1833.successor !== "none");
+    });
+    if (!list.length) return 0;
+    return Math.round(list.reduce(function (sum, b) {
+      return sum + n(b.familyV1833.readiness) + n(b.familyV1833.continuity) * .35;
+    }, 0) / list.length);
+  }
+
+  function focusBusiness() {
+    var s = ensureBusinessState();
+    return businessById(s.finance.businessOfficeV1840.focusId) || businesses()[0] || null;
+  }
+
+  function actionButton(label, action, kind, disabled) {
+    return '<button class="money-btn ' + esc(kind || "") + '" onclick="event.preventDefault();event.stopPropagation();' + action + '" ' + (disabled ? "disabled" : "") + '>' + esc(label) + '</button>';
+  }
+
+  function customRow(id, max, action, label, kind, disabled) {
+    return '<div class="v1840-custom-row"><input id="' + esc(id) + '" inputmode="numeric" placeholder="$ custom"><span>Max ' + esc(compactMoney(max)) + '</span>' + actionButton(label || "Move", action, kind || "green", disabled || max <= 0) + '</div>';
+  }
+
+  window.setBusinessFocusV1840 = function (businessId) {
+    var s = ensureBusinessState();
+    if (!businessById(businessId)) return toast("Business not found.");
+    s.finance.businessOfficeV1840.focusId = String(businessId);
+    saveRender();
+  };
+
+  window.renameBusinessV1840 = function (businessId, inputId) {
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    var value = "";
+    try {
+      var el = document.getElementById(inputId || ("v1840-rename-" + safeId(businessId)));
+      value = el ? String(el.value || "").trim() : "";
+    } catch (e) {}
+    if (!value) return toast("Type a business name first.");
+    b.name = value.slice(0, 42);
+    log("Renamed business to " + b.name + ".", {});
+    saveRender();
+  };
+
+  window.setBusinessTrustPercentV1840 = function (businessId, rawPct) {
+    var s = ensureBusinessState();
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    if (!legalTrustActive()) return toast("Create a family trust in Legal first.");
+    ensureBusiness(b);
+    var target = clamp(n(rawPct) / 100, 0, 1);
+    var old = n(b.familyV1833.trustPercent);
+    var increase = Math.max(0, target - old);
+    var legalCost = increase > 0 ? Math.min(250000, Math.max(1200, round(businessValue(b) * increase * .006))) : 0;
+    if (legalCost > Math.max(0, n(s.money))) return toast("Business trust titling needs " + compactMoney(legalCost) + " in checking.");
+    s.money = Math.max(0, round(n(s.money) - legalCost));
+    b.familyV1833.trustPercent = target;
+    if (!s.estateV1831.businessHoldingsV1833 || typeof s.estateV1831.businessHoldingsV1833 !== "object") s.estateV1831.businessHoldingsV1833 = {};
+    s.estateV1831.businessHoldingsV1833[String(b.id)] = { name: b.name, percent: target, value: round(businessValue(b) * target), updatedAge: n(s.age) };
+    if (target >= .51) s.estateV1831.clauses.businessSuccession = true;
+    b.familyV1833.continuity = clamp(n(b.familyV1833.continuity) + (target >= .51 ? 10 : target > old ? 4 : 0), 0, 100);
+    addEnterpriseHistory("Titled " + Math.round(target * 100) + "% of " + b.name + " to trust", -legalCost);
+    log("Moved " + Math.round(target * 100) + "% of " + b.name + " into the family trust plan.", { money: -legalCost });
+    saveRender();
+  };
+
+  window.payBusinessDividendToTrustV1840 = function (businessId, mode) {
+    var s = ensureBusinessState();
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    if (!legalTrustActive()) return toast("Create a family trust in Legal first.");
+    ensureBusiness(b);
+    var trustPct = n(b.familyV1833.trustPercent);
+    if (!trustPct) return toast("Title some of this business into the trust first.");
+    var inputId = "v1840-div-" + safeId(b.id);
+    var max = Math.max(0, round(n(b.retainedEarnings) * trustPct));
+    var amount = amountFromMode(mode, max, inputId);
+    if (!amount) return toast("No distributable trust dividend available.");
+    b.retainedEarnings = Math.max(0, round(n(b.retainedEarnings) - amount));
+    b.familyV1833.totalTrustDividends = Math.max(0, round(n(b.familyV1833.totalTrustDividends) + amount));
+    s.estateV1831.familyEnterpriseV1833.totalTrustDividends = Math.max(0, round(n(s.estateV1831.familyEnterpriseV1833.totalTrustDividends) + amount));
+    s.finance.incomeSources.trustBusinessDividendsV1833 = Math.max(0, round(n(s.finance.incomeSources.trustBusinessDividendsV1833) + amount));
+    addTrustCash(amount, "Trust dividend from " + b.name);
+    addEnterpriseHistory("Trust dividend from " + b.name, amount);
+    log(b.name + " paid " + compactMoney(amount) + " to the family trust. It was not personal checking income.", {});
+    saveRender();
+  };
+
+  window.trustLoanToBusinessV1840 = function (businessId, mode) {
+    var s = ensureBusinessState();
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    if (!legalTrustActive()) return toast("Create a family trust in Legal first.");
+    var inputId = "v1840-loan-" + safeId(b.id);
+    var amount = amountFromMode(mode, trustCash(), inputId);
+    if (!amount) return toast("No trust cash available to invest or lend.");
+    var moved = takeTrustCash(amount);
+    if (!moved) return toast("No trust cash moved.");
+    b.retainedEarnings = Math.max(0, round(n(b.retainedEarnings) + moved));
+    b.value = Math.max(0, round(n(b.value) + moved * .25));
+    b.familyV1833.trustLoan = Math.max(0, round(n(b.familyV1833.trustLoan) + moved));
+    b.familyV1833.continuity = clamp(n(b.familyV1833.continuity) + 4, 0, 100);
+    s.estateV1831.familyEnterpriseV1833.totalTrustLoans = Math.max(0, round(n(s.estateV1831.familyEnterpriseV1833.totalTrustLoans) + moved));
+    addEnterpriseHistory("Trust financed " + b.name, moved);
+    log("The family trust financed " + b.name + " with " + compactMoney(moved) + ".", {});
+    saveRender();
+  };
+
+  window.repayTrustLoanV1840 = function (businessId, mode) {
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    ensureBusiness(b);
+    var inputId = "v1840-repay-" + safeId(b.id);
+    var max = Math.min(Math.max(0, n(b.familyV1833.trustLoan)), Math.max(0, n(b.retainedEarnings)));
+    var amount = amountFromMode(mode, max, inputId);
+    if (!amount) return toast("No repayable trust loan amount available.");
+    b.retainedEarnings = Math.max(0, round(n(b.retainedEarnings) - amount));
+    b.familyV1833.trustLoan = Math.max(0, round(n(b.familyV1833.trustLoan) - amount));
+    addTrustCash(amount, b.name + " repaid trust loan");
+    addEnterpriseHistory(b.name + " repaid trust loan", amount);
+    saveRender();
+  };
+
+  window.setFamilyGovernanceV1840 = function (mode) {
+    var s = ensureBusinessState();
+    var fe = s.estateV1831.familyEnterpriseV1833;
+    var g = GOVERNANCE[mode] || GOVERNANCE.informal;
+    if (fe.governance === mode) return toast("Family governance already uses " + g.name + ".");
+    if (mode !== "informal" && !legalTrustActive()) return toast("Create a family trust in Legal first.");
+    var cost = g.cost;
+    if (mode === "familyoffice" && s.estateV1831.familyOffice) cost = Math.round(cost * .25);
+    if (cost > Math.max(0, n(s.money))) return toast(g.name + " needs " + compactMoney(cost) + " in checking.");
+    s.money = Math.max(0, round(n(s.money) - cost));
+    fe.governance = mode;
+    fe.harmony = clamp(n(fe.harmony) + g.harmony, 0, 100);
+    fe.readiness = clamp(n(fe.readiness) + g.readiness, 0, 100);
+    if (mode === "familyoffice") s.estateV1831.familyOffice = true;
+    addEnterpriseHistory("Set governance: " + g.name, -cost);
+    log("The family enterprise adopted " + g.name + ".", { money: -cost, stress: -2 });
+    saveRender();
+  };
+
+  window.setFamilyMissionV1840 = function (mission) {
+    var s = ensureBusinessState();
+    s.estateV1831.familyEnterpriseV1833.mission = MISSIONS[mission] ? mission : "dynasty";
+    s.estateV1831.familyEnterpriseV1833.harmony = clamp(n(s.estateV1831.familyEnterpriseV1833.harmony) + 2, 0, 100);
+    addEnterpriseHistory("Updated family mission", 0);
+    saveRender();
+  };
+
+  window.holdFamilyCouncilV1840 = function (topic) {
+    var s = ensureBusinessState();
+    if (!legalTrustActive()) return toast("Create a family trust in Legal first.");
+    var fe = s.estateV1831.familyEnterpriseV1833;
+    var cost = s.estateV1831.familyOffice ? 7500 : 15000;
+    if (cost > Math.max(0, n(s.money))) return toast("Family council needs " + compactMoney(cost) + " in checking.");
+    s.money = Math.max(0, round(n(s.money) - cost));
+    var readiness = topic === "succession" ? 12 : topic === "education" ? 9 : 5;
+    var harmony = topic === "conflict" ? 13 : topic === "charity" ? 9 : 7;
+    var disputes = topic === "conflict" ? 3 : 1;
+    fe.councilMeetings = Math.max(0, round(n(fe.councilMeetings) + 1));
+    fe.readiness = clamp(n(fe.readiness) + readiness, 0, 100);
+    fe.harmony = clamp(n(fe.harmony) + harmony, 0, 100);
+    fe.disputes = Math.max(0, round(n(fe.disputes) - disputes));
+    addEnterpriseHistory("Family council: " + topic, -cost);
+    log("Held a family council about " + topic + ".", { money: -cost, stress: -2, confidence: 1 });
+    saveRender();
+  };
+
+  window.trainBusinessSuccessorV1840 = function (businessId, mode) {
+    var s = ensureBusinessState();
+    var b = businessById(businessId);
+    var t = TRAINING[mode] || TRAINING.shadow;
+    if (!b) return toast("Business not found.");
+    ensureBusiness(b);
+    if (b.familyV1833.successor === "none") return toast("Name a successor before training them.");
+    var fromBiz = Math.min(t.cost, Math.max(0, n(b.retainedEarnings)));
+    var remaining = t.cost - fromBiz;
+    if (remaining > Math.max(0, n(s.money))) return toast(t.name + " needs " + compactMoney(t.cost) + " from company cash/checking.");
+    b.retainedEarnings = Math.max(0, round(n(b.retainedEarnings) - fromBiz));
+    s.money = Math.max(0, round(n(s.money) - remaining));
+    b.familyV1833.readiness = clamp(n(b.familyV1833.readiness) + t.readiness, 0, 100);
+    b.familyV1833.continuity = clamp(n(b.familyV1833.continuity) + t.continuity, 0, 100);
+    b.familyV1833.trainingSpend = Math.max(0, round(n(b.familyV1833.trainingSpend) + t.cost));
+    s.estateV1831.familyEnterpriseV1833.totalHeirTraining = Math.max(0, round(n(s.estateV1831.familyEnterpriseV1833.totalHeirTraining) + t.cost));
+    s.estateV1831.familyEnterpriseV1833.readiness = clamp(n(s.estateV1831.familyEnterpriseV1833.readiness) + Math.round(t.readiness / 2), 0, 100);
+    addEnterpriseHistory("Trained successor at " + b.name, -t.cost);
+    log("Invested in successor training for " + b.name + ".", { money: -remaining, confidence: 1 });
+    saveRender();
+  };
+
+  window.appointBusinessSuccessorV1840 = function (businessId, successorId) {
+    var s = ensureBusinessState();
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    ensureBusiness(b);
+    successorId = String(successorId || "professional");
+    var cost = successorId === "none" ? 0 : 2500;
+    if (cost > Math.max(0, n(s.money))) return toast("Successor paperwork needs " + compactMoney(cost) + " in checking.");
+    s.money = Math.max(0, round(n(s.money) - cost));
+    b.familyV1833.successor = successorId;
+    if (successorId !== "none") {
+      b.familyV1833.continuity = clamp(n(b.familyV1833.continuity) + 8, 0, 100);
+      s.estateV1831.familyEnterpriseV1833.readiness = clamp(n(s.estateV1831.familyEnterpriseV1833.readiness) + 3, 0, 100);
+      addEnterpriseHistory("Named successor for " + b.name, -cost);
+      log("Named a successor for " + b.name + ".", { money: -cost, stress: -1 });
+    } else {
+      addEnterpriseHistory("Cleared successor for " + b.name, 0);
+      toast("Successor cleared for " + b.name + ".");
+    }
+    saveRender();
+  };
+
+  window.appointBusinessSuccessorFromSelectV1840 = function (businessId, selectId) {
+    var value = "professional";
+    try {
+      var el = document.getElementById(selectId);
+      if (el && el.value) value = el.value;
+    } catch (e) {}
+    return window.appointBusinessSuccessorV1840(businessId, value);
+  };
+
+  window.toggleFamilyBusinessBoardV1840 = function (businessId) {
+    var s = ensureBusinessState();
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    if (b.familyV1833.board) return toast("Family board is already active for " + b.name + ".");
+    var cost = 50000;
+    var fromBiz = Math.min(cost, Math.max(0, n(b.retainedEarnings)));
+    var remaining = cost - fromBiz;
+    if (remaining > Math.max(0, n(s.money))) return toast("Family board needs " + compactMoney(cost) + " from company cash/checking.");
+    b.retainedEarnings = Math.max(0, round(n(b.retainedEarnings) - fromBiz));
+    s.money = Math.max(0, round(n(s.money) - remaining));
+    b.familyV1833.board = true;
+    b.familyV1833.continuity = clamp(n(b.familyV1833.continuity) + 18, 0, 100);
+    b.familyV1833.readiness = clamp(n(b.familyV1833.readiness) + 8, 0, 100);
+    addEnterpriseHistory("Created board for " + b.name, -cost);
+    log("Created a family business board for " + b.name + ".", { money: -remaining, confidence: 2 });
+    saveRender();
+  };
+
+  window.setBusinessDividendPolicyV1840 = function (businessId, policy) {
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    b.familyV1833.dividendPolicy = DIVIDENDS[policy] ? policy : "balanced";
+    addEnterpriseHistory("Dividend policy: " + b.name + " / " + DIVIDENDS[b.familyV1833.dividendPolicy].name, 0);
+    saveRender();
+  };
+
+  function assetTierCost(slotKey, tierIndex, v) {
+    var slot = ASSET_SLOTS[slotKey];
+    var tier = slot && slot.tiers[tierIndex];
+    if (!tier || !tier.costMult) return 0;
+    return Math.max(n(tier.costMin), Math.round(n(v && v.startup) * tier.costMult));
+  }
+
+  function businessAssetTotals(b) {
+    ensureBusiness(b);
+    var income = 0, riskCut = 0, repBonus = 0;
+    Object.keys(ASSET_SLOTS).forEach(function (slotKey) {
+      var slot = ASSET_SLOTS[slotKey];
+      var tierIndex = Math.min(n(b.assets[slotKey]), slot.tiers.length - 1);
+      var tier = slot.tiers[tierIndex];
+      if (!tier) return;
+      income += n(tier.incomeBonus);
+      riskCut += n(tier.riskCut);
+      repBonus += n(tier.repBonus);
+    });
+    return { income: Math.max(0, Math.min(.30, income)), riskCut: Math.max(0, Math.min(.10, riskCut)), repBonus: repBonus };
+  }
+
+  function businessAssetIncomeBonus(b) {
+    return businessAssetTotals(b).income;
+  }
+
+  function businessAssetRiskCut(b) {
+    return businessAssetTotals(b).riskCut;
+  }
+
+  window.upgradeBusinessAssetV1850 = function (businessId, slotKey) {
+    var s = ensureBusinessState();
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    ensureBusiness(b);
+    var slot = ASSET_SLOTS[slotKey];
+    if (!slot) return toast("Unknown asset slot.");
+    var currentTier = n(b.assets[slotKey]);
+    var nextIndex = currentTier + 1;
+    var tier = slot.tiers[nextIndex];
+    if (!tier) return toast(slot.label + " is already at its top tier for " + b.name + ".");
+    var v = catalogFor(b.id, b);
+    var cost = assetTierCost(slotKey, nextIndex, v);
+    var fromBiz = Math.min(cost, Math.max(0, n(b.retainedEarnings)));
+    var remaining = cost - fromBiz;
+    var tierName = tierLabel(b, slotKey, nextIndex, tier.name);
+    if (remaining > Math.max(0, n(s.money))) return toast(tierName + " needs " + compactMoney(cost) + " from company cash/checking.");
+    b.retainedEarnings = Math.max(0, round(n(b.retainedEarnings) - fromBiz));
+    s.money = Math.max(0, round(n(s.money) - remaining));
+    b.assets[slotKey] = nextIndex;
+    b.assetHistoryV1850.unshift({ age: round(n(s.age)), icon: slot.icon, event: "Upgraded " + slot.label + " to " + tierName, cost: cost });
+    b.assetHistoryV1850 = b.assetHistoryV1850.slice(0, 15);
+    log(slot.icon + " " + b.name + " upgraded " + slot.label.toLowerCase() + " to " + tierName + ".", { money: -remaining, confidence: 1 });
+    saveRender();
+  };
+
+  function ventureSignatureAction(b) {
+    if (VENTURE_ACTIONS[b.id]) return VENTURE_ACTIONS[b.id];
+    try { if (window.SECTOR_VENTURE_ACTIONS && window.SECTOR_VENTURE_ACTIONS[b.id]) return window.SECTOR_VENTURE_ACTIONS[b.id]; } catch (e) {}
+    return null;
+  }
+
+  window.runVentureSignatureActionV1850 = function (businessId) {
+    var s = ensureBusinessState();
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    ensureBusiness(b);
+    var action = ventureSignatureAction(b);
+    if (!action) return toast("No signature action for this business yet.");
+    var key = "venture_signature_" + b.id;
+    if (s.actionsTaken && s.actionsTaken[key]) return toast("Already done this year.");
+    var v = catalogFor(b.id, b);
+    var cost = Math.max(n(action.costMin), Math.round(n(v.startup) * n(action.costMult)));
+    var fromBiz = Math.min(cost, Math.max(0, n(b.retainedEarnings)));
+    var remaining = cost - fromBiz;
+    if (remaining > Math.max(0, n(s.money))) return toast(action.label + " needs " + compactMoney(cost) + " from company cash/checking.");
+    b.retainedEarnings = Math.max(0, round(n(b.retainedEarnings) - fromBiz));
+    s.money = Math.max(0, round(n(s.money) - remaining));
+    s.actionsTaken = s.actionsTaken || {};
+    s.actionsTaken[key] = true;
+    if (action.rep) b.reputation = clamp(n(b.reputation) + action.rep, 0, 100);
+    if (action.valueMult) b.value = Math.max(0, Math.round(n(b.value) * action.valueMult));
+    if (action.payoutMult) {
+      var payout = Math.round(n(b.value) * action.payoutMult * (.6 + Math.random() * .8));
+      b.retainedEarnings = Math.max(0, round(n(b.retainedEarnings) + payout));
+    }
+    try { if (typeof window.bumpSectorMeterV1851 === "function") window.bumpSectorMeterV1851(b, 10); } catch (e) {}
+    log(action.icon + " " + b.name + ": " + pickActionResult(action), { money: -remaining, confidence: 1 });
+    saveRender();
+  };
+
+  // v18.36: stage-gated second signature action. Unlocks once a business grows
+  // past the startup stage, giving long-lived ventures a bigger, costlier move
+  // instead of repeating the same one action forever. Keyed by sector with a
+  // generic "scale up" fallback.
+  var SECOND_ACTIONS = {
+    food:       { label: "Open a Second Location", icon: "🍽️", costMult: .9, costMin: 6000, rep: 9, valueMult: 1.14, results: ["Opened a second location across town.", "A new outpost doubled your reach."] },
+    nightlife:  { label: "Launch a Flagship Night", icon: "🎆", costMult: .7, costMin: 5000, rep: 10, payoutMult: .12, results: ["Launched a recurring flagship night that sells out.", "A signature event became a citywide draw."] },
+    retail:     { label: "Launch a Product Line", icon: "🏷️", costMult: .8, costMin: 5000, rep: 8, valueMult: 1.12, results: ["Launched an own-brand product line.", "A private-label range became your bestseller."] },
+    trades:     { label: "Buy a Truck Fleet", icon: "🚛", costMult: .8, costMin: 6000, rep: 8, valueMult: 1.13, results: ["Bought a truck fleet and tripled job capacity.", "Fleet expansion let you take on far bigger contracts."] },
+    media:      { label: "Build a Studio", icon: "🏛️", costMult: .9, costMin: 8000, rep: 10, valueMult: 1.15, results: ["Built a real studio and leveled up production.", "A dedicated studio attracted bigger projects."] },
+    tech:       { label: "Acquire a Competitor", icon: "🤝", costMult: 1.0, costMin: 10000, rep: 9, valueMult: 1.18, results: ["Acquired a smaller competitor and their userbase.", "An acqui-hire folded a rival team into yours."] },
+    finance:    { label: "Open a New Fund", icon: "🏦", costMult: .8, costMin: 15000, rep: 9, payoutMult: .1, results: ["Spun up a new fund and raised fresh capital.", "A second strategy pulled in a wave of allocations."] },
+    realestate: { label: "Break Ground on Development", icon: "🏗️", costMult: 1.0, costMin: 12000, rep: 9, valueMult: 1.16, results: ["Broke ground on a ground-up development.", "A development project reshaped the portfolio."] },
+    health:     { label: "Open a Second Clinic", icon: "🏥", costMult: .9, costMin: 9000, rep: 9, valueMult: 1.14, results: ["Opened a second clinic in a new neighborhood.", "A new location expanded patient capacity."] },
+    logistics:  { label: "Add a Distribution Hub", icon: "🏭", costMult: .9, costMin: 10000, rep: 8, valueMult: 1.15, results: ["Added a regional distribution hub.", "A new hub unlocked next-day coverage."] }
+  };
+  var SECOND_ACTION_GENERIC = { label: "Scale the Business", icon: "🚀", costMult: .8, costMin: 5000, rep: 8, valueMult: 1.12, results: ["Pushed a major expansion and leveled up.", "A big reinvestment pushed the business to a new tier."] };
+
+  function ventureSecondAction(b) {
+    if (!b || b.stage === "startup" || !b.stage) return null; // gated behind growth
+    var sid = null;
+    try { if (typeof window.sectorIdForBusinessV1851 === "function") sid = window.sectorIdForBusinessV1851(b); } catch (e) {}
+    if (!sid) {
+      try {
+        var nm = (window.SECTOR_OF && window.SECTOR_OF[b.id]) || b.sector || b.category;
+        if (window.LEDGER_SECTORS && nm) {
+          var s = window.LEDGER_SECTORS.find(function (x) { return x.name === nm || x.id === nm; });
+          if (s) sid = s.id;
+        }
+      } catch (e) {}
+    }
+    return (sid && SECOND_ACTIONS[sid]) || SECOND_ACTION_GENERIC;
+  }
+
+  window.runVentureSecondActionV1852 = function (businessId) {
+    var s = ensureBusinessState();
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    ensureBusiness(b);
+    var action = ventureSecondAction(b);
+    if (!action) return toast("This business needs to reach Growing stage first.");
+    var key = "venture_second_" + b.id;
+    if (s.actionsTaken && s.actionsTaken[key]) return toast("Already done this year.");
+    var v = catalogFor(b.id, b);
+    var cost = Math.max(n(action.costMin), Math.round(n(v.startup) * n(action.costMult)));
+    var fromBiz = Math.min(cost, Math.max(0, n(b.retainedEarnings)));
+    var remaining = cost - fromBiz;
+    if (remaining > Math.max(0, n(s.money))) return toast(action.label + " needs " + compactMoney(cost) + " from company cash/checking.");
+    b.retainedEarnings = Math.max(0, round(n(b.retainedEarnings) - fromBiz));
+    s.money = Math.max(0, round(n(s.money) - remaining));
+    s.actionsTaken = s.actionsTaken || {};
+    s.actionsTaken[key] = true;
+    if (action.rep) b.reputation = clamp(n(b.reputation) + action.rep, 0, 100);
+    if (action.valueMult) b.value = Math.max(0, Math.round(n(b.value) * action.valueMult));
+    if (action.payoutMult) {
+      var payout = Math.round(n(b.value) * action.payoutMult * (.6 + Math.random() * .8));
+      b.retainedEarnings = Math.max(0, round(n(b.retainedEarnings) + payout));
+    }
+    try { if (typeof window.bumpSectorMeterV1851 === "function") window.bumpSectorMeterV1851(b, 14); } catch (e) {}
+    log(action.icon + " " + b.name + ": " + pickActionResult(action), { money: -remaining, confidence: 2 });
+    saveRender();
+  };
+
+  // Dedicated per-sector action: the "thing you do to run this kind of business."
+  window.runSectorActionV1851 = function (businessId) {
+    var s = ensureBusinessState();
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    ensureBusiness(b);
+    var mech = (typeof window.sectorMechanicFor === "function") ? window.sectorMechanicFor(b) : null;
+    if (!mech) return toast("No sector action for this business.");
+    var key = "sector_action_" + b.id;
+    if (s.actionsTaken && s.actionsTaken[key]) return toast("Already done this year.");
+    var v = catalogFor(b.id, b);
+    var cost = Math.max(n(mech.actionCostMin), Math.round(n(v.startup) * n(mech.actionCostMult)));
+    var fromBiz = Math.min(cost, Math.max(0, n(b.retainedEarnings)));
+    var remaining = cost - fromBiz;
+    if (remaining > Math.max(0, n(s.money))) return toast(mech.actionLabel + " needs " + compactMoney(cost) + " from company cash/checking.");
+    b.retainedEarnings = Math.max(0, round(n(b.retainedEarnings) - fromBiz));
+    s.money = Math.max(0, round(n(s.money) - remaining));
+    s.actionsTaken = s.actionsTaken || {};
+    s.actionsTaken[key] = true;
+    if (typeof window.bumpSectorMeterV1851 === "function") window.bumpSectorMeterV1851(b);
+    var info = (typeof window.sectorMeterInfoV1851 === "function") ? window.sectorMeterInfoV1851(b) : null;
+    log((mech.actionIcon || "🔧") + " " + b.name + ": " + mech.actionLabel + "." + (info ? " " + mech.label + " now " + round(info.value) + "/100." : ""), { money: -remaining });
+    saveRender();
+  };
+
+  window.setEntrepreneurshipPathV1841 = function (path) {
+    var s = ensureBusinessState();
+    var f = s.finance;
+    path = FOUNDER_PATHS[path] ? path : "undecided";
+    f.entrepreneurshipV1841.path = path;
+    f.entrepreneurshipV1841.years = Math.max(0, round(f.entrepreneurshipV1841.years));
+    f.entrepreneurshipV1841.lastChangedAge = round(s.age);
+    if (path !== "undecided") {
+      s.stats.confidence = clamp(n(s.stats.confidence) + 1, 0, 200);
+      toast("Entrepreneurship path set: " + FOUNDER_PATHS[path].name + ".");
+    }
+    saveRender("entrepreneurship");
+  };
+
+  function addEnterpriseHistory(text, amount) {
+    var s = ensureBusinessState();
+    var fe = s.estateV1831.familyEnterpriseV1833;
+    fe.history.unshift({ age: round(s.age), text: text, amount: round(amount), at: Date.now ? Date.now() : 0 });
+    fe.history = fe.history.slice(0, 20);
+  }
+
+  function childrenOptions() {
+    var s = ensureBusinessState();
+    var out = [{ id: "none", name: "No named successor" }, { id: "professional", name: "Professional CEO / Trustee" }];
+    Object.keys(s.relationships || {}).forEach(function (key) {
+      var r = s.relationships[key];
+      if (!r) return;
+      var role = String(r.role || r.type || "").toLowerCase();
+      if (/child|son|daughter|spouse|partner|wife|husband/.test(role)) out.push({ id: key, name: (r.name || key) + " (" + (r.role || "family") + ")" });
+    });
+    (Array.isArray(s.children) ? s.children : []).forEach(function (kid, index) {
+      if (!kid) return;
+      var id = kid.id || ("child_" + index);
+      if (out.some(function (item) { return String(item.id) === String(id); })) return;
+      out.push({ id: id, name: (kid.name || ("Child " + (index + 1))) + " (child)" });
+    });
+    return out;
+  }
+
+  function structureName(id) {
+    return (STRUCTURES[id] || STRUCTURES.soleprop).name;
+  }
+
+  function riskFor(b) {
+    var v = catalogFor(b.id, b);
+    return clamp(n(b.failureRisk, n(v.failureRisk, .14)) - n(b.reputation) / 500 - (b.ops && b.ops.manager ? .04 : 0) - (b.ops && b.ops.counsel ? .04 : 0) - (b.ops && b.ops.insurance ? .03 : 0) - businessAssetRiskCut(b), .02, .7);
+  }
+
+  var STAGE_ICONS = { startup: "🌱", growing: "📈", breakout: "🚀" };
+  var CATEGORY_ICONS = {
+    // v18.35 clean sectors (10)
+    "Food & Drink": "🍔", "Nightlife & Events": "🌙", "Retail & Commerce": "🛍️", "Trades & Services": "🔧",
+    "Media & Entertainment": "🎬", "Tech & Startups": "💻", "Finance & Professional": "💼",
+    "Real Estate & Property": "🏢", "Health & Wellness": "🩺", "Logistics & Industrial": "🚚",
+    // legacy category labels kept for back-compat with old saves
+    "Services": "🔧", "Hospitality": "🍔", "Nightlife": "🍺", "Aviation": "✈️", "Print + Media": "🖨️",
+    "Media": "📰", "Local Services": "🏘️", "Logistics": "🚐", "Holdings": "🏦", "Business": "💼", "Venture": "🚀",
+    "Tech": "💻", "Consulting": "📊", "Finance": "💰", "Real Estate": "🏰", "Entertainment": "🎬", "Retail": "📦", "Healthcare": "🩺"
+  };
+
+  function sectorSort(list) {
+    try {
+      var ord = window.SECTOR_ORDER;
+      if (ord && ord.length) {
+        list.sort(function (a, b) {
+          var ia = ord.indexOf(a); var ib = ord.indexOf(b);
+          if (ia < 0) ia = 999; if (ib < 0) ib = 999;
+          return ia - ib;
+        });
+      }
+    } catch (e) {}
+    return list;
+  }
+
+  function stageIcon(stage) {
+    return STAGE_ICONS[stage] || STAGE_ICONS.startup;
+  }
+
+  function categoryIcon(category) {
+    return CATEGORY_ICONS[category] || "🏪";
+  }
+
+  function reputationBar(value) {
+    var pctValue = Math.max(0, Math.min(100, Math.round(n(value))));
+    var kind = pctValue >= 65 ? "high" : pctValue < 35 ? "low" : "";
+    return '<div class="bar"><div class="fill ' + kind + '" style="width:' + pctValue + '%"></div></div>';
+  }
+
+  function meterBar(value, barClass) {
+    var pctValue = Math.max(0, Math.min(100, Math.round(n(value))));
+    return '<div class="bar"><div class="fill ' + esc(barClass || "") + '" style="width:' + pctValue + '%"></div></div>';
+  }
+
+  // The sector's signature running meter (Health Rating / Buzz / MRR / AUM / ...).
+  function sectorMeterRow(b) {
+    var info = null;
+    try { if (typeof window.sectorMeterInfoV1851 === "function") info = window.sectorMeterInfoV1851(b); } catch (e) {}
+    if (!info) return "";
+    var used = !!(stateNow().actionsTaken || {})["sector_action_" + b.id];
+    var multClass = info.kind === "good" ? "good" : info.kind === "bad" ? "bad" : "gold";
+    return '<div class="row v1851-sector-meter"><div style="flex:1">' +
+      '<div class="row-title">' + esc(info.icon) + ' ' + esc(info.label) + ': ' + round(info.value) + '/100 ' +
+      '<span class="' + multClass + '" style="font-size:11px;font-weight:600">· ' + esc(info.multLabel) + '</span></div>' +
+      '<div class="row-sub">' + meterBar(info.value, info.barClass) + '</div>' +
+      '<div class="row-sub">' + esc(info.note) + '</div>' +
+      '<div class="v1840-action-strip" style="margin-top:8px">' +
+      actionButton(info.actionIcon + " " + info.actionLabel + " (" + compactMoney(info.actionCost) + ")", "runSectorActionV1851('" + esc(b.id) + "')", "blue", used || typeof window.runSectorActionV1851 !== "function") +
+      '</div></div></div>';
+  }
+
+  function metric(label, value, note, kind) {
+    return '<div class="v1840-metric ' + esc(kind || "") + '"><span>' + esc(label) + '</span><b>' + esc(value) + '</b><em>' + esc(note || "") + '</em></div>';
+  }
+
+  function hero() {
+    var s = ensureBusinessState();
+    var list = businesses();
+    var last = n(s.finance.lastEntrepreneurIncome || s.finance.lastBusinessIncome);
+    var score = enterpriseScore();
+    return '<section class="v1840-hero"><div><div class="section-label">💼 Business command center</div><h2>Business Office</h2><p>Companies, entity cash, owner payouts, business taxes, acquisitions, family enterprise, trust ownership, and succession live in one cleaner desk.</p><div class="v1840-chip-row">' +
+      '<span>' + list.length + ' businesses</span><span class="' + (last >= 0 ? "good" : "bad") + '">Last income ' + signedMoney(last) + '</span><span>Company cash ' + compactMoney(totalCompanyCash()) + '</span><span class="' + (legalTrustActive() ? "good" : "gold") + '">' + (legalTrustActive() ? "Trust active" : "No trust") + '</span><span>Dynasty ' + score + '/100</span>' +
+      '</div></div><strong>' + compactMoney(totalBusinessValue()) + '<span>business value</span></strong></section>';
+  }
+
+  function kpis() {
+    return '<section class="v1840-kpi-row">' +
+      metric("💰 Company value", compactMoney(totalBusinessValue()), "Business value plus company cash.", "gold") +
+      metric("🏦 Company cash", compactMoney(totalCompanyCash()), "Money inside companies, not personal checking.", "good") +
+      metric("⚠️ Entity tax debt", compactMoney(totalEntityDebt()), "Taxes owed by companies.", totalEntityDebt() ? "bad" : "good") +
+      metric("📋 Compliance due", compactMoney(totalCompliance()), "Admin/legal bills paid from company cash.", totalCompliance() ? "gold" : "good") +
+      metric("🏛️ Trust stake", compactMoney(trustBusinessValue()), "Business ownership titled to family trust.", trustBusinessValue() ? "good" : "gold") +
+      '</section>';
+  }
+
+  function founderMode() {
+    var s = ensureBusinessState();
+    var hasBiz = businesses().length > 0;
+    return '<section class="panel v1840-founder-mode"><div class="section-label">🧭 Founder mode</div><div class="v1840-mode-grid">' +
+      '<div class="' + (!s.finance.businessCareer ? "active " : "") + 'v1840-mode-card"><span>Side entrepreneur</span><b>Keep career income</b><em>Lower upside, lower pressure. Useful while building the first company.</em>' + actionButton("Use Side Path", "leaveEntrepreneurFullTime()", "", !s.finance.businessCareer || typeof window.leaveEntrepreneurFullTime !== "function") + '</div>' +
+      '<div class="' + (s.finance.businessCareer ? "active " : "") + 'v1840-mode-card"><span>Full-time founder</span><b>Business becomes career</b><em>Higher business upside and stress. Better when portfolio has traction.</em>' + actionButton("Go Full-Time", "goEntrepreneurFullTime()", "gold", s.age < 18 || s.finance.businessCareer || !hasBiz || typeof window.goEntrepreneurFullTime !== "function") + '</div>' +
+      '</div></section>';
+  }
+
+  function businessRail() {
+    var list = businesses();
+    if (!list.length) {
+      return '<section class="panel v1840-business-rail"><div class="section-label">🏢 Owned companies</div><div class="v1840-empty">No business yet. Use the launch or acquisition rail below when you meet the requirements.</div></section>';
+    }
+    var focus = focusBusiness();
+    var cards = list.map(function (b) {
+      ensureBusiness(b);
+      var risk = riskFor(b);
+      var selected = focus && String(focus.id) === String(b.id);
+      return '<button class="v1840-company-card ' + (selected ? "selected" : "") + '" onclick="event.preventDefault();event.stopPropagation();setBusinessFocusV1840(\'' + esc(b.id) + '\')">' +
+        '<span>' + categoryIcon(b.category) + ' ' + esc(b.category || "Business") + '</span><b>' + esc(b.name) + '</b><em>' + stageIcon(b.stage) + ' ' + esc(structureName(b.entityType)) + ' / ' + esc(b.stage || "startup") + ' / ' + round(b.years) + ' yrs</em>' +
+        reputationBar(b.reputation) +
+        '<div class="v1840-company-stats"><i>' + compactMoney(businessValue(b)) + '</i><i>' + compactMoney(b.retainedEarnings) + ' cash</i><i class="' + (risk >= .24 ? "bad" : risk <= .08 ? "good" : "gold") + '">' + pct(risk) + ' risk</i></div>' +
+        '</button>';
+    }).join("");
+    return '<section class="panel v1840-business-rail"><div class="v1840-panel-head"><div><div class="section-label">🏢 Owned companies</div><h3>Portfolio rail</h3></div><span>Click a company to focus details below.</span></div><div class="v1840-rail">' + cards + '</div></section>';
+  }
+
+  function assetRows(b) {
+    return Object.keys(ASSET_SLOTS).map(function (slotKey) {
+      var slot = ASSET_SLOTS[slotKey];
+      var tierIndex = Math.min(n(b.assets[slotKey]), slot.tiers.length - 1);
+      var current = slot.tiers[tierIndex];
+      var next = slot.tiers[tierIndex + 1];
+      var v = catalogFor(b.id, b);
+      var currentName = tierLabel(b, slotKey, tierIndex, current.name);
+      if (!next) {
+        return '<div class="row"><div><div class="row-title">' + slot.icon + ' ' + esc(slot.label) + ': ' + esc(currentName) + ' (max)</div><div class="row-sub">' + esc(current.desc) + '</div></div><button class="icon-btn" disabled>Maxed</button></div>';
+      }
+      var nextName = tierLabel(b, slotKey, tierIndex + 1, next.name);
+      var cost = assetTierCost(slotKey, tierIndex + 1, v);
+      var afford = n(b.retainedEarnings) + n(stateNow().money) >= cost;
+      return '<div class="row"><div><div class="row-title">' + slot.icon + ' ' + esc(slot.label) + ': ' + esc(currentName) + '</div><div class="row-sub">Next: ' + esc(nextName) + ' - ' + esc(next.desc) + ' - +' + Math.round(n(next.incomeBonus) * 100) + '% income' + (next.riskCut ? ', -' + Math.round(n(next.riskCut) * 100) + '% risk' : '') + (next.repBonus ? ', faster reputation' : '') + '</div></div><button class="icon-btn" onclick="event.preventDefault();event.stopPropagation();upgradeBusinessAssetV1850(\'' + esc(b.id) + '\',\'' + slotKey + '\')" ' + (afford && typeof window.upgradeBusinessAssetV1850 === "function" ? "" : "disabled") + '>' + compactMoney(cost) + '</button></div>';
+    }).join("");
+  }
+
+  function assetHistoryFeed(b) {
+    var rows = (b.assetHistoryV1850 || []).slice(0, 5);
+    if (!rows.length) return '<div class="v1840-note">No asset upgrades yet.</div>';
+    return rows.map(function (h) {
+      return '<div class="row"><div><div class="row-title">' + esc(h.icon || "🏗️") + ' ' + esc(h.event || "Asset upgrade") + '</div><div class="row-sub">Age ' + esc(h.age == null ? "?" : h.age) + ' - ' + compactMoney(h.cost || 0) + '</div></div></div>';
+    }).join("");
+  }
+
+  function eventHistoryFeed(b) {
+    var rows = (b.eventHistoryV1850 || []).slice(0, 5);
+    if (!rows.length) return '<div class="v1840-note">No market events yet. They happen occasionally as the business ages.</div>';
+    return rows.map(function (h) {
+      return '<div class="row"><div><div class="row-title">' + esc(h.icon || "📰") + ' ' + esc(h.event || "Market event") + '</div><div class="row-sub">Age ' + esc(h.age == null ? "?" : h.age) + '</div></div></div>';
+    }).join("");
+  }
+
+  function focusDesk() {
+    var b = focusBusiness();
+    if (!b) return "";
+    ensureBusiness(b);
+    var st = STRUCTURES[b.entityType] || STRUCTURES.soleprop;
+    var id = safeId(b.id);
+    var distMax = Math.max(0, round(b.retainedEarnings));
+    var entityDebt = Math.max(0, round(b.entityTaxDebt));
+    var compliance = Math.max(0, round(b.complianceDue));
+    var signatureAction = ventureSignatureAction(b);
+    var signatureUsed = !!(stateNow().actionsTaken || {})["venture_signature_" + b.id];
+    var secondAction = ventureSecondAction(b);
+    var secondUsed = !!(stateNow().actionsTaken || {})["venture_second_" + b.id];
+    var entityOptions = Object.keys(STRUCTURES).map(function (key) {
+      var option = STRUCTURES[key];
+      var locked = n(b.value) < option.minValue;
+      var active = b.entityType === key;
+      return '<button class="v1840-option ' + (active ? "active" : "") + '" onclick="event.preventDefault();event.stopPropagation();setBusinessEntityV1830(\'' + esc(b.id) + '\',\'' + esc(key) + '\')" ' + (active || locked || typeof window.setBusinessEntityV1830 !== "function" ? "disabled" : "") + '><span>' + esc(option.name) + '</span><b>' + compactMoney(option.cost) + '</b><em>' + (locked ? "Needs " + compactMoney(option.minValue) + " value" : esc(option.desc)) + '</em></button>';
+    }).join("");
+    var opsBudget = distMax + Math.max(0, round(stateNow().money)); // company + personal
+    var ops = Object.keys(OPS).map(function (key) {
+      var op = OPS[key];
+      var active = b.ops && b.ops[key];
+      return '<button class="v1840-option ' + (active ? "active" : "") + '" onclick="event.preventDefault();event.stopPropagation();hireBusinessOpsV1830(\'' + esc(b.id) + '\',\'' + esc(key) + '\')" ' + (active || opsBudget < op.cost || typeof window.hireBusinessOpsV1830 !== "function" ? "disabled" : "") + '><span>' + esc(op.name) + '</span><b>' + compactMoney(op.cost) + '</b><em>' + esc(op.note) + '</em></button>';
+    }).join("");
+    return '<section class="panel v1840-focus-desk"><div class="v1840-panel-head"><div><div class="section-label">🎯 Focused company</div><h3>' + stageIcon(b.stage) + ' ' + esc(b.name) + '</h3><p>' + esc(st.desc) + '</p></div><strong>' + compactMoney(businessValue(b)) + '<span>' + esc(structureName(b.entityType)) + '</span></strong></div>' +
+      '<div class="v1840-metric-grid">' +
+      metric("Company cash", compactMoney(b.retainedEarnings), "Inside the business. Distribute, reinvest, or pay tax below.", "good") +
+      metric("Last income", signedMoney(b.lastIncome), n(b.lastEnterpriseYieldV1851) > 0 ? "Operations + " + compactMoney(b.lastEnterpriseYieldV1851) + " yield on company value." : "Last year's business result (after the sector meter).", n(b.lastIncome) >= 0 ? "good" : "bad") +
+      metric("Auto dividend / yr", compactMoney(b.lastDividend), b.stage === "startup" ? "Reach Growing stage to start paying an automatic yearly dividend to your checking." : "Paid to your personal checking automatically every year on top of income.", n(b.lastDividend) > 0 ? "good" : "gold") +
+      metric("Entity debt", compactMoney(entityDebt), "Company tax balance.", entityDebt ? "bad" : "good") +
+      metric("Protection", pct(n(st.shield) + (b.ops && b.ops.counsel ? .12 : 0) + (b.ops && b.ops.insurance ? .1 : 0)), "Entity and ops shield.", "gold") +
+      '</div>' +
+      '<div class="row"><div><div class="row-title">⭐ Reputation: ' + round(b.reputation) + '/100</div><div class="row-sub">' + reputationBar(b.reputation) + '</div></div></div>' +
+      sectorMeterRow(b) +
+      (typeof window.renderBizChallengesPanelV1853 === "function" ? window.renderBizChallengesPanelV1853(b) : "") +
+      '<div class="v1840-action-strip">' +
+      actionButton("Work", "workVenture('" + esc(b.id) + "')", "blue", typeof window.workVenture !== "function" || (stateNow().actionsTaken || {})["venture_" + b.id]) +
+      actionButton("Market", "bizAction('" + esc(b.id) + "','market')", "blue", typeof window.bizAction !== "function" || (stateNow().actionsTaken || {})["biz_" + b.id + "_market"]) +
+      actionButton("Upgrade", "bizAction('" + esc(b.id) + "','equipment')", "gold", typeof window.bizAction !== "function" || (stateNow().actionsTaken || {})["biz_" + b.id + "_equipment"]) +
+      (signatureAction ? actionButton(signatureAction.icon + " " + signatureAction.label, "runVentureSignatureActionV1850('" + esc(b.id) + "')", "gold", signatureUsed || typeof window.runVentureSignatureActionV1850 !== "function") : "") +
+      (secondAction ? actionButton(secondAction.icon + " " + secondAction.label, "runVentureSecondActionV1852('" + esc(b.id) + "')", "green", secondUsed || typeof window.runVentureSecondActionV1852 !== "function") : "") +
+      actionButton("Sell", "sellVenture('" + esc(b.id) + "')", "red", typeof window.sellVenture !== "function") +
+      '</div>' +
+      '<div class="v1840-two-col"><div><div class="section-label">🏗️ Entity structure</div><div class="v1840-option-rail">' + entityOptions + '</div></div><div><div class="section-label">👥 Operations team</div><div class="v1840-option-rail">' + ops + '</div></div></div>' +
+      '<div class="v1840-two-col"><div><div class="section-label">🏗️ Assets</div>' + assetRows(b) + '</div><div><div class="section-label">📜 Asset history</div>' + assetHistoryFeed(b) + '</div></div>' +
+      '<div><div class="section-label">📰 Recent market events</div>' + eventHistoryFeed(b) + '</div>' +
+      '<div class="v1840-two-col"><div><div class="section-label">💵 Company cash: where it can go</div>' +
+      '<div class="v1851-cash-explain"><b>' + compactMoney(b.retainedEarnings) + '</b> is held inside the company &mdash; this is <b>not</b> your personal checking. Move it three ways:</div>' +
+      '<div class="v1851-cash-group"><span class="v1851-cash-label">🧍 Take it out &rarr; your personal checking</span>' +
+      '<div class="v1840-action-strip">' +
+      actionButton("Distribute All", "distributeBusinessCashV1830('" + esc(b.id) + "','all')", "green", !distMax || typeof window.distributeBusinessCashV1830 !== "function") +
+      actionButton("Pay $25K Salary", "payOwnerSalaryV1830('" + esc(b.id) + "',25000)", "blue", !distMax || typeof window.payOwnerSalaryV1830 !== "function") +
+      '</div>' +
+      customRow("v1830-dist-" + id, distMax, "distributeBusinessCashV1830('" + esc(b.id) + "','custom')", "Distribute", "green", typeof window.distributeBusinessCashV1830 !== "function") +
+      '</div>' +
+      '<div class="v1851-cash-group"><span class="v1851-cash-label">📈 Reinvest &rarr; grows company value</span>' +
+      '<div class="v1840-action-strip">' +
+      actionButton("Reinvest Half", "reinvestBusinessCashV1830('" + esc(b.id) + "','half')", "gold", !distMax || typeof window.reinvestBusinessCashV1830 !== "function") +
+      '</div>' +
+      customRow("v1830-reinvest-" + id, distMax, "reinvestBusinessCashV1830('" + esc(b.id) + "','custom')", "Reinvest", "gold", typeof window.reinvestBusinessCashV1830 !== "function") +
+      '</div>' +
+      '<div class="v1851-cash-group"><span class="v1851-cash-label">🧾 Pay company obligations</span>' +
+      '<div class="v1840-action-strip">' +
+      actionButton(entityDebt ? "Pay Tax " + compactMoney(entityDebt) : "Pay Tax", "payBusinessEntityTaxV1830('" + esc(b.id) + "','all')", "red", !entityDebt || !distMax || typeof window.payBusinessEntityTaxV1830 !== "function") +
+      actionButton(compliance ? "Pay Compliance " + compactMoney(compliance) : "Pay Compliance", "payBusinessComplianceV1830('" + esc(b.id) + "')", "", !compliance || !distMax || typeof window.payBusinessComplianceV1830 !== "function") +
+      '</div></div>' +
+      '</div><div><div class="section-label">Nameplate</div><div class="v1840-rename-row"><input id="v1840-rename-' + esc(id) + '" placeholder="Rename company"><button class="money-btn" onclick="event.preventDefault();event.stopPropagation();renameBusinessV1840(\'' + esc(b.id) + '\',\'v1840-rename-' + esc(id) + '\')">Rename</button></div><p class="v1840-note">Business value is not checking. Distributions and salaries become personal cash; retained earnings stay inside the company.</p></div></div>' +
+      '</section>';
+  }
+
+  function familyEnterpriseDesk() {
+    var s = ensureBusinessState();
+    var e = s.estateV1831;
+    var fe = e.familyEnterpriseV1833;
+    var b = focusBusiness();
+    var g = GOVERNANCE[fe.governance] || GOVERNANCE.informal;
+    var missionOptions = Object.keys(MISSIONS).map(function (key) {
+      return '<option value="' + esc(key) + '" ' + (fe.mission === key ? "selected" : "") + '>' + esc(MISSIONS[key]) + '</option>';
+    }).join("");
+    var governanceCards = Object.keys(GOVERNANCE).map(function (key) {
+      var option = GOVERNANCE[key];
+      var active = fe.governance === key;
+      return '<button class="v1840-option ' + (active ? "active" : "") + '" onclick="event.preventDefault();event.stopPropagation();setFamilyGovernanceV1840(\'' + esc(key) + '\')" ' + (active ? "disabled" : "") + '><span>' + esc(option.name) + '</span><b>' + compactMoney(option.cost) + '</b><em>' + esc(option.desc) + '</em></button>';
+    }).join("");
+    var focusedTrust = b ? focusedTrustControls(b) : '<div class="v1840-empty">Own a business to title shares into the trust and train successors.</div>';
+    return '<section class="panel v1840-family-enterprise"><div class="v1840-panel-head"><div><div class="section-label">👨‍👩‍👧 Family enterprise</div><h3>Trust + succession desk</h3><p>Business trust work uses Legal trust status, then keeps company-level control here.</p></div><strong>' + enterpriseScore() + '<span>dynasty score</span></strong></div>' +
+      '<div class="v1840-metric-grid">' +
+      metric("Trust liquidity", compactMoney(trustCash()), "Family trust corpus plus estate trust cash.", legalTrustActive() ? "good" : "gold") +
+      metric("Business stake", compactMoney(trustBusinessValue()), "Company value titled to the trust.", trustBusinessValue() ? "good" : "gold") +
+      metric("Governance", g.name, "Harmony " + round(fe.harmony) + "/100, disputes " + round(fe.disputes) + ".", fe.governance === "informal" ? "gold" : "good") +
+      metric("Heir readiness", averageReadiness() + "/100", "Successor training and continuity.", averageReadiness() >= 50 ? "good" : "gold") +
+      '</div>' +
+      '<div class="v1840-two-col"><div><div class="section-label">🎯 Mission</div><select class="v1840-select" onchange="event.preventDefault();event.stopPropagation();setFamilyMissionV1840(this.value)">' + missionOptions + '</select><div class="v1840-action-strip">' +
+      actionButton("Succession Meeting", "holdFamilyCouncilV1840('succession')", "gold", !legalTrustActive()) +
+      actionButton("Conflict Mediation", "holdFamilyCouncilV1840('conflict')", "red", !legalTrustActive()) +
+      actionButton("Heir Education", "holdFamilyCouncilV1840('education')", "blue", !legalTrustActive()) +
+      '</div></div><div><div class="section-label">🏛️ Governance rail</div><div class="v1840-option-rail">' + governanceCards + '</div></div></div>' +
+      focusedTrust +
+      historyDesk() +
+      '</section>';
+  }
+
+  function focusedTrustControls(b) {
+    ensureBusiness(b);
+    var id = safeId(b.id);
+    var fam = b.familyV1833;
+    var trustPct = n(fam.trustPercent);
+    var distributable = Math.max(0, round(n(b.retainedEarnings) * trustPct));
+    var loanMax = trustCash();
+    var repayMax = Math.min(Math.max(0, n(fam.trustLoan)), Math.max(0, n(b.retainedEarnings)));
+    var selectId = "v1840-successor-" + id;
+    var successors = childrenOptions().map(function (item) {
+      return '<option value="' + esc(item.id) + '" ' + (String(fam.successor) === String(item.id) ? "selected" : "") + '>' + esc(item.name) + '</option>';
+    }).join("");
+    var chosen = childrenOptions().find(function (item) { return String(item.id) === String(fam.successor); }) || childrenOptions()[0];
+    var policyButtons = Object.keys(DIVIDENDS).map(function (key) {
+      return actionButton(DIVIDENDS[key].name, "setBusinessDividendPolicyV1840('" + esc(b.id) + "','" + esc(key) + "')", fam.dividendPolicy === key ? "gold" : "", false);
+    }).join("");
+    var trainingButtons = Object.keys(TRAINING).map(function (key) {
+      return actionButton(TRAINING[key].name, "trainBusinessSuccessorV1840('" + esc(b.id) + "','" + esc(key) + "')", "", fam.successor === "none");
+    }).join("");
+    return '<div class="v1840-focused-trust"><div class="section-label">🤝 Focused trust controls</div><div class="v1840-trust-head"><b>' + esc(b.name) + '</b><span>' + Math.round(trustPct * 100) + '% in trust / readiness ' + round(fam.readiness) + '/100 / continuity ' + round(fam.continuity) + '/100</span></div>' +
+      '<div class="v1840-action-strip">' +
+      actionButton("25% Trust", "setBusinessTrustPercentV1840('" + esc(b.id) + "',25)", "", !legalTrustActive()) +
+      actionButton("51% Control", "setBusinessTrustPercentV1840('" + esc(b.id) + "',51)", "gold", !legalTrustActive()) +
+      actionButton("100% Dynasty", "setBusinessTrustPercentV1840('" + esc(b.id) + "',100)", "green", !legalTrustActive()) +
+      actionButton("Remove Trust Stake", "setBusinessTrustPercentV1840('" + esc(b.id) + "',0)", "red", false) +
+      actionButton("Create Board", "toggleFamilyBusinessBoardV1840('" + esc(b.id) + "')", "blue", !!fam.board) +
+      '</div>' +
+      '<div class="v1840-two-col"><div><div class="section-label">👑 Successor</div><div class="v1840-selected-line">Current: <b>' + esc(chosen ? chosen.name : "No named successor") + '</b></div><select id="' + esc(selectId) + '" class="v1840-select">' + successors + '</select><div class="v1840-action-strip">' + actionButton("Set Successor", "appointBusinessSuccessorFromSelectV1840('" + esc(b.id) + "','" + esc(selectId) + "')", "blue", false) + trainingButtons + '</div></div>' +
+      '<div><div class="section-label">💵 Dividend policy</div><div class="v1840-action-strip">' + policyButtons + '</div>' + customRow("v1840-div-" + id, distributable, "payBusinessDividendToTrustV1840('" + esc(b.id) + "','custom')", "Pay Dividend", "green", !legalTrustActive() || !trustPct || !distributable) + actionButton("Pay Max Dividend", "payBusinessDividendToTrustV1840('" + esc(b.id) + "','all')", "green", !legalTrustActive() || !trustPct || !distributable) + '</div></div>' +
+      '<div class="v1840-two-col"><div><div class="section-label">💰 Trust finances company</div>' + customRow("v1840-loan-" + id, loanMax, "trustLoanToBusinessV1840('" + esc(b.id) + "','custom')", "Trust To Business", "blue", !legalTrustActive() || !loanMax) + actionButton("Use 25% Trust Cash", "trustLoanToBusinessV1840('" + esc(b.id) + "','quarter')", "blue", !legalTrustActive() || !loanMax) + '</div>' +
+      '<div><div class="section-label">💳 Repay trust loan</div>' + customRow("v1840-repay-" + id, repayMax, "repayTrustLoanV1840('" + esc(b.id) + "','custom')", "Repay Trust", "", !repayMax) + actionButton("Repay Max", "repayTrustLoanV1840('" + esc(b.id) + "','all')", "", !repayMax) + '</div></div>' +
+      '</div>';
+  }
+
+  function historyDesk() {
+    var rows = (ensureBusinessState().estateV1831.familyEnterpriseV1833.history || []).slice(0, 5);
+    if (!rows.length) return "";
+    return '<div class="v1840-history"><div class="section-label">📜 Enterprise ledger</div>' + rows.map(function (row) {
+      var icon = n(row.amount) > 0 ? "✅" : n(row.amount) < 0 ? "📉" : "📝";
+      return '<div><span>Age ' + esc(row.age == null ? "?" : row.age) + '</span><b>' + icon + ' ' + esc(row.text || "Business event") + '</b><em class="' + (n(row.amount) >= 0 ? "good" : "bad") + '">' + signedMoney(row.amount || 0) + '</em></div>';
+    }).join("") + '</div>';
+  }
+
+  function launchFilterState() {
+    var existing = window.__ledgerLaunchFilterV1850 || {};
+    var filter = { category: existing.category || "all", search: existing.search || "" };
+    window.__ledgerLaunchFilterV1850 = filter;
+    return filter;
+  }
+
+  window.setLaunchFilterV1850 = function (key, value) {
+    var filter = launchFilterState();
+    filter[key] = value;
+    if (typeof window.renderHubInPlaceV16 === "function") window.renderHubInPlaceV16("business");
+    else if (typeof render === "function") render();
+  };
+
+  window.setLaunchSearchV1850 = function (value) {
+    var filter = launchFilterState();
+    filter.search = String(value || "");
+    window.filterLaunchCardsDomV1850();
+  };
+
+  window.filterLaunchCardsDomV1850 = function () {
+    if (typeof document === "undefined" || !document.querySelectorAll) return;
+    var filter = launchFilterState();
+    var search = String(filter.search || "").toLowerCase().trim();
+    var cards = Array.prototype.slice.call(document.querySelectorAll("[data-launch-card='1']"));
+    var visibleGroups = {};
+    cards.forEach(function (card) {
+      var hay = String((card.dataset && card.dataset.search) || "").toLowerCase();
+      var show = !search || hay.indexOf(search) >= 0;
+      card.style.display = show ? "" : "none";
+      if (show && card.dataset && card.dataset.group) visibleGroups[card.dataset.group] = true;
+    });
+    var groups = Array.prototype.slice.call(document.querySelectorAll("[data-launch-group]"));
+    groups.forEach(function (group) {
+      group.style.display = !search || visibleGroups[group.dataset.launchGroup] ? "" : "none";
+    });
+  };
+
+  function launchRail() {
+    var s = ensureBusinessState();
+    var owned = businesses();
+    var filter = launchFilterState();
+    var fullCatalog = businessCatalog().filter(function (v) {
+      return v && v.id && String(v.id).indexOf("acq_") !== 0;
+    });
+    // Sort everything cheapest-first: sectors by their cheapest venture, and the
+    // ventures inside each sector by startup cost — so the easy, low-cost ways in
+    // are at the top and the big-money, high-potential plays sit at the bottom.
+    var catMinCost = {};
+    fullCatalog.forEach(function (v) {
+      var cat = v.category || "Business";
+      var sc = n(v.startup);
+      if (catMinCost[cat] == null || sc < catMinCost[cat]) catMinCost[cat] = sc;
+    });
+    var byCheapestSector = function (a, b) { return n(catMinCost[a]) - n(catMinCost[b]); };
+    var categories = Object.keys(catMinCost).sort(byCheapestSector);
+    var catalog = filter.category === "all" ? fullCatalog : fullCatalog.filter(function (v) { return (v.category || "Business") === filter.category; });
+    if (!fullCatalog.length) return "";
+    var catOptions = '<option value="all"' + (filter.category === "all" ? " selected" : "") + '>All categories</option>' + categories.map(function (cat) {
+      return '<option value="' + esc(cat) + '"' + (filter.category === cat ? " selected" : "") + '>' + esc(categoryIcon(cat)) + ' ' + esc(cat) + '</option>';
+    }).join("");
+    var groups = {};
+    var order = [];
+    catalog.forEach(function (v) {
+      var cat = v.category || "Business";
+      if (!groups[cat]) { groups[cat] = []; order.push(cat); }
+      groups[cat].push(v);
+    });
+    order.sort(byCheapestSector);
+    var sections = order.map(function (cat) {
+      groups[cat].sort(function (a, b) { return n(a.startup) - n(b.startup); });
+      var cards = groups[cat].map(function (v) {
+        var exists = owned.some(function (b) { return String(b.id) === String(v.id); });
+        var missing = [];
+        if (n(s.age) < n(v.minAge, 18)) missing.push("Age " + n(v.minAge, 18) + "+");
+        if (n(s.money) < n(v.startup)) missing.push(compactMoney(v.startup) + " cash");
+        if (exists) missing.push("Owned");
+        var ready = !missing.length;
+        var risk = n(v.failureRisk, .12);
+        var riskTag = risk >= .30 ? '<i class="bad">High risk</i>' : risk >= .18 ? '<i class="gold">Medium risk</i>' : '<i class="good">Low risk</i>';
+        var searchHay = esc(String((v.name || "") + " " + (v.desc || "") + " " + (v.category || "")).toLowerCase());
+        return '<button class="v1840-launch-card ' + (ready ? "ready" : "") + '" data-launch-card="1" data-group="' + esc(cat) + '" data-search="' + searchHay + '" onclick="event.preventDefault();event.stopPropagation();startVenture(\'' + esc(v.id) + '\')" ' + (!ready || typeof window.startVenture !== "function" ? "disabled" : "") + '><span>' + categoryIcon(v.category) + ' ' + esc(v.category || "Business") + '</span><b>' + esc(v.name || v.id) + '</b><em>' + esc(v.desc || "Business path.") + '</em><div class="v1840-company-stats">' + riskTag + '</div><strong>' + (ready ? "Start " + compactMoney(v.startup) : missing.join(" / ")) + '</strong></button>';
+      }).join("");
+      return '<div class="v1840-launch-group" data-launch-group="' + esc(cat) + '"><div class="v1840-launch-group-label">' + categoryIcon(cat) + ' ' + esc(cat) + '</div><div class="v1840-rail">' + cards + '</div></div>';
+    }).join("");
+    if (!sections) sections = '<div class="v1840-empty">No ventures match that category.</div>';
+    return '<section class="panel v1840-launch-board"><div class="v1840-panel-head"><div><div class="section-label">🚀 Launch board</div><h3>Start from scratch</h3></div><span>' + fullCatalog.length + ' ventures - cheapest first, big-money plays at the bottom.</span></div>' +
+      '<div class="v1840-launch-controls"><input type="text" placeholder="🔍 Search ventures..." value="' + esc(filter.search) + '" oninput="setLaunchSearchV1850(this.value)"><select onchange="setLaunchFilterV1850(\'category\', this.value)">' + catOptions + '</select></div>' +
+      sections + '</section>';
+  }
+
+  function acquisitionRail() {
+    var s = ensureBusinessState();
+    var catalog = acquisitionCatalog().slice(0, 18);
+    if (!catalog.length) return "";
+    var cards = catalog.map(function (v) {
+      var price = n(v.buy || n(v.startup) * 2 || 50000);
+      var missing = [];
+      if (n(s.age) < n(v.minAge, 18)) missing.push("Age " + n(v.minAge, 18) + "+");
+      if (n(s.money) < price) missing.push(compactMoney(price) + " cash");
+      var ready = !missing.length;
+      return '<button class="v1840-launch-card acquisition ' + (ready ? "ready" : "") + '" onclick="event.preventDefault();event.stopPropagation();buyCompany(\'' + esc(v.id) + '\')" ' + (!ready || typeof window.buyCompany !== "function" ? "disabled" : "") + '><span>' + categoryIcon(v.category) + ' ' + esc(v.category || "Acquisition") + '</span><b>' + esc(v.name || v.id) + '</b><em>' + esc(v.desc || "Buy an existing company.") + '</em><strong>' + (ready ? "Buy around " + compactMoney(price) : missing.join(" / ")) + '</strong></button>';
+    }).join("");
+    return '<section class="panel v1840-launch-board"><div class="v1840-panel-head"><div><div class="section-label">🤝 Acquisition market</div><h3>Buy existing companies</h3></div><span>Purchases create one focused company card.</span></div><div class="v1840-rail">' + cards + '</div></section>';
+  }
+
+  function openHubCode(hub) {
+    hub = esc(hub);
+    return "(window.setTabV16 || window.setTab || setTab)('" + hub + "')";
+  }
+
+  function entrepreneurshipShortcut() {
+    var s = ensureBusinessState();
+    var founder = s.finance.entrepreneurshipV1841;
+    var path = FOUNDER_PATHS[founder.path] || FOUNDER_PATHS.undecided;
+    return '<section class="panel v1841-business-shortcut"><div class="v1840-panel-head"><div><div class="section-label">🧭 Entrepreneurship path</div><h3>' + esc(path.name) + '</h3><p>Founder identity, full-time choice, thesis, and long-game direction now live in their own hub. This Business office stays focused on owned companies.</p></div><strong>' + esc(path.tag) + '<span>active path</span></strong></div><div class="v1840-action-strip">' + actionButton("Open Entrepreneurship", openHubCode("entrepreneurship"), "blue", false) + actionButton("Open Legal Trust", openHubCode("law"), "", false) + '</div></section>';
+  }
+
+  function pathCard(key, founder) {
+    var path = FOUNDER_PATHS[key] || FOUNDER_PATHS.undecided;
+    var active = founder.path === key;
+    return '<button class="v1841-path-card ' + (active ? "active" : "") + '" onclick="event.preventDefault();event.stopPropagation();setEntrepreneurshipPathV1841(\'' + esc(key) + '\')">' +
+      '<span>' + esc(path.tag) + '</span><b>' + esc(path.name) + '</b><em>' + esc(path.desc) + '</em><i>' + esc(path.bonus) + '</i></button>';
+  }
+
+  function entrepreneurshipPathDeck() {
+    var s = ensureBusinessState();
+    var founder = s.finance.entrepreneurshipV1841;
+    return '<section class="panel v1841-path-deck"><div class="v1840-panel-head"><div><div class="section-label">🧭 Choose founder lane</div><h3>Lifelong entrepreneurship path</h3><p>This is the identity layer. Business remains the operating-company desk.</p></div><span>Change anytime, but the game remembers the lane.</span></div><div class="v1841-path-grid">' +
+      Object.keys(FOUNDER_PATHS).map(function (key) { return pathCard(key, founder); }).join("") +
+      '</div></section>';
+  }
+
+  function entrepreneurshipStatus() {
+    var s = ensureBusinessState();
+    var founder = s.finance.entrepreneurshipV1841;
+    var path = FOUNDER_PATHS[founder.path] || FOUNDER_PATHS.undecided;
+    var list = businesses();
+    var fullTime = !!s.finance.businessCareer;
+    return '<section class="panel v1841-founder-status"><div class="v1840-panel-head"><div><div class="section-label">📊 Founder status</div><h3>' + esc(path.name) + '</h3><p>' + esc(path.desc) + '</p></div><strong>' + compactMoney(totalBusinessValue()) + '<span>owned value</span></strong></div>' +
+      '<div class="v1840-metric-grid">' +
+      metric("Founder mode", fullTime ? "Full-time" : "Side path", fullTime ? "Business is your career." : "Career income stays active.", fullTime ? "good" : "gold") +
+      metric("Owned companies", String(list.length), "Business Office controls the companies.", list.length ? "good" : "gold") +
+      metric("Company cash", compactMoney(totalCompanyCash()), "Retained earnings across companies.", "good") +
+      metric("Family trust", legalTrustActive() ? "Active" : "Not set", legalTrustActive() ? "Trust controls can protect businesses." : "Create one in Legal when ready.", legalTrustActive() ? "good" : "gold") +
+      '</div>' + founderMode() + '<div class="v1840-action-strip">' + actionButton("Open Business Office", openHubCode("business"), "gold", false) + actionButton("Open Investments", openHubCode("brokerage"), "blue", false) + actionButton("Open Legal", openHubCode("law"), "", false) + '</div></section>';
+  }
+
+  function entrepreneurshipRequirementDeck() {
+    var s = ensureBusinessState();
+    var launch = businessCatalog().slice(0, 12);
+    var acquisition = acquisitionCatalog().slice(0, 8);
+    var rows = launch.concat(acquisition).map(function (v) {
+      var price = n(v.buy || v.startup || 0);
+      var missing = [];
+      if (n(s.age) < n(v.minAge, 18)) missing.push("Age " + n(v.minAge, 18) + "+");
+      if (price && n(s.money) < price) missing.push(compactMoney(price) + " cash");
+      if (!missing.length) missing.push("Ready");
+      return '<div class="v1841-requirement"><span>' + esc(v.category || "Business") + '</span><b>' + esc(v.name || v.id) + '</b><em>' + esc(v.desc || "Business path.") + '</em><i class="' + (missing[0] === "Ready" ? "good" : "gold") + '">' + esc(missing.join(" / ")) + '</i></div>';
+    }).join("");
+    return '<section class="panel v1841-requirements"><div class="v1840-panel-head"><div><div class="section-label">🔓 What unlocks next</div><h3>Founder opportunity board</h3></div><span>Requirements stay visible before you spend.</span></div><div class="v1841-requirement-grid">' + (rows || '<div class="v1840-empty">No business catalog loaded yet.</div>') + '</div></section>';
+  }
+
+  function renderEntrepreneurshipHub() {
+    try { ensureBusinessState(); } catch (e) {}
+    return '<div class="v1840-business-shell v1841-entrepreneurship-shell">' +
+      '<section class="v1840-hero v1841-entrepreneur-hero"><div><div class="section-label">Founder path</div><h2>Entrepreneurship</h2><p>Pick the lifelong direction first. Use Business for the actual companies, cash, entity structure, and acquisitions.</p><div class="v1840-chip-row"><span>' + businesses().length + ' companies</span><span>Business value ' + compactMoney(totalBusinessValue()) + '</span><span class="' + (legalTrustActive() ? "good" : "gold") + '">' + (legalTrustActive() ? "Trust active" : "No trust") + '</span><span>Founder score ' + enterpriseScore() + '/100</span></div></div><strong>' + esc((FOUNDER_PATHS[financeNow().entrepreneurshipV1841.path] || FOUNDER_PATHS.undecided).tag) + '<span>current lane</span></strong></section>' +
+      entrepreneurshipStatus() +
+      entrepreneurshipPathDeck() +
+      entrepreneurshipRequirementDeck() +
+      '</div>';
+  }
+
+  // Each section is isolated: if one throws (e.g. odd state right after an
+  // action), it degrades to an empty string instead of taking down the whole
+  // business hub render — which previously left the screen frozen/unclickable.
+  function safeSection(name, fn) {
+    try { return fn(); }
+    catch (e) {
+      try { if (window.console && console.error) console.error("[business hub] section '" + name + "' failed:", e); } catch (e2) {}
+      return "";
+    }
+  }
+  function renderBusinessHub() {
+    try { ensureBusinessState(); } catch (e) {}
+    return '<div class="v1840-business-shell">' +
+      safeSection("hero", hero) +
+      safeSection("kpis", kpis) +
+      safeSection("entrepreneurshipShortcut", entrepreneurshipShortcut) +
+      safeSection("businessRail", businessRail) +
+      safeSection("focusDesk", focusDesk) +
+      safeSection("launchRail", launchRail) +
+      safeSection("acquisitionRail", acquisitionRail) +
+      safeSection("familyEnterpriseDesk", familyEnterpriseDesk) +
+      '</div>';
+  }
+
+  var previousRenderHubContent = window.renderHubContent || (typeof renderHubContent === "function" ? renderHubContent : null);
+  window.renderBusinessHubV1840 = renderBusinessHub;
+  window.renderEntrepreneurshipHubV1841 = renderEntrepreneurshipHub;
+  window.businessEnterpriseScoreV1840 = enterpriseScore;
+  window.businessTrustValueV1840 = trustBusinessValue;
+  window.businessAssetIncomeBonus = businessAssetIncomeBonus;
+  window.businessAssetRiskCut = businessAssetRiskCut;
+  window.businessAssetTotalsV1850 = businessAssetTotals;
+  window.renderHubContent = function (hubId) {
+    var id = String(hubId || "").toLowerCase();
+    if (id === "business" || id === "biz" || id === "company") return renderBusinessHub();
+    if (id === "entrepreneurship" || id === "founder" || id === "startup") return renderEntrepreneurshipHub();
+    return previousRenderHubContent ? previousRenderHubContent.apply(this, arguments) : "";
+  };
+  try { renderHubContent = window.renderHubContent; } catch (e) {}
+
+  if (typeof document !== "undefined" && document.createElement && document.head) {
+    var style = document.createElement("style");
+    style.textContent = [
+      ".hub-overlay.hub-business .hub-head,.hub-overlay.hub-entrepreneurship .hub-head{position:sticky!important;top:0!important;z-index:8!important;background:linear-gradient(180deg,rgba(18,14,10,1),rgba(18,14,10,.92))!important;box-shadow:0 1px 0 rgba(255,255,255,.05)}",
+      ".v1840-business-shell{display:grid;gap:14px;padding:4px 0 96px;color:#f6ead8;min-width:0}.v1840-business-shell *{box-sizing:border-box}.v1840-business-shell .panel{min-width:0;overflow:hidden;border:1px solid rgba(216,173,109,.22);border-radius:12px;background:linear-gradient(135deg,rgba(34,30,23,.96),rgba(22,19,15,.96));padding:14px}.v1840-business-shell .section-label{font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.16em;color:#d8b16e;font-size:10px;margin-bottom:9px}",
+      ".v1840-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:end;border:1px solid rgba(143,175,108,.46);border-radius:16px;background:radial-gradient(circle at 12% 10%,rgba(143,175,108,.22),transparent 30%),radial-gradient(circle at 82% 0,rgba(216,173,109,.18),transparent 28%),linear-gradient(135deg,rgba(24,42,29,.98),rgba(43,31,21,.98));padding:18px;box-shadow:0 22px 58px rgba(0,0,0,.28)}.v1840-hero h2{font-size:38px;margin:0 0 6px;letter-spacing:0}.v1840-hero p{margin:0;color:#d9c8aa;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.55}.v1840-hero strong{font-size:40px;color:#f0ca7b;text-align:right}.v1840-hero strong span{display:block;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.15em;font-size:9px;color:#bba988}",
+      ".v1840-chip-row,.v1840-action-strip{display:flex;gap:7px;flex-wrap:wrap}.v1840-chip-row{margin-top:12px}.v1840-chip-row span{border:1px solid rgba(255,255,255,.13);border-radius:999px;background:rgba(255,255,255,.045);padding:6px 9px;color:#d8b16e;font-family:'JetBrains Mono',monospace;font-size:10px}.v1840-chip-row .good{color:#b9dc8a;border-color:rgba(185,220,138,.36)}.v1840-chip-row .bad{color:#e9927d;border-color:rgba(233,146,125,.40)}",
+      ".v1840-kpi-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}.v1840-metric{border:1px solid rgba(255,255,255,.11);border-radius:12px;background:rgba(255,255,255,.045);padding:11px;min-width:0}.v1840-metric span{display:block;color:#aa9a82;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.11em;font-size:9px}.v1840-metric b{display:block;color:#fff3df;font-size:20px;margin-top:5px;overflow-wrap:anywhere}.v1840-metric em{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-style:normal;font-size:10px;line-height:1.4;margin-top:5px}.v1840-metric.good b,.v1840-history em.good{color:#b9dc8a}.v1840-metric.bad b,.v1840-history em.bad{color:#e9927d}.v1840-metric.gold b{color:#f0ca7b}",
+      ".v1840-main-grid{display:grid;grid-template-columns:1fr;gap:14px;align-items:start}.v1840-panel-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:12px}.v1840-panel-head h3{font-size:23px;margin:0 0 4px}.v1840-panel-head p,.v1840-panel-head span{font-family:'JetBrains Mono',monospace;color:#b9a98e;font-size:10px;line-height:1.45;margin:0}.v1840-panel-head strong{color:#f0ca7b;font-size:32px;text-align:right}.v1840-panel-head strong span{display:block;text-transform:uppercase;letter-spacing:.14em;font-family:'JetBrains Mono',monospace;font-size:8px;color:#b9a98e}",
+      ".v1840-mode-grid,.v1840-two-col{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.v1840-mode-card{border:1px solid rgba(255,255,255,.11);border-radius:12px;background:rgba(255,255,255,.045);padding:12px;min-width:0}.v1840-mode-card.active{border-color:rgba(240,202,123,.58);background:rgba(216,173,109,.09)}.v1840-mode-card span,.v1840-option span,.v1840-company-card span,.v1840-launch-card span,.v1841-path-card span,.v1841-requirement span{display:block;color:#d8b16e;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.12em;font-size:9px}.v1840-mode-card b,.v1840-option b,.v1840-company-card b,.v1840-launch-card b,.v1841-path-card b,.v1841-requirement b{display:block;color:#fff3df;font-size:17px;line-height:1.1;margin-top:5px}.v1840-mode-card em,.v1840-option em,.v1840-company-card em,.v1840-launch-card em,.v1841-path-card em,.v1841-requirement em{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.4;font-style:normal;margin-top:7px}",
+      ".v1840-rail{display:flex;gap:10px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;padding:2px 2px 10px;margin-top:8px}.v1840-option-rail,.v1841-path-grid,.v1841-requirement-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:8px}.v1840-company-card,.v1840-launch-card{flex:0 0 250px;scroll-snap-align:start;border:1px solid rgba(255,255,255,.11);border-radius:12px;background:rgba(255,255,255,.045);color:#f6ead8;text-align:left;padding:12px;min-height:142px}.v1840-option,.v1841-path-card,.v1841-requirement{min-width:0;border:1px solid rgba(255,255,255,.11);border-radius:12px;background:rgba(255,255,255,.045);color:#f6ead8;text-align:left;padding:12px;min-height:132px}.v1841-path-card i,.v1841-requirement i{display:block;margin-top:9px;color:#f0ca7b;font:10px 'JetBrains Mono',monospace;font-style:normal}.v1841-requirement i.good{color:#b9dc8a}.v1840-company-card.selected,.v1840-launch-card.ready,.v1840-option.active,.v1841-path-card.active{border-color:rgba(240,202,123,.64);background:linear-gradient(135deg,rgba(65,48,26,.82),rgba(25,21,17,.96))}.v1840-company-card:disabled,.v1840-launch-card:disabled,.v1840-option:disabled{opacity:.52}.v1840-company-stats{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}.v1840-company-stats i{border:1px solid rgba(255,255,255,.10);border-radius:999px;padding:4px 7px;font-style:normal;color:#f0ca7b;font-family:'JetBrains Mono',monospace;font-size:9px}.v1840-company-stats i.good{color:#b9dc8a}.v1840-company-stats i.bad{color:#e9927d}",
+      ".v1840-focus-desk,.v1840-family-enterprise{margin-top:14px}.v1840-metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:10px 0}.v1840-action-strip{margin:10px 0;overflow:visible;flex-wrap:wrap;padding-bottom:0}.v1840-action-strip .money-btn{flex:0 0 auto}.v1840-note,.v1840-selected-line{border:1px solid rgba(255,255,255,.09);border-radius:10px;background:rgba(255,255,255,.035);padding:10px;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.45;margin:8px 0 0}.v1840-selected-line b{color:#f0ca7b}",
+      ".v1840-custom-row,.v1840-rename-row{display:grid;grid-template-columns:minmax(120px,1fr) minmax(94px,auto) auto;gap:8px;align-items:center;margin-top:9px}.v1840-rename-row{grid-template-columns:minmax(0,1fr) auto}.v1840-custom-row input,.v1840-rename-row input,.v1840-select{min-width:0;width:100%;border:1px solid rgba(216,173,109,.45);background:rgba(0,0,0,.36);color:#f6ead8;border-radius:9px;padding:10px;font:12px 'JetBrains Mono',monospace}.v1840-custom-row span{border:1px solid rgba(126,160,172,.35);border-radius:10px;background:rgba(126,160,172,.10);color:#dcecf0;font-family:'JetBrains Mono',monospace;font-size:9px;line-height:1.25;padding:9px;overflow-wrap:anywhere}",
+      ".v1840-family-enterprise{border-color:rgba(143,175,108,.38)!important;background:linear-gradient(135deg,rgba(22,40,28,.96),rgba(34,29,22,.96))!important}.v1840-focused-trust{border:1px solid rgba(143,175,108,.26);border-radius:12px;background:rgba(143,175,108,.07);padding:12px;margin-top:12px}.v1840-trust-head{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:9px;margin-bottom:9px}.v1840-trust-head b{color:#fff3df;font-size:17px}.v1840-trust-head span{font-family:'JetBrains Mono',monospace;color:#b9a98e;font-size:10px;text-align:right}",
+      ".v1840-history{border:1px solid rgba(255,255,255,.10);border-radius:12px;overflow:hidden;margin-top:12px}.v1840-history .section-label{padding:10px 10px 0}.v1840-history div:not(.section-label){display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;border-top:1px solid rgba(255,255,255,.07);padding:8px 10px;align-items:center}.v1840-history span,.v1840-history b,.v1840-history em{font-family:'JetBrains Mono',monospace;font-size:9px;font-style:normal}.v1840-history span{color:#aa9a82}.v1840-history b{color:#f6ead8}.v1840-history em{color:#f0ca7b}.v1840-empty{border:1px dashed rgba(255,255,255,.14);border-radius:12px;padding:14px;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.5}",
+      ".v1840-rail::-webkit-scrollbar{height:10px}.v1840-rail::-webkit-scrollbar-thumb{background:rgba(216,177,110,.72);border-radius:999px}.v1840-rail::-webkit-scrollbar-track{background:rgba(255,255,255,.05);border-radius:999px}",
+      ".v1840-launch-group{margin-top:12px}.v1840-launch-group-label{font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.12em;color:#d8b16e;font-size:10px;margin-bottom:8px}",
+      ".v1840-launch-controls{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}.v1840-launch-controls input{flex:1 1 220px;min-width:0;border:1px solid rgba(216,173,109,.45);background:rgba(0,0,0,.36);color:#f6ead8;border-radius:9px;padding:10px;font:12px 'JetBrains Mono',monospace}.v1840-launch-controls select{flex:0 0 auto;border:1px solid rgba(216,173,109,.45);background:rgba(0,0,0,.36);color:#f6ead8;border-radius:9px;padding:10px;font:12px 'JetBrains Mono',monospace}",
+      ".v1851-sector-meter{border:1px solid rgba(126,160,172,.30)!important;border-radius:12px;background:rgba(126,160,172,.07);padding:11px}.v1851-sector-meter .row-title{color:#dcecf0;font-size:13px}.v1851-sector-meter .good{color:#b9dc8a}.v1851-sector-meter .bad{color:#e9927d}.v1851-sector-meter .gold{color:#f0ca7b}",
+      ".v1851-cash-explain{border:1px solid rgba(240,202,123,.30);border-radius:10px;background:rgba(240,202,123,.06);padding:10px;margin:0 0 10px;color:#e9d9bb;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.5}.v1851-cash-explain b{color:#f0ca7b}",
+      ".v1851-cash-group{border:1px solid rgba(255,255,255,.09);border-radius:10px;background:rgba(255,255,255,.025);padding:9px;margin-top:8px}.v1851-cash-group>.v1851-cash-label{display:block;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.1em;font-size:9px;color:#d8b16e;margin-bottom:6px}.v1851-cash-group .v1840-action-strip{margin:0}",
+      "@media(max-width:1060px){.v1840-main-grid,.v1840-mode-grid,.v1840-two-col{grid-template-columns:1fr}.v1840-kpi-row,.v1840-metric-grid{display:flex;overflow-x:auto;padding-bottom:9px}.v1840-metric{flex:0 0 190px}.v1840-hero{grid-template-columns:1fr}.v1840-hero strong{text-align:left}.v1840-company-card,.v1840-launch-card{flex-basis:78vw}.v1840-custom-row{grid-template-columns:1fr}.v1840-trust-head{display:block}.v1840-trust-head span{text-align:left;display:block;margin-top:4px}}"
+    ].join("\n");
+    document.head.appendChild(style);
+  }
+
+  if (window.registerLedgerSystem) {
+    window.registerLedgerSystem({
+      id: "business-entities",
+      file: "pages/systems/business-entities.js",
+      status: "active",
+      globals: [
+        "renderBusinessHubV1840",
+        "setBusinessFocusV1840",
+        "renameBusinessV1840",
+        "setBusinessTrustPercentV1840",
+        "payBusinessDividendToTrustV1840",
+        "trustLoanToBusinessV1840",
+        "repayTrustLoanV1840",
+        "businessEnterpriseScoreV1840"
+      ],
+      notes: "Business is now a focused command center: portfolio rail, one selected company desk, entity cash/tax controls, family enterprise governance, trust ownership, dividends, trust loans, successor training, acquisitions, and launch rails."
+    });
+  }
+})();

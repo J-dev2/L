@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ledger System Logic"
+  short_description: "Design and maintain Ledger simulation logic safely."
+  default_prompt: "Plan or implement Ledger gameplay logic."

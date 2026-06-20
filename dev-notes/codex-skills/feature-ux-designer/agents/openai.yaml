@@ -1,0 +1,4 @@
+interface:
+  display_name: "Feature UX Designer"
+  short_description: "Design polished UX for feature concepts in any project."
+  default_prompt: "Design a refined UX plan for this feature."

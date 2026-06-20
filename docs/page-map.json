@@ -1,0 +1,377 @@
+{
+  "source": "outputs/Ledger_18_dynamic_stocks_v18_33_7_splash_stack_gate.html",
+  "generatedAt": "2026-06-12T05:15:25.203Z",
+  "index": "index.html",
+  "play": "play.html",
+  "groups": {
+    "themes": [
+      "themes/ledger-dark.css"
+    ],
+    "styles": [
+      "styles/ledger-ui.css",
+      "styles/landing.css"
+    ],
+    "assets": [
+      "assets/manifest.json",
+      "assets/README.md"
+    ],
+    "pages": [
+      "pages/landing/landing-page.js",
+      "play.html",
+      "pages/systems/play-boot.js",
+      "pages/runtime/00-core-app-runtime.js",
+      "pages/patches/01-patch-v18-24.js",
+      "pages/patches/02-patch-v18-25.js",
+      "pages/patches/03-patch-v18-26.js",
+      "pages/patches/04-patch-v18-27.js",
+      "pages/patches/05-patch-v18-28.js",
+      "pages/patches/06-patch-v18-29.js",
+      "pages/patches/07-patch-v18-30.js",
+      "pages/patches/08-patch-v18-31.js",
+      "pages/patches/09-patch-v18-32.js",
+      "pages/patches/10-patch-v18-33.js",
+      "pages/patches/11-patch-v18-33-2.js",
+      "pages/patches/12-patch-v18-33-3.js",
+      "pages/patches/13-patch-v18-33-4.js",
+      "pages/patches/14-patch-v18-33-5.js",
+      "pages/patches/15-patch-v18-33-6.js",
+      "pages/patches/16-patch-v18-33-7.js",
+      "state/state-map.js",
+      "pages/systems/00-system-map.js",
+      "pages/systems/sandbox-startup.js",
+      "pages/systems/people-family.js",
+      "pages/systems/education-career.js",
+      "pages/systems/business-entities.js",
+      "pages/systems/stocks-investing.js",
+      "pages/systems/tax-legal.js",
+      "pages/systems/money-banking.js",
+      "pages/systems/finance-ledger.js",
+      "pages/systems/save-recovery.js",
+      "pages/systems/scroll-stability.js",
+      "pages/systems/life-command.js",
+      "pages/systems/more-command.js",
+      "pages/hubs/00-hub-registry.js",
+      "pages/hubs/life-stack.js",
+      "pages/hubs/people.js",
+      "pages/hubs/education.js",
+      "pages/hubs/career.js",
+      "pages/hubs/finance.js",
+      "pages/hubs/money.js",
+      "pages/hubs/stocks.js",
+      "pages/hubs/business.js",
+      "pages/hubs/legal.js",
+      "pages/hubs/more.js"
+    ],
+    "state": [
+      "state/state-map.js"
+    ],
+    "systems": [
+      "pages/systems/00-system-map.js",
+      "pages/systems/play-boot.js",
+      "pages/systems/save-recovery.js",
+      "pages/systems/finance-ledger.js",
+      "pages/systems/money-banking.js",
+      "pages/systems/tax-legal.js",
+      "pages/systems/stocks-investing.js",
+      "pages/systems/business-entities.js",
+      "pages/systems/education-career.js",
+      "pages/systems/people-family.js",
+      "pages/systems/sandbox-startup.js",
+      "pages/systems/scroll-stability.js",
+      "pages/systems/life-command.js",
+      "pages/systems/more-command.js"
+    ],
+    "hubs": [
+      "pages/hubs/00-hub-registry.js",
+      "pages/hubs/life-stack.js",
+      "pages/hubs/people.js",
+      "pages/hubs/education.js",
+      "pages/hubs/career.js",
+      "pages/hubs/finance.js",
+      "pages/hubs/money.js",
+      "pages/hubs/stocks.js",
+      "pages/hubs/business.js",
+      "pages/hubs/legal.js",
+      "pages/hubs/more.js"
+    ],
+    "build": [
+      "build/build-ledger18.js"
+    ]
+  },
+  "scripts": [
+    {
+      "index": 0,
+      "file": "pages/runtime/00-core-app-runtime.js",
+      "marker": "core-app-runtime",
+      "bytes": 1251007,
+      "kind": "runtime"
+    },
+    {
+      "index": 1,
+      "file": "pages/patches/01-patch-v18-24.js",
+      "marker": "patch-v18-24",
+      "bytes": 41721,
+      "kind": "patch"
+    },
+    {
+      "index": 2,
+      "file": "pages/patches/02-patch-v18-25.js",
+      "marker": "patch-v18-25",
+      "bytes": 42161,
+      "kind": "patch"
+    },
+    {
+      "index": 3,
+      "file": "pages/patches/03-patch-v18-26.js",
+      "marker": "patch-v18-26",
+      "bytes": 59394,
+      "kind": "patch"
+    },
+    {
+      "index": 4,
+      "file": "pages/patches/04-patch-v18-27.js",
+      "marker": "patch-v18-27",
+      "bytes": 48328,
+      "kind": "patch"
+    },
+    {
+      "index": 5,
+      "file": "pages/patches/05-patch-v18-28.js",
+      "marker": "patch-v18-28",
+      "bytes": 45317,
+      "kind": "patch"
+    },
+    {
+      "index": 6,
+      "file": "pages/patches/06-patch-v18-29.js",
+      "marker": "patch-v18-29",
+      "bytes": 27434,
+      "kind": "patch"
+    },
+    {
+      "index": 7,
+      "file": "pages/patches/07-patch-v18-30.js",
+      "marker": "patch-v18-30",
+      "bytes": 36290,
+      "kind": "patch"
+    },
+    {
+      "index": 8,
+      "file": "pages/patches/08-patch-v18-31.js",
+      "marker": "patch-v18-31",
+      "bytes": 44503,
+      "kind": "patch"
+    },
+    {
+      "index": 9,
+      "file": "pages/patches/09-patch-v18-32.js",
+      "marker": "patch-v18-32",
+      "bytes": 60102,
+      "kind": "patch"
+    },
+    {
+      "index": 10,
+      "file": "pages/patches/10-patch-v18-33.js",
+      "marker": "patch-v18-33",
+      "bytes": 46474,
+      "kind": "patch"
+    },
+    {
+      "index": 11,
+      "file": "pages/patches/11-patch-v18-33-2.js",
+      "marker": "patch-v18-33-2",
+      "bytes": 16322,
+      "kind": "patch"
+    },
+    {
+      "index": 12,
+      "file": "pages/patches/12-patch-v18-33-3.js",
+      "marker": "patch-v18-33-3",
+      "bytes": 14036,
+      "kind": "patch"
+    },
+    {
+      "index": 13,
+      "file": "pages/patches/13-patch-v18-33-4.js",
+      "marker": "patch-v18-33-4",
+      "bytes": 10116,
+      "kind": "patch"
+    },
+    {
+      "index": 14,
+      "file": "pages/patches/14-patch-v18-33-5.js",
+      "marker": "patch-v18-33-5",
+      "bytes": 7328,
+      "kind": "patch"
+    },
+    {
+      "index": 15,
+      "file": "pages/patches/15-patch-v18-33-6.js",
+      "marker": "patch-v18-33-6",
+      "bytes": 6238,
+      "kind": "patch"
+    },
+    {
+      "index": 16,
+      "file": "pages/patches/16-patch-v18-33-7.js",
+      "marker": "patch-v18-33-7",
+      "bytes": 3580,
+      "kind": "patch"
+    },
+    {
+      "index": 17,
+      "file": "state/state-map.js",
+      "marker": "state-map",
+      "bytes": 1579,
+      "kind": "state"
+    },
+    {
+      "index": 18,
+      "file": "pages/systems/00-system-map.js",
+      "marker": "system-map",
+      "bytes": 3146,
+      "kind": "system"
+    },
+    {
+      "index": 19,
+      "file": "pages/hubs/00-hub-registry.js",
+      "marker": "hub-00-hub-registry",
+      "bytes": 1758,
+      "kind": "hub"
+    },
+    {
+      "index": 20,
+      "file": "pages/hubs/life-stack.js",
+      "marker": "hub-life-stack",
+      "bytes": 656,
+      "kind": "hub"
+    },
+    {
+      "index": 21,
+      "file": "pages/hubs/people.js",
+      "marker": "hub-people",
+      "bytes": 618,
+      "kind": "hub"
+    },
+    {
+      "index": 22,
+      "file": "pages/hubs/education.js",
+      "marker": "hub-education",
+      "bytes": 640,
+      "kind": "hub"
+    },
+    {
+      "index": 23,
+      "file": "pages/hubs/career.js",
+      "marker": "hub-career",
+      "bytes": 613,
+      "kind": "hub"
+    },
+    {
+      "index": 24,
+      "file": "pages/hubs/finance.js",
+      "marker": "hub-finance",
+      "bytes": 560,
+      "kind": "hub"
+    },
+    {
+      "index": 25,
+      "file": "pages/hubs/money.js",
+      "marker": "hub-money",
+      "bytes": 649,
+      "kind": "hub"
+    },
+    {
+      "index": 26,
+      "file": "pages/hubs/stocks.js",
+      "marker": "hub-stocks",
+      "bytes": 701,
+      "kind": "hub"
+    },
+    {
+      "index": 27,
+      "file": "pages/hubs/business.js",
+      "marker": "hub-business",
+      "bytes": 613,
+      "kind": "hub"
+    },
+    {
+      "index": 28,
+      "file": "pages/hubs/legal.js",
+      "marker": "hub-legal",
+      "bytes": 592,
+      "kind": "hub"
+    },
+    {
+      "index": 29,
+      "file": "pages/hubs/more.js",
+      "marker": "hub-more",
+      "bytes": 601,
+      "kind": "hub"
+    },
+    {
+      "index": 30,
+      "file": "pages/systems/save-recovery.js",
+      "marker": "system-save-recovery",
+      "bytes": 422,
+      "kind": "system"
+    },
+    {
+      "index": 31,
+      "file": "pages/systems/finance-ledger.js",
+      "marker": "system-finance-ledger",
+      "bytes": 419,
+      "kind": "system"
+    },
+    {
+      "index": 32,
+      "file": "pages/systems/money-banking.js",
+      "marker": "system-money-banking",
+      "bytes": 436,
+      "kind": "system"
+    },
+    {
+      "index": 33,
+      "file": "pages/systems/tax-legal.js",
+      "marker": "system-tax-legal",
+      "bytes": 441,
+      "kind": "system"
+    },
+    {
+      "index": 34,
+      "file": "pages/systems/stocks-investing.js",
+      "marker": "system-stocks-investing",
+      "bytes": 450,
+      "kind": "system"
+    },
+    {
+      "index": 35,
+      "file": "pages/systems/business-entities.js",
+      "marker": "system-business-entities",
+      "bytes": 482,
+      "kind": "system"
+    },
+    {
+      "index": 36,
+      "file": "pages/systems/education-career.js",
+      "marker": "system-education-career",
+      "bytes": 449,
+      "kind": "system"
+    },
+    {
+      "index": 37,
+      "file": "pages/systems/people-family.js",
+      "marker": "system-people-family",
+      "bytes": 411,
+      "kind": "system"
+    },
+    {
+      "index": 38,
+      "file": "pages/systems/sandbox-startup.js",
+      "marker": "system-sandbox-startup",
+      "bytes": 423,
+      "kind": "system"
+    }
+  ],
+  "version": "v18.35"
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ledger AI Handoff"
+  short_description: "Orient AI agents before Ledger development."
+  default_prompt: "Orient me before working on Ledger."

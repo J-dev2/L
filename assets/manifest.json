@@ -1,0 +1,16 @@
+{
+  "version": "v18.35",
+  "assets": [],
+  "rules": [
+    "Use stable relative paths from the modular index.",
+    "Prefer real gameplay assets: portraits, icons, audio cues, screenshots, maps, and visual item art.",
+    "Do not embed large binary assets directly inside JavaScript or HTML."
+  ],
+  "plannedFolders": [
+    "assets/icons",
+    "assets/portraits",
+    "assets/audio",
+    "assets/screenshots",
+    "assets/textures"
+  ]
+}

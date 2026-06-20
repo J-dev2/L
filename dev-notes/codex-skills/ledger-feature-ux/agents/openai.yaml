@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ledger Feature UX"
+  short_description: "Design refined UX for Ledger feature expansions."
+  default_prompt: "Design a polished Ledger feature expansion UX."
