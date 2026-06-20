@@ -41,11 +41,32 @@ Use browser/CDP tests when:
 - save/load or boot changed,
 - charts/graphs changed.
 
-Existing useful probes:
+Probes live in the **`cdp/`** folder (run via the CDP driver against headless Chrome).
+See `cdp/README.md` for the full list and run steps.
 
-- `.cdp-separation.js`
-- `.cdp-features.js`
-- `.cdp-ipo.js`
+- `cdp/separation.js` — Entrepreneurship vs Business separation (20 checks)
+- `cdp/features.js` — models make revenue, wizard, graphs across tabs (17)
+- `cdp/ipo.js` — IPO / public-company / grants / scale graph (17)
+- `cdp/dashboard.js` — Dashboard 2.0 tabs/panels, public gating, market signal (32)
+- `cdp/death.js` — death screen + continue-as-heir incl. no-child successor (20)
+- `cdp/founderpay.js` — founder salary + manual distribution + tax (24)
+- `cdp/stock.js` — share counts, buyback de-list, splits, dividends (30)
+- `cdp/trust.js` — family trust net worth + succession carry + death haircut (18)
+- `cdp/wayback.js` — checkpoint create/restore + death-screen "Undo Death" (11)
+- `cdp/devtools.js` — hidden dev-tools gate/unlock + panel tools (run with `&dev=1` in the URL) (17)
+- `cdp/business-locations.js` — Business #10 locations/franchises/rival share (22)
+
+How to run a probe (Chrome must be started with `--remote-debugging-port=<PORT>`
+and a temp `--user-data-dir`; `cdp/driver.js` navigates + evaluates the probe). Reuse ONE
+`--user-data-dir` and clean it up — fresh temp profiles per run will fill the disk:
+
+```bash
+node cdp/driver.js <PORT> "file:///d:/code/L/play.html?sandbox=1&from=landing" cdp/<name>.js
+```
+
+Each probe returns JSON `{ pass, fail, summary, __consoleErrors }`. Keep them green
+after any entrepreneurship/stock/finance change; update a probe (don't delete checks)
+when the intended contract changes.
 
 ## Screenshot QA
 

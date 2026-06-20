@@ -1,0 +1,48 @@
+# CDP test probes
+
+Headless-browser smoke tests for the game, driven via the Chrome DevTools Protocol.
+These are **dev tooling only** — they are not part of the game build (the bundler
+only pulls scripts referenced in `play.html` / `index.html`).
+
+## How to run
+
+1. Start headless Chrome with a remote-debugging port and a temp profile:
+
+   ```bash
+   chrome --headless=new --disable-gpu --remote-debugging-port=9350 \
+     --user-data-dir=/tmp/ledger-cdp --no-first-run --no-default-browser-check about:blank
+   ```
+
+2. Run a probe through the driver (it navigates to the game and evaluates the probe):
+
+   ```bash
+   node cdp/driver.js 9350 "file:///d:/code/L/play.html?sandbox=1&from=landing" cdp/<probe>.js
+   ```
+
+   Each probe prints JSON `{ pass, fail, summary, __consoleErrors }`.
+   For the dev-tools probe, add `&dev=1` to the URL.
+
+3. Kill Chrome and delete the temp profile when done (reuse ONE `--user-data-dir`;
+   creating a fresh temp profile per run will fill the disk).
+
+`driver.js` takes the probe path as an argument, so probes have no internal path coupling.
+
+## Probes
+
+| File | Area | Checks |
+|------|------|--------|
+| `separation.js` | Entrepreneurship vs Business route + data separation | 20 |
+| `features.js`   | Business models make revenue, wizard, graphs across tabs | 17 |
+| `ipo.js`        | IPO / public company / grants / scale graph | 17 |
+| `dashboard.js`  | Dashboard 2.0 tabs/panels, public gating, market signal | 32 |
+| `death.js`      | Death screen + continue-as-heir incl. no-child successor | 20 |
+| `founderpay.js` | Founder salary + manual distribution + tax | 24 |
+| `stock.js`      | Share counts, buyback de-list, splits, dividends | 30 |
+| `trust.js`      | Family trust create/fund, net worth, succession carry, death haircut | 18 |
+| `wayback.js`    | Checkpoint create/restore + death-screen "Undo Death" | 11 |
+| `devtools.js`   | Hidden dev-tools gate/unlock + panel tools (run with `&dev=1`) | 17 |
+| `business-locations.js` | Business #10 locations/franchises/rival share | 22 |
+| `pacing.js`, `fundgrad.js` | Older startup-founder pacing/grant probes | — |
+
+Keep these green after entrepreneurship/stock/finance/legal changes. When the intended
+contract changes, update the probe (don't delete checks).

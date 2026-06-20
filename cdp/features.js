@@ -71,12 +71,17 @@
     // ===== GRAPHS render in the active panel =====
     // age up a few years to build history
     for (var y = 0; y < 4; y++) { S.actionsTaken = {}; S.age += 1; try { window.resolveLifeAndFinanceYear(); } catch (e) { out.notes.push("ageup err " + e); } }
-    var panel = window.renderEntrepreneurHubV1861();
-    ok("graphs_growth_trends", panel.indexOf("Growth trends") >= 0 && panel.indexOf("biz1861-spark") >= 0);
-    ok("graphs_budget_allocation", panel.indexOf("Budget allocation") >= 0 && panel.indexOf("biz1861-segbar") >= 0);
-    ok("graphs_hiring_impact", panel.indexOf("Hiring impact") >= 0);
-    ok("graphs_marketing_roi", panel.indexOf("Marketing ROI") >= 0 && panel.indexOf("biz1861-roi") >= 0);
-    ok("active_panel_renders", panel.indexOf("biz1861-graphs") >= 0 && panel.length > 500);
+    // Dashboard 2.0 splits graphs across tabbed panels — select the owning tab first.
+    function panelHtml(tab) { window.bizSetPanelV1862(tab); return window.renderEntrepreneurHubV1861(); }
+    var overviewP = panelHtml("overview");
+    ok("graphs_growth_trends", overviewP.indexOf("Growth trends") >= 0 && overviewP.indexOf("biz1861-spark") >= 0);
+    var productP = panelHtml("product");
+    ok("graphs_budget_allocation", productP.indexOf("Budget allocation") >= 0 && productP.indexOf("biz1861-segbar") >= 0);
+    var teamP = panelHtml("team");
+    ok("graphs_hiring_impact", teamP.indexOf("Hiring impact") >= 0);
+    var growthP = panelHtml("growth");
+    ok("graphs_marketing_roi", growthP.indexOf("Marketing ROI") >= 0 && growthP.indexOf("biz1861-roi") >= 0);
+    ok("active_panel_renders", overviewP.indexOf("biz1861-graphs") >= 0 && overviewP.length > 500);
 
     out.summary = { total: Object.keys(out.pass).length, passed: Object.keys(out.pass).filter(function (k) { return out.pass[k]; }).length, failed: out.fail.length };
   } catch (e) {

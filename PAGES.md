@@ -3,6 +3,9 @@
 Plain-English index of the game so you can make quick changes yourself without
 guessing. **You edit the small source files in `pages/`. You never edit `dist/`.**
 
+AI agents should start with `AI_DEV_README.md` and
+`dev-notes/ai-handoff/START_HERE.md` before using this edit guide.
+
 ---
 
 ## The one rule: source vs. build

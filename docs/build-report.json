@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-06-20T03:00:30.772Z",
+  "builtAt": "2026-06-20T18:04:20.867Z",
   "source": "outputs/ledger18_modular_v18_35",
   "entries": [
     {
@@ -23,7 +23,7 @@
         },
         {
           "src": "pages/runtime/00-core-app-runtime.js",
-          "bytes": 1264677
+          "bytes": 1266562
         },
         {
           "src": "pages/patches/01-patch-v18-24.js",
@@ -111,7 +111,7 @@
         },
         {
           "src": "pages/systems/business-entities.js",
-          "bytes": 111433
+          "bytes": 153253
         },
         {
           "src": "pages/systems/business-sectors.js",
@@ -131,7 +131,7 @@
         },
         {
           "src": "pages/systems/tax-legal.js",
-          "bytes": 80710
+          "bytes": 82769
         },
         {
           "src": "pages/systems/money-banking.js",
@@ -155,7 +155,7 @@
         },
         {
           "src": "pages/systems/entrepreneur.js",
-          "bytes": 121117
+          "bytes": 157765
         },
         {
           "src": "pages/systems/save-recovery.js",
@@ -220,9 +220,13 @@
         {
           "src": "pages/hubs/more.js",
           "bytes": 601
+        },
+        {
+          "src": "pages/systems/dev-tools.js",
+          "bytes": 12612
         }
       ],
-      "bytes": 3009651
+      "bytes": 3104736
     },
     {
       "entry": "index.html",

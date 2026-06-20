@@ -464,7 +464,7 @@
     log("🏢 " + biz.name + " is founded. " + (biz.coFounders.length ? "With co-founder " + biz.coFounders[0].name + " (" + biz.coFounders[0].equity + "% equity)." : "Solo founder.") + " Cash: " + fmt(biz.cashInBusiness) + ".", { confidence: 3 });
     try { if (typeof window.applyDeltas === "function") window.applyDeltas({ confidence: 3, stress: 2 }); } catch (e2) {}
     saveGame();
-    try { if (typeof window.setTab === "function") window.setTab("business"); else rerender(); } catch (e3) { rerender(); }
+    try { if (typeof window.setTab === "function") window.setTab("entrepreneurship"); else rerender(); } catch (e3) { rerender(); }
   }
 
   function btnH(label, handler) { return '<button class="icon-btn" onclick="event.preventDefault();event.stopPropagation();' + handler + '">' + escH(label) + '</button>'; }
@@ -564,6 +564,13 @@
   }
 
   // ---------------------------------------------------- charts (interactive) --
+  function compactSharesV1862(n) {
+    n = Math.round(num(n));
+    if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
+    return String(n);
+  }
   function compactMoneyV1861(v) {
     v = num(v); var sign = v < 0 ? "-" : ""; var a = Math.abs(v);
     if (a >= 1e9) return sign + "$" + (a / 1e9).toFixed(a >= 1e10 ? 0 : 1) + "B";
@@ -609,6 +616,26 @@
       return '<span><i style="background:' + s.color + '"></i>' + escH(s.label) + ' <b>' + Math.round((num(s.value) / total) * 100) + '%</b> <em>' + escH(compactMoneyV1861(s.value)) + '</em></span>';
     }).join("") + '</div>';
     return bar + legend;
+  }
+  // Donut/pie chart for a spend/allocation breakdown (SVG ring + legend).
+  function donutSVG(segments, centerLabel) {
+    var segs = (segments || []).filter(function (s) { return num(s.value) > 0; });
+    var total = segs.reduce(function (s, x) { return s + num(x.value); }, 0);
+    if (total <= 0) return '<div class="biz1861-spark-empty">Nothing allocated yet.</div>';
+    var R = 42, C = 2 * Math.PI * R, cx = 60, cy = 60, sw = 17, off = 0;
+    var rings = segs.map(function (s) {
+      var len = (num(s.value) / total) * C;
+      var ring = '<circle cx="' + cx + '" cy="' + cy + '" r="' + R + '" fill="none" stroke="' + s.color + '" stroke-width="' + sw + '" stroke-dasharray="' + len.toFixed(2) + ' ' + (C - len).toFixed(2) + '" stroke-dashoffset="' + (-off).toFixed(2) + '" transform="rotate(-90 ' + cx + ' ' + cy + ')"></circle>';
+      off += len;
+      return ring;
+    }).join("");
+    var svg = '<svg class="biz1862-donut" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><circle cx="' + cx + '" cy="' + cy + '" r="' + R + '" fill="none" stroke="rgba(0,0,0,.28)" stroke-width="' + sw + '"></circle>' + rings +
+      '<text x="' + cx + '" y="' + (cy - 1) + '" text-anchor="middle" fill="#fff3df" font-family="Fraunces,Georgia,serif" font-size="15">' + escH(compactMoneyV1861(total)) + '</text>' +
+      '<text x="' + cx + '" y="' + (cy + 13) + '" text-anchor="middle" fill="#b9a98e" font-family="JetBrains Mono,monospace" font-size="7" letter-spacing="1.5">' + escH(centerLabel || "TOTAL") + '</text></svg>';
+    var legend = '<div class="biz1861-legend">' + segs.map(function (s) {
+      return '<span><i style="background:' + s.color + '"></i>' + escH(s.label) + ' <b>' + Math.round((num(s.value) / total) * 100) + '%</b> <em>' + escH(compactMoneyV1861(s.value)) + '</em></span>';
+    }).join("") + '</div>';
+    return '<div class="biz1862-donut-wrap">' + svg + legend + '</div>';
   }
   var BIZ_CHART_COLORS = { rev: "#9fd07d", profit: "#7ea0ac", val: "#d8b16e", staff: "#7ea0ac", mktg: "#e0a35f", tools: "#9b8cc2", cofounder: "#cf6f6f", features: "#7ea0ac", bugfix: "#cf6f6f", ux: "#9b8cc2", custdev: "#9fd07d" };
 
@@ -678,7 +705,7 @@
     try { return candleChartSVGV1862(monthlyCandlesV1862(closes, id || "x", 12), opts || {}); } catch (e) { return ""; }
   };
 
-  function renderBizGraphsV1861(biz) {
+  function renderBizGraphsV1861(biz, mode) {
     if (!biz) return "";
     var C = BIZ_CHART_COLORS;
     var hist = Array.isArray(biz.revenueHistory) ? biz.revenueHistory : [];
@@ -698,12 +725,12 @@
     var coFounderCosts = (biz.coFounders || []).length * 60000;
     var mktgCosts = num(biz._mktgBudget);
     var toolsCosts = num(biz.headcount) * 2400;
-    var spendBar = segBar([
+    var spendBar = donutSVG([
       { label: "Staff payroll", value: staffCosts, color: C.staff },
       { label: "Marketing", value: mktgCosts, color: C.mktg },
       { label: "Co-founders", value: coFounderCosts, color: C.cofounder },
       { label: "Tools / overhead", value: toolsCosts, color: C.tools },
-    ]);
+    ], "SPEND/YR");
     var alloc = biz._devAlloc || { features: 40, bugfix: 20, ux: 20, custdev: 20 };
     var devBar = segBar([
       { label: "Features", value: alloc.features, color: C.features },
@@ -771,7 +798,13 @@
       trendCard("Valuation multiple", multSeries, C.mktg, fmtMult) +
       '</div></div>';
 
-    return '<div class="biz1861-graphs">' + growth + scale + budget + hiring + marketing + '</div>';
+    var parts = [growth, scale, budget, hiring, marketing];
+    if (mode === "overview") parts = [growth, scale];
+    else if (mode === "product") parts = [budget];
+    else if (mode === "growth") parts = [scale, marketing];
+    else if (mode === "team") parts = [hiring];
+    else if (mode === "funding") parts = [budget];
+    return '<div class="biz1861-graphs">' + parts.join("") + '</div>';
   }
 
   function setActiveBiz(id) {
@@ -783,6 +816,23 @@
     rerender();
   }
   window.bizSetActiveV1861 = setActiveBiz;
+  var DASHBOARD_PANELS_V1862 = ["overview", "product", "growth", "team", "funding", "public", "exit"];
+  function dashboardPanelV1862(biz) {
+    var B = initBiz();
+    var p = String(B.activePanelV1862 || "overview").toLowerCase();
+    if (p === "public" && (!biz || !biz.public)) p = "overview";
+    if (DASHBOARD_PANELS_V1862.indexOf(p) < 0) p = "overview";
+    B.activePanelV1862 = p;
+    return p;
+  }
+  window.bizSetPanelV1862 = function (panel) {
+    var B = initBiz();
+    var p = String(panel || "overview").toLowerCase();
+    if (DASHBOARD_PANELS_V1862.indexOf(p) < 0) p = "overview";
+    B.activePanelV1862 = p;
+    saveGame();
+    rerender();
+  };
   window.bizSelfFundCustomV1861 = function (inputId) {
     var el = typeof document !== "undefined" ? document.getElementById(inputId) : null;
     var amt = el ? String(el.value || "").replace(/[^0-9.]/g, "") : "0";
@@ -798,7 +848,7 @@
 
   function renderFounderStatsV1861(B, active) {
     var portfolioValue = allBusinesses().reduce(function (sum, b) { return sum + Math.max(0, round(num(b.valuation) || num(b.cashInBusiness))); }, 0);
-    return '<section class="panel biz1861-hero"><div><div class="section-label">Founder command</div><h2>Entrepreneurship</h2><p>Build companies from idea to exit. The new founder engine now owns the Business hub when active.</p></div><div class="biz1861-hero-stat"><b>' + moneyText(portfolioValue) + '</b><span>portfolio value</span></div><div class="biz1861-metric-grid">' +
+    return '<section class="panel biz1861-hero"><div><div class="section-label">Founder command</div><h2>Entrepreneurship</h2><p>Build companies from idea to exit. Entrepreneurship is your founder journey; Business stays separate for managed companies, entities, trust, and family enterprise.</p></div><div class="biz1861-hero-stat"><b>' + moneyText(portfolioValue) + '</b><span>portfolio value</span></div><div class="biz1861-metric-grid">' +
       metric("Active companies", String(active.length), "Run up to 3 at once.", active.length ? "good" : "gold") +
       metric("Founder rep", String(Math.round(num(B.founderReputation, 30))), "Raised by exits, growth, press, and strong profits.", "blue") +
       metric("Lifetime profit", moneyText(B.lifetimeProfit || 0), "Founder distributions and exits.", "green") +
@@ -814,34 +864,178 @@
     }).join("") + '</div></section>';
   }
 
-  function renderActiveBusinessV1861(biz) {
-    if (!biz) return '<section class="panel biz1861-empty"><div class="section-label">Build</div><div class="row"><div><div class="row-title">No active business yet</div><div class="row-sub">Use the founding wizard to create your first company.</div></div><div class="mini-actions">' + actionBtn("Found a Business", "startEntrepreneurV1861()", "green", !canFound()) + '</div></div></section>';
+  function bizNextMilestoneV1862(biz) {
+    if (!biz) return "Found a company to start your founder track.";
+    if (biz.productStage !== "live" && biz.productStage !== "v2") return "Finish product development and launch before growth becomes real.";
+    if (num(biz.runway, 999) < 6 && num(biz.cashInBusiness) > 0) return "Runway is under 6 months: inject capital, raise, or reduce burn.";
+    if (!biz.public && (num(biz.annualRevenue) < 10000000 || num(biz.yearsOld) < 5)) return "IPO path: reach $10M+ revenue and 5+ years trading.";
+    if (!biz.public) return "IPO-ready: choose a float percentage or keep scaling privately.";
+    if (biz.controlLost) return "Public company: buy back above 10% ownership to regain CEO control.";
+    return "Public company: keep growing fundamentals while managing your listed stake.";
+  }
+  function renderDashboardTabsV1862(active, biz) {
+    var panels = [
+      ["overview", "Overview"],
+      ["product", "Product"],
+      ["growth", "Growth"],
+      ["team", "Team"],
+      ["funding", "Funding"],
+      ["public", "Public Market"],
+      ["exit", "Exit"]
+    ];
+    return '<div class="biz1862-tabs">' + panels.map(function (p) {
+      var id = p[0], disabled = id === "public" && (!biz || !biz.public);
+      return '<button class="biz1862-tab ' + (active === id ? "selected" : "") + '" onclick="event.preventDefault();event.stopPropagation();bizSetPanelV1862(\'' + id + '\')"' + (disabled ? " disabled" : "") + '>' + escH(p[1]) + '</button>';
+    }).join("") + '</div>';
+  }
+  function renderBizCommandHeaderV1862(biz, panel) {
     var t = BIZ_TYPES[biz.type] || {};
     var model = BIZ_MODEL_INFO[biz.model] || {};
     var runwayKind = num(biz.runway, 999) < 6 ? "bad" : num(biz.runway, 999) < 12 ? "gold" : "good";
-    var canRaiseSeed = num(biz.annualRevenue) > 0 || biz.productStage !== "concept";
-    var inputId = "biz1861-self-" + escH(biz.uid);
-    var mktgId = "biz1861-mktg-" + escH(biz.uid);
-    return '<section class="panel biz1861-active"><div class="biz1861-active-head"><div><div class="section-label">' + escH(t.emoji || "") + ' Active company</div><h3>' + escH(biz.name) + '</h3><p>' + escH(t.name || "Business") + ' / ' + escH(model.name || biz.model || "Model") + ' / ' + escH(stageLabel(biz.stage)) + '</p></div><strong>' + moneyText(biz.valuation || 0) + '<span>valuation</span></strong></div>' +
+    return '<div class="biz1862-command"><div class="biz1861-active-head"><div><div class="section-label">' + escH(t.emoji || "") + ' Founder command</div><h3>' + escH(biz.name) + '</h3><p>' + escH(t.name || "Business") + ' / ' + escH(model.name || biz.model || "Model") + ' / ' + escH(stageLabel(biz.stage)) + '</p></div><strong>' + moneyText(biz.valuation || 0) + '<span>valuation</span></strong></div>' +
       '<div class="biz1861-metric-grid">' +
       metric("Revenue", moneyText(biz.annualRevenue || 0), "Last year revenue.", (biz.annualRevenue || 0) > 0 ? "green" : "gold") +
-      metric("Profit", moneyText(biz.annualProfit || 0), "Founder payout is 40% of positive profit.", (biz.annualProfit || 0) >= 0 ? "green" : "bad") +
+      metric("Profit", moneyText(biz.annualProfit || 0), "After your salary. You also draw 40% of positive profit.", (biz.annualProfit || 0) >= 0 ? "green" : "bad") +
       metric("Cash", moneyText(biz.cashInBusiness || 0), "Business cash and runway fuel.", runwayKind) +
       metric("Runway", (num(biz.runway, 999) >= 999 ? "Infinite" : Math.max(0, round(biz.runway)) + " mo"), "Below 6 months is dangerous.", runwayKind) +
       metric("Product", escH(stageLabel(biz.productStage)), "Dev " + round(biz.productDev || 0) + " / Quality " + round(biz.productQuality || 0), "blue") +
       metric("Customers", String(round(biz.customers || 0)), "NPS " + round(biz.nps || 0) + " / Churn " + pct(biz.churnRate || 0), "gold") +
-      '</div>' +
-      renderBizGraphsV1861(biz) +
-      '<div class="biz1861-control-grid">' +
-      '<div><b>Capital</b><span>Your cash: ' + moneyText(wealth()) + '</span><div class="biz1861-actions">' + actionBtn("Inject $10K", "bizSelfFundV1861(10000)", "green", wealth() < 10000) + actionBtn("Inject $100K", "bizSelfFundV1861(100000)", "green", wealth() < 100000) + actionBtn("Inject Max", "bizSelfFundV1861('max')", "gold", wealth() <= 0) + '</div><div class="biz1861-custom"><input id="' + inputId + '" placeholder="Custom funding" inputmode="numeric">' + actionBtn("Inject", "bizSelfFundCustomV1861('" + inputId + "')", "green", wealth() <= 0) + '</div></div>' +
-      '<div><b>Marketing</b><span>Current budget: ' + moneyText(biz._mktgBudget || 0) + '/yr</span><div class="biz1861-actions">' + actionBtn("$10K", "bizSetMktgBudgetV1861(10000)", "", false) + actionBtn("$50K", "bizSetMktgBudgetV1861(50000)", "", false) + actionBtn("$250K", "bizSetMktgBudgetV1861(250000)", "", false) + '</div><div class="biz1861-custom"><input id="' + mktgId + '" placeholder="Custom budget" inputmode="numeric">' + actionBtn("Set", "bizSetMktgBudgetCustomV1861('" + mktgId + "')", "blue", false) + '</div></div>' +
-      '<div><b>Dev focus</b><span>Features / Bugs / UX / Customer dev</span><div class="biz1861-actions">' + actionBtn("Ship Fast", "bizSetDevAllocV1861(60,10,20,10)", "blue", false) + actionBtn("Quality", "bizSetDevAllocV1861(30,35,30,5)", "blue", false) + actionBtn("Customer-Led", "bizSetDevAllocV1861(20,10,20,50)", "blue", false) + '</div></div>' +
-      '<div><b>Funding</b><span>Raise equity if the company is ready.</span><div class="biz1861-actions">' + actionBtn("Pre-Seed", "bizRaiseFundingV1861('preseed')", "gold", false) + actionBtn("Seed", "bizRaiseFundingV1861('seed')", "gold", !canRaiseSeed) + actionBtn("Series A", "bizRaiseFundingV1861('seriesA')", "gold", num(biz.annualRevenue) < 500000) + '</div></div>' +
-      '</div>' +
-      renderPublicDeskV1861(biz) +
-      renderHiringV1861(biz) +
-      renderExitDeskV1861(biz) +
-      '</section>';
+      '</div><div class="biz1862-next"><span>Next milestone</span><b>' + escH(bizNextMilestoneV1862(biz)) + '</b></div>' +
+      renderDashboardTabsV1862(panel, biz) + '</div>';
+  }
+  function renderDevFocusControlsV1862(biz) {
+    return '<div class="biz1862-ctl ctl-blue"><b>Dev focus</b><span>Features / Bugs / UX / Customer dev</span><div class="biz1861-actions">' + actionBtn("Ship Fast", "bizSetDevAllocV1861(60,10,20,10)", "blue", false) + actionBtn("Quality", "bizSetDevAllocV1861(30,35,30,5)", "blue", false) + actionBtn("Customer-Led", "bizSetDevAllocV1861(20,10,20,50)", "blue", false) + '</div></div>';
+  }
+  function renderMarketingControlsV1862(biz) {
+    var mktgId = "biz1861-mktg-" + escH(biz.uid);
+    return '<div class="biz1862-ctl ctl-green"><b>Marketing</b><span>Current budget: ' + moneyText(biz._mktgBudget || 0) + '/yr</span><div class="biz1861-actions">' + actionBtn("$10K", "bizSetMktgBudgetV1861(10000)", "", false) + actionBtn("$50K", "bizSetMktgBudgetV1861(50000)", "", false) + actionBtn("$250K", "bizSetMktgBudgetV1861(250000)", "", false) + '</div><div class="biz1861-custom"><input id="' + mktgId + '" placeholder="Custom budget" inputmode="numeric">' + actionBtn("Set", "bizSetMktgBudgetCustomV1861('" + mktgId + "')", "blue", false) + '</div></div>';
+  }
+  function renderCapitalControlsV1862(biz) {
+    var inputId = "biz1861-self-" + escH(biz.uid);
+    return '<div class="biz1862-ctl ctl-gold"><b>Capital</b><span>Your cash: ' + moneyText(wealth()) + '</span><div class="biz1861-actions">' + actionBtn("Inject $10K", "bizSelfFundV1861(10000)", "green", wealth() < 10000) + actionBtn("Inject $100K", "bizSelfFundV1861(100000)", "green", wealth() < 100000) + actionBtn("Inject Max", "bizSelfFundV1861('max')", "gold", wealth() <= 0) + '</div><div class="biz1861-custom"><input id="' + inputId + '" placeholder="Custom funding" inputmode="numeric">' + actionBtn("Inject", "bizSelfFundCustomV1861('" + inputId + "')", "green", wealth() <= 0) + '</div></div>';
+  }
+  function renderFundingControlsV1862(biz) {
+    var canRaiseSeed = num(biz.annualRevenue) > 0 || biz.productStage !== "concept";
+    return '<div class="biz1862-ctl ctl-violet"><b>Funding rounds</b><span>Raise equity if the company is ready.</span><div class="biz1861-actions">' + actionBtn("Pre-Seed", "bizRaiseFundingV1861('preseed')", "gold", false) + actionBtn("Seed", "bizRaiseFundingV1861('seed')", "gold", !canRaiseSeed) + actionBtn("Series A", "bizRaiseFundingV1861('seriesA')", "gold", num(biz.annualRevenue) < 500000) + '</div></div>';
+  }
+  function renderFounderPayControlsV1862(biz) {
+    var rate = clampN(num(biz.founderSalaryRate, FOUNDER_SALARY_RATE_DEFAULT), FOUNDER_SALARY_RATE_MIN, FOUNDER_SALARY_RATE_MAX);
+    var floor = Math.max(0, num(biz.founderSalaryFloor, FOUNDER_SALARY_FLOOR_DEFAULT));
+    var estSalary = Math.max(floor, Math.round(num(biz.annualRevenue) * rate));
+    var lastPaid = num(biz._founderSalaryPaid);
+    var cash = num(biz.cashInBusiness);
+    var distAmt = Math.max(0, Math.round(cash * DISTRIBUTION_RATE_V1862));
+    var distReady = age() > num(biz._lastDistributionAge, -9999);
+    var canDist = biz.active && !biz.dead && cash > 0 && distReady;
+    function rb(p) { return actionBtn(Math.round(p * 100) + "%", "bizSetSalaryRateV1862(" + p + ")", Math.abs(rate - p) < 0.001 ? "gold" : "", false); }
+    return '<div class="biz1862-ctl ctl-green"><b>Founder pay</b><span>Salary last drawn: ' + moneyText(lastPaid) + ' · target ~' + moneyText(estSalary) + '/yr (' + Math.round(rate * 100) + '% of revenue, min ' + moneyText(floor) + ')</span>' +
+      '<div class="biz1861-actions">' + rb(0.03) + rb(0.05) + rb(0.08) + rb(0.10) + '</div>' +
+      '<div class="biz1861-actions">' + actionBtn("Take distribution", "bizTakeDistributionV1862()", "green", !canDist) + '</div>' +
+      '<span style="margin-top:6px">' + escH(distReady ? ("Pull " + moneyText(distAmt) + " (" + Math.round(DISTRIBUTION_RATE_V1862 * 100) + "% of company cash) now") : "Distribution available again next year") + '</span></div>';
+  }
+  function renderFundingHistoryV1862(biz) {
+    var rounds = (biz.fundingRounds || []).slice(-5).reverse();
+    var grants = (biz.grantHistory || []).slice(-4).reverse();
+    var roundRows = rounds.length ? rounds.map(function (r) { return '<div class="biz1862-minirow"><b>' + escH(String(r.round || "round").replace(/_/g, " ")) + '</b><span>' + moneyText(r.amount || 0) + ' / ' + round(r.dilution || 0) + '% dilution / age ' + round(r.age || 0) + '</span></div>'; }).join("") : '<div class="biz1861-spark-empty">No funding rounds yet.</div>';
+    var grantRows = grants.length ? grants.map(function (g) { return '<div class="biz1862-minirow"><b>Grant</b><span>' + moneyText(g.amount || 0) + ' / age ' + round(g.age || 0) + '</span></div>'; }).join("") : '<div class="biz1861-spark-empty">Grant wins will appear here.</div>';
+    return '<div class="biz1862-split"><div><div class="section-label">Funding history</div>' + roundRows + '</div><div><div class="section-label">Grants</div>' + grantRows + '</div></div>';
+  }
+  function renderOverviewPanelV1862(biz) {
+    var hist = Array.isArray(biz.revenueHistory) ? biz.revenueHistory : [];
+    var last = hist.length ? hist[hist.length - 1] : null;
+    var recent = last ? "Latest year: " + moneyText(last.revenue || 0) + " revenue, " + moneyText(last.profit || 0) + " profit, " + round(last.customers || 0) + " customers." : "Age up after launch to build a performance record.";
+    return '<div class="biz1862-panel"><div class="biz1862-callout"><span>Current read</span><b>' + escH(recent) + '</b></div>' + renderBizGraphsV1861(biz, "overview") + '</div>';
+  }
+  function renderProductPanelV1862(biz) {
+    return '<div class="biz1862-panel"><div class="biz1861-control-grid">' + renderDevFocusControlsV1862(biz) + '</div>' + renderBizGraphsV1861(biz, "product") + '</div>';
+  }
+  function renderGrowthPanelV1862(biz) {
+    return '<div class="biz1862-panel"><div class="biz1861-control-grid">' + renderMarketingControlsV1862(biz) + '</div>' + renderBizGraphsV1861(biz, "growth") + '</div>';
+  }
+  function perfKindV1862(p) { return p >= 70 ? "good" : p >= 45 ? "gold" : "bad"; }
+  function initialsV1862(name) {
+    var parts = String(name || "?").trim().split(/\s+/);
+    return ((parts[0] || " ").charAt(0) + ((parts[1] || "").charAt(0) || "")).toUpperCase() || "?";
+  }
+  function renderTeamSummaryV1862(biz) {
+    var emps = biz.employees || [];
+    var coCount = (biz.coFounders || []).length;
+    var head = num(biz.headcount, emps.length + coCount);
+    var payroll = emps.reduce(function (s, e) { return s + num(e.salary); }, 0);
+    var avgPerf = emps.length ? Math.round(emps.reduce(function (s, e) { return s + num(e.performance); }, 0) / emps.length) : 0;
+    var prod = round(biz.productivity || 0);
+    var culture = round(biz.culture || 0);
+    return '<div class="biz1861-metric-grid">' +
+      metric("Headcount", String(head), coCount ? (coCount + " co-founder" + (coCount > 1 ? "s" : "") + " + " + emps.length + " staff") : (emps.length + " on payroll"), head > 0 ? "blue" : "gold") +
+      metric("Payroll", moneyText(payroll) + "/yr", "Salaries across the team.", payroll > 0 ? "gold" : "good") +
+      metric("Productivity", prod + "%", "From culture, performance, and your stress.", prod >= 60 ? "good" : prod >= 40 ? "gold" : "bad") +
+      metric("Culture", culture + "%", "Drifts with leadership and attrition.", culture >= 60 ? "good" : culture >= 40 ? "gold" : "bad") +
+      (emps.length ? metric("Avg performance", String(avgPerf), "Mean across staff.", perfKindV1862(avgPerf)) : "") +
+      '</div>';
+  }
+  function renderRecruitRailV1862(biz) {
+    var cash = num(biz.cashInBusiness);
+    var cards = Object.keys(BIZ_ROLES).slice(0, 8).map(function (id) {
+      var r = BIZ_ROLES[id];
+      var disabled = cash < r.salMin * 0.5;
+      var boost = r.skill ? (r.skill.charAt(0).toUpperCase() + r.skill.slice(1)) : "Operations";
+      return '<div class="biz1862-role' + (disabled ? " off" : "") + '">' +
+        '<div class="biz1862-role-head"><span class="biz1862-role-emoji">' + escH(r.emoji || "") + '</span><b>' + escH(r.title) + '</b></div>' +
+        '<span class="biz1862-role-boost">Boosts ' + escH(boost) + '</span>' +
+        '<div class="biz1862-role-foot"><em>' + compactMoneyV1861(r.salMin) + '–' + compactMoneyV1861(r.salMax) + '</em>' + actionBtn("Hire", "bizHireV1861('" + id + "')", "green", disabled) + '</div>' +
+        '</div>';
+    }).join("");
+    return '<div class="biz1862-subsection"><div class="section-label">Recruit — open roles</div><div class="biz1862-recruit">' + cards + '</div></div>';
+  }
+  function renderRosterV1862(biz) {
+    var emps = biz.employees || [];
+    var cofs = (biz.coFounders || []).map(function (c) {
+      return '<div class="biz1862-emp founder"><div class="biz1862-emp-top"><span class="biz1862-emp-avatar gold">' + escH(initialsV1862(c.name)) + '</span>' +
+        '<div class="biz1862-emp-id"><b>' + escH(c.name) + '</b><span>Co-founder · ' + round(c.equity) + '% equity</span></div></div>' +
+        '<div class="biz1862-perf"><div class="biz1862-perf-bar gold" style="width:100%"></div></div>' +
+        '<div class="biz1862-emp-foot"><span>Founding team</span><em>equity</em></div></div>';
+    }).join("");
+    if (!emps.length && !cofs) return '<div class="biz1862-subsection"><div class="section-label">Roster</div><div class="biz1861-spark-empty">No team yet. Hire your first role above — co-founders count separately.</div></div>';
+    var staff = emps.slice(0, 12).map(function (e) {
+      var role = BIZ_ROLES[e.roleId] || {};
+      var perf = round(e.performance);
+      var pk = perfKindV1862(perf);
+      var tenure = num(e.yearsAtCompany);
+      var risk = num(e.leaveRisk) >= 0.18;
+      return '<div class="biz1862-emp">' +
+        '<div class="biz1862-emp-top"><span class="biz1862-emp-avatar">' + escH(initialsV1862(e.name)) + '</span>' +
+        '<div class="biz1862-emp-id"><b>' + escH(e.name) + '</b><span>' + escH(role.emoji || "") + ' ' + escH(role.title || e.roleId) + '</span></div>' +
+        actionBtn("Fire", "bizFireV1861('" + escH(e.id) + "')", "red", false) + '</div>' +
+        '<div class="biz1862-perf"><div class="biz1862-perf-bar ' + pk + '" style="width:' + Math.max(4, Math.min(100, perf)) + '%"></div></div>' +
+        '<div class="biz1862-emp-foot"><span>Perf ' + perf + ' · ' + (tenure ? tenure + "y tenure" : "new hire") + (risk ? ' · <i class="warn">flight risk</i>' : '') + '</span><em>' + moneyText(e.salary) + '/yr</em></div>' +
+        '</div>';
+    }).join("");
+    return '<div class="biz1862-subsection"><div class="section-label">Roster</div><div class="biz1862-roster">' + cofs + staff + '</div></div>';
+  }
+  function renderTeamPanelV1862(biz) {
+    return '<div class="biz1862-panel">' +
+      renderTeamSummaryV1862(biz) +
+      renderRecruitRailV1862(biz) +
+      renderRosterV1862(biz) +
+      renderBizGraphsV1861(biz, "team") +
+      '</div>';
+  }
+  function renderFundingPanelV1862(biz) {
+    return '<div class="biz1862-panel"><div class="biz1861-control-grid">' + renderFounderPayControlsV1862(biz) + renderCapitalControlsV1862(biz) + renderFundingControlsV1862(biz) + '</div>' + renderFundingHistoryV1862(biz) + renderBizGraphsV1861(biz, "funding") + '</div>';
+  }
+  function renderActivePanelBodyV1862(biz, panel) {
+    if (panel === "product") return renderProductPanelV1862(biz);
+    if (panel === "growth") return renderGrowthPanelV1862(biz);
+    if (panel === "team") return renderTeamPanelV1862(biz);
+    if (panel === "funding") return renderFundingPanelV1862(biz);
+    if (panel === "public") return '<div class="biz1862-panel">' + renderPublicDeskV1861(biz) + '</div>';
+    if (panel === "exit") return '<div class="biz1862-panel">' + renderExitDeskV1861(biz) + '</div>';
+    return renderOverviewPanelV1862(biz);
+  }
+  function renderActiveBusinessV1861(biz) {
+    if (!biz) return '<section class="panel biz1861-empty"><div class="section-label">Build</div><div class="row"><div><div class="row-title">No active business yet</div><div class="row-sub">Use the founding wizard to create your first company.</div></div><div class="mini-actions">' + actionBtn("Found a Business", "startEntrepreneurV1861()", "green", !canFound()) + '</div></div></section>';
+    var panel = dashboardPanelV1862(biz);
+    return '<section class="panel biz1861-active biz1862-accent-' + escH(panel) + '">' + renderBizCommandHeaderV1862(biz, panel) + renderActivePanelBodyV1862(biz, panel) + '</section>';
   }
 
   function renderPublicDeskV1861(biz) {
@@ -851,34 +1045,40 @@
     var shares = h ? num(h.shares) : 0;
     var stakeVal = shares * price;
     var ownPct = bizOwnershipPctV1861(biz);
+    var totalShares = num(biz.shares);
+    var publicShares = Math.max(0, totalShares - shares);
+    var publicFloatPct = totalShares > 0 ? clampN((publicShares / totalShares) * 100, 0, 100) : 0;
+    var buyoutCost = Math.round(publicShares * price);
     var hist = (fin().stocksV18 && fin().stocksV18.history && fin().stocksV18.history[biz.shareTicker]) || [price];
     var ipo = num(biz._ipoPrice, price);
     var sinceIpo = ipo > 0 ? ((price - ipo) / ipo) * 100 : 0;
+    var lastMove = num(biz.lastPriceMoveV1862);
+    var market = num(biz.lastMarketFactorV1862);
+    var marketLabel = market > 0.025 ? "Market tailwind" : market < -0.025 ? "Market headwind" : "Flat market";
+    var moveLabel = (lastMove > 0 ? "+" : "") + (lastMove * 100).toFixed(1) + "% last update";
+    var marketKind = market > 0.025 ? "good" : market < -0.025 ? "bad" : "blue";
     var buyId = "biz1861-buyown-" + escH(biz.uid);
     var sellId = "biz1861-sellown-" + escH(biz.uid);
     return '<div class="biz1861-public"><div class="section-label">📡 Public company — ' + escH(biz.shareTicker) + (biz.controlLost ? ' <span class="biz1861-ctrl-lost">control lost</span>' : ' <span class="biz1861-ctrl-ok">you are CEO</span>') + '</div>' +
       '<div class="biz1861-metric-grid">' +
       metric("Share price", moneyText(price), (sinceIpo >= 0 ? "▲ +" : "▼ ") + Math.round(sinceIpo) + "% since IPO at " + moneyText(ipo), sinceIpo >= 0 ? "good" : "bad") +
-      metric("Your stake", moneyText(stakeVal), Math.round(ownPct) + "% of the company · counts in your net worth", ownPct >= 25 ? "green" : ownPct >= 10 ? "gold" : "bad") +
-      metric("Float", Math.round(num(biz.floatPct)) + "%", "Shares trading publicly. " + escH(biz.shareTicker) + " shows in your Stocks portfolio.", "blue") +
+      metric("Your stake", moneyText(stakeVal), Math.round(ownPct) + "% · " + compactSharesV1862(shares) + " of " + compactSharesV1862(totalShares) + " sh · counts in net worth", ownPct >= 25 ? "green" : ownPct >= 10 ? "gold" : "bad") +
+      metric("Public float", Math.round(publicFloatPct) + "%", compactSharesV1862(publicShares) + " sh trade as " + escH(biz.shareTicker) + " in your Stocks portfolio", "blue") +
+      metric("Market signal", marketLabel, moveLabel + " / beta " + (market * 100).toFixed(1) + "%", marketKind) +
       '</div>' + sparkSVG(hist, sinceIpo >= 0 ? BIZ_CHART_COLORS.rev : "#e9927d") +
       '<div class="biz1861-control-grid" style="margin-top:10px">' +
       '<div><b>Invest in yourself</b><span>Buy ' + escH(biz.shareTicker) + ' with personal cash (' + moneyText(wealth()) + ')</span><div class="biz1861-actions">' + actionBtn("Buy $10K", "bizBuyOwnStockV1861(10000)", "green", wealth() < 10000) + actionBtn("Buy $100K", "bizBuyOwnStockV1861(100000)", "green", wealth() < 100000) + actionBtn("Buy Max", "bizBuyOwnStockV1861('max')", "gold", wealth() <= 0) + '</div><div class="biz1861-custom"><input id="' + buyId + '" placeholder="Custom buy" inputmode="numeric">' + actionBtn("Buy", "bizBuyOwnStockCustomV1861('" + buyId + "')", "green", wealth() <= 0) + '</div></div>' +
       '<div><b>Sell shares</b><span>Cash out part of your stake</span><div class="biz1861-actions">' + actionBtn("Sell $10K", "bizSellOwnStockV1861(10000)", "", stakeVal < 10000) + actionBtn("Sell $100K", "bizSellOwnStockV1861(100000)", "", stakeVal < 100000) + actionBtn("Sell All", "bizSellOwnStockV1861('max')", "red", stakeVal <= 0) + '</div><div class="biz1861-custom"><input id="' + sellId + '" placeholder="Custom sell" inputmode="numeric">' + actionBtn("Sell", "bizSellOwnStockCustomV1861('" + sellId + "')", "", stakeVal <= 0) + '</div></div>' +
+      (function () {
+        var divRate = clampN(num(biz.dividendRateV1862), 0, 0.10);
+        function dvb(r) { return actionBtn(r === 0 ? "Off" : Math.round(r * 100) + "%", "bizSetDividendRateV1862(" + r + ")", Math.abs(divRate - r) < 0.001 ? "gold" : "", false); }
+        return '<div class="biz1862-ctl ctl-green"><b>Dividend policy</b><span>Return a share of yearly profit to holders. Last paid: ' + moneyText(num(biz._lastDividendV1862)) + ' (' + moneyText(num(biz._lastFounderDivV1862)) + ' to you). Capped to cash — never bankrupts the company.</span><div class="biz1861-actions">' + dvb(0) + dvb(0.05) + dvb(0.10) + '</div></div>';
+      })() +
+      '<div class="biz1862-ctl ctl-blue"><b>Split stock</b><span>Reprice shares without changing value, your ' + Math.round(ownPct) + '% stake, or the ' + Math.round(publicFloatPct) + '% float. Price now ' + moneyText(price) + ' · ' + compactSharesV1862(totalShares) + ' shares.</span><div class="biz1861-actions">' + actionBtn("2:1 Split", "bizSplitStockV1862(2)", "", false) + actionBtn("10:1 Split", "bizSplitStockV1862(10)", "", false) + actionBtn("1:2 Reverse", "bizSplitStockV1862(0.5)", "", false) + '</div></div>' +
+      (ownPct >= 90 && publicShares > 0 ? '<div class="biz1862-ctl ctl-gold"><b>Take private</b><span>Buy out the remaining ' + compactSharesV1862(publicShares) + ' public shares (~' + moneyText(buyoutCost) + ') and delist ' + escH(biz.shareTicker) + '.</span><div class="biz1861-actions">' + actionBtn("Take Private", "bizTakePrivateV1862()", "gold", wealth() < buyoutCost) + '</div></div>' : '') +
       '</div>' +
       (ownPct < 25 && ownPct > 0 ? '<div class="biz1861-sublabel" style="color:#e0a35f">Hold ≥25% to keep a strong grip on the board. Below 10% you lose CEO control.</div>' : '') +
       '</div>';
-  }
-
-  function renderHiringV1861(biz) {
-    var roles = Object.keys(BIZ_ROLES).slice(0, 8).map(function (id) {
-      var r = BIZ_ROLES[id];
-      return actionBtn((r.emoji || "") + " " + r.title, "bizHireV1861('" + id + "')", "", num(biz.cashInBusiness) < r.salMin * 0.5);
-    }).join("");
-    var staff = (biz.employees || []).slice(0, 8).map(function (e) {
-      return '<div class="biz1861-staff"><b>' + escH(e.name) + '</b><span>' + escH((BIZ_ROLES[e.roleId] || {}).title || e.roleId) + ' / ' + moneyText(e.salary) + '/yr / Perf ' + round(e.performance) + '</span>' + actionBtn("Fire", "bizFireV1861('" + escH(e.id) + "')", "red", false) + '</div>';
-    }).join("");
-    return '<div class="biz1861-hiring"><div class="section-label">Team</div><div class="biz1861-actions">' + roles + '</div>' + (staff ? '<div class="biz1861-staff-grid">' + staff + '</div>' : '<div class="row-sub">No employees yet. Co-founders count separately.</div>') + '</div>';
   }
 
   function renderExitDeskV1861(biz) {
@@ -908,25 +1108,13 @@
     return rows ? '<section class="panel biz1861-history"><div class="section-label">Founder track record</div>' + rows + '</section>' : "";
   }
 
-  function renderOldBusinessCheckV1861() {
-    var chk = oldBusinessCheckV1861();
-    if (!chk.oldCount && !chk.migrated && !chk.duplicates) return "";
-    return '<section class="panel biz1861-migration"><div class="section-label">Old Business Check</div><div class="biz1861-metric-grid">' +
-      metric("Old records found", String(chk.oldCount), "Legacy businesses/startups still present in older save fields.", chk.oldCount ? "gold" : "good") +
-      metric("Migrated copies", String(chk.migrated), "Represented in the new entrepreneur portfolio.", chk.migrated ? "green" : "bad") +
-      metric("Duplicates", String(chk.duplicates), "Repeated companies from overlapping migrations — repair to merge.", chk.duplicates ? "bad" : "good") +
-      metric("New portfolio", String(chk.newCount), "Total companies in bizV1860.", chk.newCount ? "blue" : "gold") +
-      '</div><div class="biz1861-actions">' +
-      actionBtn("Recheck / Migrate Old Businesses", "migrateOldBusinessesV1861()", "gold", false) +
-      (chk.duplicates ? actionBtn("Merge " + chk.duplicates + " Duplicate" + (chk.duplicates === 1 ? "" : "s"), "repairDuplicateBusinessesV1861()", "bad", false) : "") +
-      '</div></section>';
-  }
-
   function renderEntrepreneurHubV1861() {
     var B = initBiz();
     var active = activeBusinesses();
     var wizard = renderWizardV1861();
-    var html = '<div class="biz1861-shell">' + renderFounderStatsV1861(B, active) + renderOldBusinessCheckV1861() + wizard + renderBusinessSwitcherV1861(active) + renderActiveBusinessV1861(getActiveBiz()) + renderHistoryV1861();
+    // Old-business migration/repair tooling moved to the hidden Dev Tools (?dev=1); migration
+    // still runs automatically via initBiz(), and the data fn oldBusinessCheckV1861 stays exported.
+    var html = '<div class="biz1861-shell">' + renderFounderStatsV1861(B, active) + wizard + renderBusinessSwitcherV1861(active) + renderActiveBusinessV1861(getActiveBiz()) + renderHistoryV1861();
     if (active.length && active.length < 3) html += '<section class="panel biz1861-new"><div class="row"><div><div class="row-title">Start another company</div><div class="row-sub">Multiple companies split attention and raise stress, but can build a portfolio.</div></div><div class="mini-actions">' + actionBtn("Found Another", "bizStartSecondV1861()", "green", false) + '</div></div></section>';
     return html + '</div>';
   }
@@ -977,6 +1165,14 @@
   window.EntrepreneurV1861_BIZ_ROLES = BIZ_ROLES;
   window.EntrepreneurV1861_FUNDING_ROUNDS = FUNDING_ROUNDS;
 
+  // Founder pay model (v18.62): a founder draws a living salary from the company
+  // (a real operating cost, capped to what the company can fund) plus the existing
+  // profit distribution, and can pull a yearly one-time distribution from cash.
+  var FOUNDER_SALARY_RATE_DEFAULT = 0.05;   // share of revenue, adjustable 3%–10%
+  var FOUNDER_SALARY_FLOOR_DEFAULT = 40000; // minimum livable draw when affordable
+  var FOUNDER_SALARY_RATE_MIN = 0.03, FOUNDER_SALARY_RATE_MAX = 0.10;
+  var DISTRIBUTION_RATE_V1862 = 0.15;       // yearly one-time chunk of company cash
+
   function clamp01(v) { return clampN(v, 0, 100); }
   function setMoney(v) { S().money = round(v); }
   function addMoney(v) { S().money = round(wealth() + num(v)); }
@@ -986,7 +1182,11 @@
     var B = fin().bizV1860;
     if (!B || !B.active) return;
     B.yearsAsFounder = num(B.yearsAsFounder) + 1;
-    fin().lastEntrepreneurIncome = 0; // accumulate founder payouts this year (taxed downstream)
+    // Seed this year's taxable founder income with any manual distributions taken
+    // since the last tick, then clear the pending bucket. Salary + profit share add
+    // on top below, so each draw is taxed exactly once.
+    fin().lastEntrepreneurIncome = round(num(fin().pendingFounderDrawV1862));
+    fin().pendingFounderDrawV1862 = 0;
     var g = 0.3;
     B.skills.vision     = Math.min(10, num(B.skills.vision, 1)     + g * 0.8);
     B.skills.execution  = Math.min(10, num(B.skills.execution, 1)  + g * 0.7);
@@ -1119,17 +1319,30 @@
     var m = ensureStocksV18Store();
     var fair = Math.max(0.01, num(biz.valuation) / num(biz.shares));
     var prev = num(m.prices[biz.shareTicker]) || fair;
+    var marketFactor = _marketFactorV1861();
     var noise = (Math.random() - 0.5) * 0.12;
-    var next = fair * (1 + 0.6 * _marketFactorV1861() + noise);
+    var next = fair * (1 + 0.6 * marketFactor + noise);
     next = Math.max(0.01, Math.round((prev * 0.3 + next * 0.7) * 100) / 100);
     m.prices[biz.shareTicker] = next;
     if (!Array.isArray(m.history[biz.shareTicker])) m.history[biz.shareTicker] = [prev];
     m.history[biz.shareTicker] = m.history[biz.shareTicker].concat([next]).slice(-20);
+    biz.lastMarketFactorV1862 = marketFactor;
+    biz.lastPriceMoveV1862 = prev > 0 ? (next - prev) / prev : 0;
   }
   function _bizFullyExitPublic(biz) {
     biz.active = false; biz.exitType = 'ipo_exit'; biz.exitAge = age();
     var B = fin().bizV1860; if (B) { if (!Array.isArray(B.exitHistory)) B.exitHistory = []; B.exitHistory.push({ bizId: biz.uid, name: biz.name, exitType: 'ipo_exit', salePrice: 0, age: age() }); B.totalExits = num(B.totalExits) + 1; }
     log("🏁 You sold your entire stake in " + biz.name + ". Fully exited.");
+  }
+  // Take the company private: remove the public ticker from the market; your shares
+  // become private equity again (still counted via the company valuation in net worth).
+  function _bizTakePrivateV1862(biz) {
+    var ticker = biz.shareTicker;
+    var m = ensureStocksV18Store();
+    if (ticker) { delete m.prices[ticker]; delete m.history[ticker]; m.holdings = m.holdings.filter(function (h) { return h.id !== ticker; }); }
+    biz.public = false; biz.controlLost = false; biz.floatPct = 0; biz.equity = 100;
+    biz._wasPublicV1862 = true; biz.shareTicker = "";
+    log("🔒 " + biz.name + (ticker ? " (" + ticker + ")" : "") + " was taken private and delisted. You own 100% again.");
   }
 
   function _runBizSalesEngine(biz, attentionMult) {
@@ -1141,10 +1354,20 @@
     var stageGrowth = ({ 'pre-revenue': 0.02, early: 0.08, growth: 0.18, scale: 0.30, mature: 0.10 })[biz.stage] || 0.05;
     var organicRate = (stageGrowth + (sales / 10) * 0.05 + (mktg / 100000) * 0.08) * qualityMult * npsBonus * attentionMult;
     var newCustomers = Math.max(biz.customers === 0 ? rnd(1, 5) : 0, Math.floor(num(biz.customers) * organicRate + (mktg / (num(biz.cac) || 500))));
-    biz.customers = num(biz.customers) + newCustomers;
     var typeDef = BIZ_TYPES[biz.type];
-    var custCap = typeDef ? typeDef.marketSizeM * 100 : 50000;
-    biz.customers = Math.min(biz.customers, custCap);
+    var baseM = typeDef ? typeDef.marketSizeM : 100;
+    // The market expands over time (~4%/yr) and a strong brand reaches more of it, so a
+    // great company keeps growing — and growing profit — instead of freezing forever at a
+    // hard customer cap (the old `marketSizeM * 100` froze profit once saturated).
+    biz._marketExpansionV1862 = num(biz._marketExpansionV1862, 1) * 1.04;
+    var brandReach = 0.8 + (num(biz.brand, 30) / 100) * 1.6; // brand 0→0.8x, 100→2.4x
+    var custCap = Math.round(baseM * 120 * brandReach * biz._marketExpansionV1862);
+    // Soft saturation: capture at most ~half the remaining headroom each year (diminishing
+    // returns) so growth tapers smoothly toward the cap rather than stopping dead.
+    var room = Math.max(0, custCap - num(biz.customers));
+    newCustomers = Math.min(Math.max(0, newCustomers), Math.ceil(room * 0.5) + 1);
+    biz.customers = Math.min(custCap, num(biz.customers) + newCustomers);
+    if (typeDef) biz.marketSize = Math.max(num(biz.marketSize), baseM * 1000000 * biz._marketExpansionV1862);
     var churnMult = biz.nps < 0 ? 1.4 : biz.nps > 50 ? 0.7 : 1.0;
     var churned = Math.floor(num(biz.customers) * num(biz.churnRate) * churnMult);
     biz.customers = Math.max(0, biz.customers - churned);
@@ -1187,17 +1410,31 @@
     else if (biz.model === 'affiliate') { gross = num(biz.customers) * num(biz._avgOrderValue, 200) * num(biz._commission, 0.12); }
     else { gross = num(biz.customers) * num(biz._avgSellingPrice, 200); }
     if (biz.franchiseActive && num(biz.franchiseUnits) > 0) gross += num(biz.franchiseUnits) * gross * 0.35 * 0.065;
+    // Cap revenue BEFORE computing gross profit so revenue and profit stay consistent
+    // (profit can never exceed revenue). Ceiling raised to $5B so a great company can
+    // scale into the billions instead of freezing at the old $500M.
+    gross = Math.min(gross, 5000000000);
     var grossProfit = gross * gm;
     var staffCosts = (biz.employees || []).reduce(function (s, e) { return s + num(e.salary); }, 0);
     var coFounderCosts = (biz.coFounders || []).length * 60000;
     var mktgCosts = num(biz._mktgBudget);
     var toolsCosts = num(biz.headcount) * 2400;
-    var totalCosts = staffCosts + coFounderCosts + mktgCosts + toolsCosts;
-    gross = Math.min(gross, 500000000);
+    var operatingCosts = staffCosts + coFounderCosts + mktgCosts + toolsCosts;
+    // Founder salary: pay yourself a living wage from the company so founding can be
+    // your livelihood before it turns a net profit. It is a real cost (lowers profit)
+    // and is capped at what the company can actually fund this year, so it never drives
+    // company cash negative by itself.
+    var salRate = clampN(num(biz.founderSalaryRate, FOUNDER_SALARY_RATE_DEFAULT), FOUNDER_SALARY_RATE_MIN, FOUNDER_SALARY_RATE_MAX);
+    var salFloor = Math.max(0, num(biz.founderSalaryFloor, FOUNDER_SALARY_FLOOR_DEFAULT));
+    var salaryTarget = Math.max(salFloor, Math.round(gross * salRate));
+    var fundableForSalary = Math.max(0, num(biz.cashInBusiness) + grossProfit - operatingCosts);
+    var founderSalary = Math.max(0, Math.min(salaryTarget, Math.round(fundableForSalary)));
+    var totalCosts = operatingCosts + founderSalary;
     biz.annualRevenue = gross;
     biz.annualCosts = totalCosts;
-    biz.annualProfit = grossProfit - totalCosts;
+    biz.annualProfit = grossProfit - totalCosts; // profit AFTER your salary
     biz.lifetimeRevenue = num(biz.lifetimeRevenue) + gross;
+    biz._founderSalaryPaid = founderSalary;
     var founderPayout = Math.max(0, Math.round(biz.annualProfit * 0.4));
     var retainedProfit = biz.annualProfit - founderPayout;
     biz.cashInBusiness = num(biz.cashInBusiness) + retainedProfit;
@@ -1215,14 +1452,34 @@
     if (biz.revenueHistory.length > 30) biz.revenueHistory.shift();
     B.lifetimeRevenue = num(B.lifetimeRevenue) + gross;
     biz._yearWithdrawn = 0;
-    if (founderPayout > 0) {
-      biz._yearWithdrawn = founderPayout;
-      addMoney(founderPayout);
-      B.lifetimeProfit = num(B.lifetimeProfit) + founderPayout;
-      fin().lastEntrepreneurIncome = round(num(fin().lastEntrepreneurIncome) + founderPayout); // taxed by v18.24 true-up
+    var founderTake = founderSalary + founderPayout; // living salary + profit distribution
+    if (founderTake > 0) {
+      biz._yearWithdrawn = founderTake;
+      addMoney(founderTake);
+      B.lifetimeProfit = num(B.lifetimeProfit) + founderTake;
+      fin().lastEntrepreneurIncome = round(num(fin().lastEntrepreneurIncome) + founderTake); // taxed by v18.24 true-up
+    }
+    // Dividends: a public company can return a % of POSITIVE profit to shareholders. The
+    // pool is capped to available cash so a dividend can never push the company into the red.
+    // You receive your ownership share (taxable); the public float's share leaves the company.
+    biz._lastDividendV1862 = 0; biz._lastFounderDivV1862 = 0;
+    if (biz.public && num(biz.dividendRateV1862) > 0 && biz.annualProfit > 0) {
+      var pool = Math.min(Math.round(biz.annualProfit * clampN(num(biz.dividendRateV1862), 0, 0.10)), Math.max(0, Math.round(num(biz.cashInBusiness))));
+      if (pool > 0) {
+        biz.cashInBusiness = num(biz.cashInBusiness) - pool;
+        var founderDiv = Math.round(pool * clampN(bizOwnershipPctV1861(biz) / 100, 0, 1));
+        biz._lastDividendV1862 = pool; biz._lastFounderDivV1862 = founderDiv;
+        if (founderDiv > 0) {
+          addMoney(founderDiv);
+          B.lifetimeProfit = num(B.lifetimeProfit) + founderDiv;
+          fin().lastEntrepreneurIncome = round(num(fin().lastEntrepreneurIncome) + founderDiv);
+        }
+        log("💵 " + biz.name + " paid a " + Math.round(num(biz.dividendRateV1862) * 100) + "% dividend — " + moneyText(pool) + " to shareholders (" + moneyText(founderDiv) + " to you).", founderDiv > 0 ? { money: founderDiv } : {});
+      }
     }
     var emoji = BIZ_TYPES[biz.type] ? BIZ_TYPES[biz.type].emoji : '🏢';
-    log(emoji + " " + biz.name + " — Revenue " + moneyText(gross) + ", Profit " + moneyText(biz.annualProfit) + ", Cash " + moneyText(biz.cashInBusiness) + ", Customers " + biz.customers + ", Stage " + String(biz.stage).toUpperCase() + (founderPayout > 0 ? ". You drew " + moneyText(founderPayout) + "." : ""), founderPayout > 0 ? { money: founderPayout } : {});
+    var takeNote = founderTake > 0 ? (". You took " + moneyText(founderTake) + " — salary " + moneyText(founderSalary) + (founderPayout > 0 ? " + profit share " + moneyText(founderPayout) : "")) : "";
+    log(emoji + " " + biz.name + " — Revenue " + moneyText(gross) + ", Profit " + moneyText(biz.annualProfit) + ", Cash " + moneyText(biz.cashInBusiness) + ", Customers " + biz.customers + ", Stage " + String(biz.stage).toUpperCase() + takeNote + ".", founderTake > 0 ? { money: founderTake } : {});
     if (biz.runway < 6 && biz.runway > 0 && biz.cashInBusiness > 0) log("🚨 " + biz.name + ": only " + biz.runway + " months runway. Inject capital, raise, or cut costs.");
     _checkBizDeath(biz);
   }
@@ -1400,16 +1657,68 @@
     var amt = amount === "max" ? Math.max(0, round(wealth())) : Math.min(Math.max(0, round(wealth())), Math.max(0, round(amount)));
     if (!amt) { toast("Not enough personal cash."); return; }
     var m = ensureStocksV18Store();
-    var shares = amt / price;
     var h = bizShareHoldingV1861(biz);
     if (!h) { h = { id: biz.shareTicker, shares: 0, avgCost: price, invested: 0, _entrepreneurV1861: true }; m.holdings.push(h); }
+    // You can only buy back what actually trades publicly (the float) — not phantom shares.
+    var maxBuyable = Math.max(0, num(biz.shares) - num(h.shares));
+    if (maxBuyable <= 0) { toast("You already hold every share."); return; }
+    var shares = Math.min(amt / price, maxBuyable);
+    var spent = Math.round(shares * price);
+    if (spent <= 0) { toast("Not enough to buy a share."); return; }
     var oldCost = num(h.shares) * num(h.avgCost, price);
     h.shares = num(h.shares) + shares;
-    h.avgCost = (oldCost + amt) / h.shares;
-    h.invested = num(h.invested) + amt;
-    setMoney(wealth() - amt);
-    if (num(bizOwnershipPctV1861(biz)) >= 10) biz.controlLost = false;
-    log("📈 Bought " + moneyText(amt) + " of your own stock (" + biz.shareTicker + " @ " + moneyText(price) + "). You now own " + Math.round(bizOwnershipPctV1861(biz)) + "%.", { money: -amt });
+    h.avgCost = (oldCost + spent) / h.shares;
+    h.invested = num(h.invested) + spent;
+    setMoney(wealth() - spent);
+    var ownNow = num(bizOwnershipPctV1861(biz));
+    if (ownNow >= 10) biz.controlLost = false;
+    biz.floatPct = Math.max(0, Math.round(100 - ownNow)); // public float shrinks as you buy back
+    log("📈 Bought " + moneyText(spent) + " of your own stock (" + biz.shareTicker + " @ " + moneyText(price) + "). You now own " + Math.round(ownNow) + "%.", { money: -spent });
+    if (ownNow >= 99.5) _bizTakePrivateV1862(biz); // repurchased the whole float → delist
+    saveGame(); rerender();
+  };
+  // Take the company private by buying out the remaining public float in one move.
+  window.bizTakePrivateV1862 = function () {
+    var biz = getActiveBiz(); if (!biz || !biz.public) { toast("No public company."); return; }
+    var price = bizSharePriceV1861(biz); if (price <= 0) { toast("No share price yet."); return; }
+    var h = bizShareHoldingV1861(biz); var yourShares = h ? num(h.shares) : 0;
+    var publicShares = Math.max(0, num(biz.shares) - yourShares);
+    if (publicShares <= 0) { _bizTakePrivateV1862(biz); saveGame(); rerender(); return; }
+    var cost = Math.round(publicShares * price);
+    if (wealth() < cost) { toast("Need " + moneyText(cost) + " to buy out the public float."); return; }
+    setMoney(wealth() - cost);
+    _bizTakePrivateV1862(biz);
+    log("🏛️ You bought out " + compactSharesV1862(publicShares) + " public shares for " + moneyText(cost) + " and took " + biz.name + " private.", { money: -cost });
+    bump("confidence", 2);
+    saveGame(); rerender();
+  };
+  // Stock split / reverse split: changes share count and price WITHOUT changing total value,
+  // your ownership %, or the public float %. factor>1 splits (cheaper shares so anyone can
+  // buy in); factor<1 is a reverse split (fewer, pricier shares).
+  window.bizSplitStockV1862 = function (factor) {
+    var biz = getActiveBiz(); if (!biz || !biz.public) { toast("Only a public company's stock can be split."); return; }
+    factor = num(factor);
+    if (!(factor > 0) || factor === 1) return;
+    var m = ensureStocksV18Store(); var t = biz.shareTicker;
+    var price = bizSharePriceV1861(biz); if (price <= 0) { toast("No share price yet."); return; }
+    var newPrice = price / factor;
+    if (newPrice < 0.05) { toast("That split would push the share price below $0.05."); return; }
+    if (newPrice > 5000000) { toast("That reverse split would push the share price too high."); return; }
+    biz.shares = Math.max(1, Math.round(num(biz.shares) * factor));
+    if (num(biz._ipoPrice)) biz._ipoPrice = num(biz._ipoPrice) / factor;
+    m.prices[t] = Math.max(0.01, Math.round(newPrice * 100) / 100);
+    if (Array.isArray(m.history[t])) m.history[t] = m.history[t].map(function (p) { return Math.max(0.01, Math.round((num(p) / factor) * 100) / 100); });
+    var h = bizShareHoldingV1861(biz);
+    if (h) { h.shares = num(h.shares) * factor; if (num(h.avgCost)) h.avgCost = num(h.avgCost) / factor; }
+    var label = factor > 1 ? (Math.round(factor) + "-for-1 split — cheaper shares, anyone can buy a slice") : ("1-for-" + Math.round(1 / factor) + " reverse split — fewer, pricier shares");
+    log("🪓 " + biz.name + " (" + t + ") did a " + label + ". Your " + Math.round(bizOwnershipPctV1861(biz)) + "% stake and the " + Math.round(num(biz.floatPct)) + "% float are unchanged.");
+    saveGame(); rerender();
+  };
+  // Dividend policy for a public company (share of yearly profit returned to shareholders).
+  window.bizSetDividendRateV1862 = function (rate) {
+    var biz = getActiveBiz(); if (!biz || !biz.public) { toast("Only public companies pay dividends."); return; }
+    biz.dividendRateV1862 = clampN(num(rate), 0, 0.10);
+    log("💵 " + biz.name + " set its dividend to " + Math.round(biz.dividendRateV1862 * 100) + "% of yearly profit.");
     saveGame(); rerender();
   };
   window.bizBuyOwnStockCustomV1861 = function (inputId) {
@@ -1459,6 +1768,38 @@
     log("💸 Injected " + moneyText(amt) + " of your own cash into " + biz.name + ".", { money: -amt }); bump("confidence", 1); saveGame(); rerender();
   };
 
+  // Founder pay: adjust your auto-salary rate (share of revenue, 3%–10%).
+  window.bizSetSalaryRateV1862 = function (rate) {
+    var biz = getActiveBiz(); if (!biz) return;
+    biz.founderSalaryRate = clampN(num(rate, FOUNDER_SALARY_RATE_DEFAULT), FOUNDER_SALARY_RATE_MIN, FOUNDER_SALARY_RATE_MAX);
+    log("🧾 " + biz.name + ": founder salary set to " + Math.round(biz.founderSalaryRate * 100) + "% of revenue (min " + moneyText(num(biz.founderSalaryFloor, FOUNDER_SALARY_FLOOR_DEFAULT)) + ").");
+    saveGame(); rerender();
+  };
+
+  // Take a one-time distribution from company cash (once per year).
+  window.bizTakeDistributionV1862 = function () {
+    var biz = getActiveBiz(); if (!biz) { toast("No active business."); return; }
+    if (!biz.active || biz.dead) { toast("This company is no longer active."); return; }
+    if (age() <= num(biz._lastDistributionAge, -9999)) { toast("You already took a distribution this year."); return; }
+    var cash = num(biz.cashInBusiness);
+    if (cash <= 0) { toast("No company cash to distribute."); return; }
+    var amt = Math.max(0, Math.round(cash * DISTRIBUTION_RATE_V1862));
+    if (amt <= 0) { toast("Company cash is too low to distribute."); return; }
+    biz.cashInBusiness = cash - amt;
+    biz._lastDistributionAge = age();
+    addMoney(amt);
+    var B = initBiz();
+    B.lifetimeProfit = num(B.lifetimeProfit) + amt;
+    // Defer tax to the next yearly tick (folded into taxable founder income there);
+    // reflect immediately in the UI's "Last founder income" until then.
+    fin().pendingFounderDrawV1862 = round(num(fin().pendingFounderDrawV1862) + amt);
+    fin().lastEntrepreneurIncome = round(num(fin().lastEntrepreneurIncome) + amt);
+    if (num(biz.burnRate) > 0) biz.runway = Math.round(biz.cashInBusiness / num(biz.burnRate));
+    log("💸 You took a " + moneyText(amt) + " distribution from " + biz.name + " (" + Math.round(DISTRIBUTION_RATE_V1862 * 100) + "% of company cash).", { money: amt });
+    bump("happiness", 2);
+    saveGame(); rerender();
+  };
+
   // Hook the yearly engine into the age-up chain (run BEFORE prev so founder income is
   // taxed by the downstream v18.24 true-up). New businesses live in bizV1860.businesses,
   // separate from the legacy state.finance.businesses[], so the old core loop can't double-tick.
@@ -1482,7 +1823,7 @@
         ".biz1861-shell *{box-sizing:border-box}.biz1861-shell .panel{min-width:0;overflow:hidden;border:1px solid rgba(216,173,109,.22);border-radius:12px;background:linear-gradient(135deg,rgba(31,27,21,.96),rgba(18,16,13,.97));padding:14px}",
         ".biz1861-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start}.biz1861-hero h2,.biz1861-active h3{margin:0;color:#fff3df}.biz1861-hero p,.biz1861-active p{margin:5px 0 0;color:#b9a98e;line-height:1.4}",
         ".biz1861-hero-stat,.biz1861-active-head strong{border:1px solid rgba(255,255,255,.12);border-radius:10px;background:rgba(255,255,255,.05);padding:10px 12px;text-align:right;color:#fff3df}.biz1861-hero-stat b,.biz1861-active-head strong{display:block;font-size:20px}.biz1861-hero-stat span,.biz1861-active-head strong span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;margin-top:3px}",
-        ".biz1861-metric-grid{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-top:4px}.biz1861-metric{border:1px solid rgba(255,255,255,.10);border-radius:10px;background:rgba(255,255,255,.045);padding:10px;min-width:0}.biz1861-metric span{display:block;color:#d8b16e;font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.12em}.biz1861-metric b{display:block;color:#fff3df;font-size:17px;margin-top:5px;overflow-wrap:anywhere}.biz1861-metric em{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;font-style:normal;line-height:1.4;margin-top:4px}.biz1861-metric.good b{color:#9fd07d}.biz1861-metric.bad b{color:#e9927d}.biz1861-metric.gold b{color:#d8b16e}.biz1861-metric.blue b{color:#7ea0ac}",
+        ".biz1861-metric-grid{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-top:4px}.biz1861-metric{border:1px solid rgba(255,255,255,.10);border-radius:10px;background:rgba(255,255,255,.045);padding:10px;min-width:0}.biz1861-metric span{display:block;color:#d8b16e;font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.12em}.biz1861-metric b{display:block;color:#fff3df;font-size:17px;margin-top:5px;overflow-wrap:anywhere}.biz1861-metric em{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;font-style:normal;line-height:1.4;margin-top:4px}.biz1861-metric.good b,.biz1861-metric.green b{color:#9fd07d}.biz1861-metric.bad b,.biz1861-metric.red b{color:#e9927d}.biz1861-metric.gold b{color:#d8b16e}.biz1861-metric.blue b{color:#7ea0ac}",
         ".biz1861-switch-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}.biz1861-switch{border:1px solid rgba(255,255,255,.12);border-radius:10px;background:rgba(255,255,255,.045);color:#f6ead8;text-align:left;padding:10px;cursor:pointer}.biz1861-switch.selected{border-color:rgba(159,208,125,.55);background:rgba(159,208,125,.10)}.biz1861-switch b,.biz1861-switch span{display:block}.biz1861-switch span{color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;margin-top:4px}",
         ".biz1861-active-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start}.biz1861-control-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:12px}.biz1861-control-grid>div,.biz1861-hiring,.biz1861-exit{border:1px solid rgba(255,255,255,.10);border-radius:10px;background:rgba(255,255,255,.04);padding:11px;min-width:0}.biz1861-control-grid b{display:block;color:#fff3df}.biz1861-control-grid span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;margin-top:3px}",
         ".biz1861-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}.biz1861-custom{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;margin-top:8px}.biz1861-custom input{min-width:0;border:1px solid rgba(216,173,109,.32);border-radius:8px;background:#100d0a;color:#f6ead8;padding:9px;font-family:'JetBrains Mono',monospace;font-size:11px}",
@@ -1493,11 +1834,33 @@
         ".biz1861-graphs{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:12px}.biz1861-graph{border:1px solid rgba(255,255,255,.10);border-radius:10px;background:rgba(255,255,255,.035);padding:11px;min-width:0}.biz1861-sublabel{color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;margin:6px 0 6px}",
         ".biz1861-trend-grid{display:grid;grid-template-columns:1fr;gap:8px;margin-top:6px}.biz1861-trend{border:1px solid rgba(255,255,255,.08);border-radius:8px;background:rgba(0,0,0,.18);padding:8px}.biz1861-trend-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.biz1861-trend-head span{color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;flex:1;min-width:60px}.biz1861-trend-head b{color:#fff3df;font-size:15px}.biz1861-trend-head i{font-family:'JetBrains Mono',monospace;font-size:10px;font-style:normal;color:#b9a98e}.biz1861-trend-head i.good{color:#9fd07d}.biz1861-trend-head i.bad{color:#e9927d}",
         ".biz1861-spark{display:block;width:100%;height:46px;margin-top:6px}.biz1861-spark-empty{color:#8c7f6a;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.4;margin-top:6px}",
+        ".biz1862-donut-wrap{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:6px}.biz1862-donut{width:120px;height:120px;flex:none}.biz1862-donut-wrap .biz1861-legend{flex:1;min-width:140px;margin-top:0;gap:7px 14px}",
         ".biz1861-segbar{display:flex;height:18px;border-radius:6px;overflow:hidden;background:rgba(0,0,0,.25);margin-top:4px}.biz1861-seg{display:block;height:100%}.biz1861-legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:8px}.biz1861-legend span{display:flex;align-items:center;gap:5px;color:#c8b89c;font-family:'JetBrains Mono',monospace;font-size:10px}.biz1861-legend i{width:9px;height:9px;border-radius:2px;display:inline-block;flex:none}.biz1861-legend b{color:#fff3df}.biz1861-legend em{color:#8c7f6a;font-style:normal}",
         ".biz1861-roi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}.biz1861-roi{border:1px solid rgba(255,255,255,.08);border-radius:8px;background:rgba(0,0,0,.18);padding:8px;text-align:center}.biz1861-roi span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.06em}.biz1861-roi b{display:block;color:#fff3df;font-size:16px;margin-top:4px}.biz1861-roi em{display:block;color:#8c7f6a;font-family:'JetBrains Mono',monospace;font-size:9px;font-style:normal;margin-top:2px}.biz1861-roi.good b{color:#9fd07d}.biz1861-roi.bad b{color:#e9927d}",
         // public company desk
         ".biz1861-public{margin-top:12px;border:1px solid rgba(126,160,172,.3);border-radius:11px;background:linear-gradient(135deg,rgba(126,160,172,.08),rgba(0,0,0,.12));padding:12px}.biz1861-ctrl-ok{color:#9fd07d;font-family:'JetBrains Mono',monospace;font-size:9px;border:1px solid rgba(159,208,125,.4);border-radius:5px;padding:1px 5px;margin-left:6px}.biz1861-ctrl-lost{color:#e9927d;font-family:'JetBrains Mono',monospace;font-size:9px;border:1px solid rgba(233,146,125,.4);border-radius:5px;padding:1px 5px;margin-left:6px}.biz1861-ipo-row{border:1px solid rgba(159,208,125,.25);border-radius:10px;background:rgba(159,208,125,.05);padding:11px;margin-bottom:9px}.biz1861-ipo-row b{display:block;color:#fff3df}.biz1861-ipo-row span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;margin-top:3px;line-height:1.4}",
-        "@media(max-width:640px){.biz1861-hero,.biz1861-active-head{grid-template-columns:1fr}.biz1861-hero-stat,.biz1861-active-head strong{text-align:left}.biz1861-control-grid{grid-template-columns:1fr}.biz1861-wizgrid,.biz1861-graphs{grid-template-columns:1fr}}"
+        // dashboard 2.0 — tabbed founder command
+        ".biz1862-command{display:block;min-width:0}.biz1862-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.biz1862-tab{border:1px solid rgba(255,255,255,.12);border-radius:8px;background:rgba(255,255,255,.04);color:#c8b89c;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.04em;padding:7px 11px;cursor:pointer;transition:border-color .12s,background .12s,color .12s}.biz1862-tab:hover:not(:disabled){border-color:rgba(216,173,109,.45);color:#f6ead8}.biz1862-tab.selected{border-color:rgba(216,173,109,.6);background:rgba(216,173,109,.12);color:#fff3df}.biz1862-tab:disabled{opacity:.4;cursor:not-allowed}",
+        ".biz1862-next{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin-top:12px;border:1px solid rgba(216,173,109,.25);border-radius:10px;background:rgba(216,173,109,.06);padding:10px 12px}.biz1862-next span{color:#d8b16e;font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.12em;flex:none}.biz1862-next b{color:#fff3df;font-size:13px;line-height:1.4;font-weight:500}",
+        ".biz1862-panel{display:grid;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid rgba(216,173,109,.18);min-width:0}.biz1862-callout{border:1px solid rgba(126,160,172,.28);border-radius:10px;background:linear-gradient(135deg,rgba(126,160,172,.08),rgba(0,0,0,.12));padding:11px 12px}.biz1862-callout span{display:block;color:#7ea0ac;font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.12em}.biz1862-callout b{display:block;color:#fff3df;font-size:14px;line-height:1.45;margin-top:5px;font-weight:500}",
+        ".biz1862-split{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}.biz1862-split>div{border:1px solid rgba(255,255,255,.10);border-radius:10px;background:rgba(255,255,255,.035);padding:11px;min-width:0}.biz1862-minirow{border:1px solid rgba(255,255,255,.08);border-radius:8px;background:rgba(0,0,0,.18);padding:8px;margin-top:6px}.biz1862-minirow b{display:block;color:#fff3df;font-size:12px}.biz1862-minirow span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.35;margin-top:3px}.biz1862-candles{display:block;width:100%;height:120px;margin-top:6px}",
+        // dashboard 2.0 — team panel (recruit rail + roster)
+        ".biz1862-subsection{margin-top:4px}.biz1862-recruit{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-top:8px}.biz1862-role{display:flex;flex-direction:column;gap:6px;border:1px solid rgba(255,255,255,.10);border-radius:10px;background:rgba(255,255,255,.04);padding:10px;min-width:0}.biz1862-role.off{opacity:.55}.biz1862-role-head{display:flex;align-items:center;gap:7px;min-width:0}.biz1862-role-emoji{font-size:15px;flex:none}.biz1862-role-head b{color:#fff3df;font-size:12.5px;line-height:1.25;overflow-wrap:anywhere}.biz1862-role-boost{color:#7ea0ac;font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.08em}.biz1862-role-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto}.biz1862-role-foot em{color:#d8b16e;font-family:'JetBrains Mono',monospace;font-size:11px;font-style:normal}",
+        ".biz1862-roster{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;margin-top:8px}.biz1862-emp{display:flex;flex-direction:column;gap:8px;border:1px solid rgba(255,255,255,.10);border-radius:10px;background:rgba(255,255,255,.04);padding:11px;min-width:0}.biz1862-emp.founder{border-color:rgba(216,173,109,.35);background:rgba(216,173,109,.06)}.biz1862-emp-top{display:flex;align-items:center;gap:9px;min-width:0}.biz1862-emp-avatar{flex:none;width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:rgba(126,160,172,.16);border:1px solid rgba(126,160,172,.4);color:#cfe0e6;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700}.biz1862-emp-avatar.gold{background:rgba(216,173,109,.16);border-color:rgba(216,173,109,.45);color:#e9cf9c}.biz1862-emp-id{min-width:0;flex:1}.biz1862-emp-id b{display:block;color:#fff3df;font-family:'Fraunces',Georgia,serif;font-size:15px;line-height:1.15;overflow-wrap:anywhere}.biz1862-emp-id span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;margin-top:3px;overflow-wrap:anywhere}.biz1862-emp .money-btn{flex:none;padding:4px 9px;font-size:10px}",
+        ".biz1862-perf{height:6px;border-radius:99px;background:rgba(0,0,0,.3);overflow:hidden}.biz1862-perf-bar{height:100%;border-radius:99px;background:#7ea0ac}.biz1862-perf-bar.good{background:#9fd07d}.biz1862-perf-bar.gold{background:#d8b16e}.biz1862-perf-bar.bad{background:#e9927d}.biz1862-emp-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}.biz1862-emp-foot span{color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;min-width:0;overflow-wrap:anywhere}.biz1862-emp-foot i.warn{color:#e9927d;font-style:normal}.biz1862-emp-foot em{color:#d8b16e;font-family:'JetBrains Mono',monospace;font-size:11px;font-style:normal;flex:none}",
+        // dashboard 2.0 — color pass: semantic per-section accents + gradient pop
+        ".biz1861-active{--acc:216,173,109}.biz1862-accent-overview{--acc:216,173,109}.biz1862-accent-product{--acc:126,160,172}.biz1862-accent-growth{--acc:159,208,125}.biz1862-accent-team{--acc:195,155,211}.biz1862-accent-funding{--acc:216,173,109}.biz1862-accent-public{--acc:120,170,185}.biz1862-accent-exit{--acc:233,146,125}",
+        // semantic gradient tint on metric cards so status strips read in color, not grey
+        ".biz1861-metric.good,.biz1861-metric.green{background:linear-gradient(135deg,rgba(159,208,125,.16),rgba(255,255,255,.025));border-color:rgba(159,208,125,.32)}.biz1861-metric.bad,.biz1861-metric.red{background:linear-gradient(135deg,rgba(233,146,125,.16),rgba(255,255,255,.025));border-color:rgba(233,146,125,.32)}.biz1861-metric.gold{background:linear-gradient(135deg,rgba(216,173,109,.16),rgba(255,255,255,.025));border-color:rgba(216,173,109,.32)}.biz1861-metric.blue{background:linear-gradient(135deg,rgba(126,160,172,.16),rgba(255,255,255,.025));border-color:rgba(126,160,172,.32)}",
+        // section accent: panel wash, valuation badge, tabs, next-milestone, section labels
+        ".biz1861-active .biz1862-panel{border-top-color:rgba(var(--acc),.45);background:linear-gradient(180deg,rgba(var(--acc),.06),rgba(0,0,0,0) 150px)}.biz1861-active-head strong{background:linear-gradient(135deg,rgba(var(--acc),.18),rgba(255,255,255,.03));border-color:rgba(var(--acc),.4)}.biz1861-active-head strong b,.biz1861-active-head strong{color:#fff3df}.biz1861-active .biz1862-tab.selected{border-color:rgba(var(--acc),.65);background:linear-gradient(135deg,rgba(var(--acc),.22),rgba(var(--acc),.05));color:#fff3df;box-shadow:0 0 0 1px rgba(var(--acc),.15)}.biz1861-active .biz1862-tab:hover:not(:disabled){border-color:rgba(var(--acc),.5)}.biz1861-active .biz1862-next{border-color:rgba(var(--acc),.38);background:linear-gradient(135deg,rgba(var(--acc),.14),rgba(0,0,0,.10))}.biz1861-active .biz1862-next span{color:rgb(var(--acc))}.biz1861-active .biz1862-subsection>.section-label,.biz1861-active .biz1862-panel>.section-label{color:rgb(var(--acc))}",
+        // gradient meters + colorful accents on cards
+        ".biz1862-perf-bar{background:linear-gradient(90deg,rgba(126,160,172,.55),#7ea0ac)}.biz1862-perf-bar.good{background:linear-gradient(90deg,#7cbf57,#a8db86)}.biz1862-perf-bar.gold{background:linear-gradient(90deg,#c4953f,#e2bd74)}.biz1862-perf-bar.bad{background:linear-gradient(90deg,#d46a52,#ef9a86)}.biz1862-role{background:linear-gradient(150deg,rgba(126,160,172,.07),rgba(255,255,255,.03))}.biz1862-role:hover{border-color:rgba(126,160,172,.4)}.biz1861-hero-stat{background:linear-gradient(135deg,rgba(216,173,109,.18),rgba(255,255,255,.03));border-color:rgba(216,173,109,.38)}.biz1861-hero-stat b{color:#f0d6a0}.biz1861-trend-head b{color:#fff3df}",
+        // color-coded control cards (per-card gradient + tinted title) so panels read in color
+        ".biz1861-control-grid b{font-size:13.5px}.biz1862-ctl{position:relative}.biz1862-ctl::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:10px 0 0 10px}.ctl-green{background:linear-gradient(150deg,rgba(159,208,125,.13),rgba(255,255,255,.02))!important;border-color:rgba(159,208,125,.30)!important}.ctl-green::before{background:#9fd07d}.ctl-green>b{color:#bfe0a2}.ctl-gold{background:linear-gradient(150deg,rgba(216,173,109,.14),rgba(255,255,255,.02))!important;border-color:rgba(216,173,109,.32)!important}.ctl-gold::before{background:#d8b16e}.ctl-gold>b{color:#e9cf9c}.ctl-blue{background:linear-gradient(150deg,rgba(126,160,172,.14),rgba(255,255,255,.02))!important;border-color:rgba(126,160,172,.32)!important}.ctl-blue::before{background:#7ea0ac}.ctl-blue>b{color:#a8c4cd}.ctl-violet{background:linear-gradient(150deg,rgba(195,155,211,.14),rgba(255,255,255,.02))!important;border-color:rgba(195,155,211,.32)!important}.ctl-violet::before{background:#c39bd3}.ctl-violet>b{color:#d8bfe3}.biz1862-ctl>b,.biz1862-ctl>span,.biz1862-ctl>div{padding-left:8px}",
+        // richer split / graph / minirow cards + colored eyebrow dots in the active panel
+        ".biz1862-split>div,.biz1861-graph{background:linear-gradient(160deg,rgba(255,255,255,.055),rgba(0,0,0,.10))}.biz1862-minirow{background:linear-gradient(150deg,rgba(216,173,109,.07),rgba(0,0,0,.18))}.biz1861-active .biz1862-subsection>.section-label,.biz1861-active .biz1862-split>div>.section-label{display:flex;align-items:center;gap:6px}.biz1861-active .biz1862-subsection>.section-label::before,.biz1861-active .biz1862-split>div>.section-label::before{content:'';width:7px;height:7px;border-radius:50%;background:rgb(var(--acc));box-shadow:0 0 6px rgba(var(--acc),.6);flex:none}.biz1861-active .biz1862-split>div>.section-label{color:rgb(var(--acc))}",
+        "@media(max-width:640px){.biz1861-hero,.biz1861-active-head{grid-template-columns:1fr}.biz1861-hero-stat,.biz1861-active-head strong{text-align:left}.biz1861-control-grid{grid-template-columns:1fr}.biz1861-wizgrid,.biz1861-graphs{grid-template-columns:1fr}.biz1862-split{grid-template-columns:1fr}.biz1862-recruit,.biz1862-roster{grid-template-columns:1fr}}"
       ].join("\n");
       document.head.appendChild(st);
     }

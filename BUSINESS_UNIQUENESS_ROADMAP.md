@@ -22,6 +22,25 @@
 > past startup stage. Popups are capped at 2/year so they read as moments, not
 > spam. The notes below are the *remaining* ideas.
 
+> **Status (v18.37 - Portfolio/Risk polish, shipped):** Roadmap #6 and #7 are
+> now implemented. The Business Office shows named category risk line items
+> (licensing, regulatory, IP/security, inventory, vacancy, clinical, etc.) in
+> the focused-company risk panel, and the same visible risk math includes sector
+> meter pressure. Portfolio synergy is real yearly logic: 2+ companies in the
+> same sector create a small franchise income/reputation lift, while 3+ sectors
+> create a diversification risk cut. See `pages/systems/business-entities.js`
+> and the yearly business loop in `pages/runtime/00-core-app-runtime.js`.
+
+> **Status (v18.38 - Locations/franchises/rivals, shipped):** Roadmap #10 is
+> now implemented as a real expansion layer. Mature businesses can open
+> sector-specific owned sites or franchise/partner sites, manage site quality,
+> staff, demand, and closure, compete yearly for market share against their named
+> rival, and acquire that rival as a late-game play. Location income and balanced
+> expansion risk now tick in the yearly Business loop, and the focused-company
+> desk shows network health, market share, rival identity, site controls, and
+> location/rival risk lines. See `pages/systems/business-entities.js`,
+> `pages/runtime/00-core-app-runtime.js`, and `cdp/business-locations.js`.
+
 ## What already makes businesses unique (don't redo this)
 
 - **Name, description, numbers** — startup cost, income range, failure risk,
@@ -96,37 +115,40 @@ Best next step: small, data-shaped changes to systems that already exist.
    (inspection events hit it, recovers slowly, low score raises failure
    risk); Finance gets **AUM** (assets under management, separate from
    `b.value`, grows with signature actions, market events swing it harder).
-6. **Category-specific risk line items** in `riskFor()` — surface a named
-   risk factor per category the way `manager`/`insurance`/`counsel` already
-   show as line items: "licensing risk" for nightlife, "regulatory risk" for
-   aviation/medical, "IP/security risk" for tech. Makes the risk pill explain
-   *why* a hedge fund is riskier than a tutoring business beyond a flat
-   number.
-7. **Portfolio synergy bonuses.** Owning 2+ businesses in the same category
-   gives a small discount/reputation bonus (franchise effect); owning across
-   many categories instead gives a small diversification risk cut. Lightweight
-   addition to the existing per-business yearly loop, encourages a deliberate
-   specialize-vs-diversify choice.
+6. **Category-specific risk line items. SHIPPED v18.37.** `riskFor()` now routes
+   through a visible breakdown panel with named risk factors per sector:
+   licensing/noise, regulatory, IP/security, inventory, vacancy, clinical,
+   capacity/safety, and similar lines. The panel also shows reputation,
+   operations, assets, sector meter pressure, and diversification effects.
+7. **Portfolio synergy bonuses. SHIPPED v18.37.** Owning 2+ businesses in the
+   same sector gives a small yearly franchise income/reputation bonus; owning
+   across 3+ sectors gives a diversification risk cut. The Business hero, KPI,
+   rail cards, and focused-company risk panel surface the active edge.
 
 ## Phase 3 — Bigger systemic bets (future, optional)
 
-8. **Interactive choice events for businesses**, reusing the life-event
-   choice-modal pattern (`events` catalog + `maybeEvent()`) instead of
-   auto-resolving market events. "A competitor opened nearby" becomes a
+8. **Interactive choice events for businesses. SHIPPED v18.36.** Reuses the
+   life-event choice-modal pattern (`events` catalog + `maybeEvent()`) instead
+   of auto-resolving market events. "A competitor opened nearby" becomes a
    choice — cut prices / out-market them / ignore — with category-specific
    options and payoffs.
-9. **Named rivals.** A lightweight per-business rival NPC that persists and
-   evolves year to year, showing up by name in log lines and market events
-   ("Sunrise Cleaners is undercutting your prices again"), instead of
-   one-off anonymous event text.
-10. **Multi-location/franchise expansion.** Once a business reaches Flagship
-    Location, allow opening a second location as a distinct late-game money
-    sink and scaling path. Noted as out of scope in the previous redesign
-    pass too — biggest lift on this list, do last if at all.
+9. **Named rivals. SHIPPED v18.36.** A lightweight per-business rival NPC that
+   persists and evolves year to year, showing up by name in log lines and
+   market events ("Sunrise Cleaners is undercutting your prices again"), instead
+   of one-off anonymous event text.
+10. **Multi-location/franchise expansion. SHIPPED v18.38.** Once a business
+    reaches Flagship Location, reputation 70+, and a non-startup stage, it can
+    open sector-specific sites as distinct expansion state. Three open sites and
+    reputation 80+ unlock franchise/partner models. The system also adds yearly
+    location income, sprawl/control/rival risk lines, market-share competition,
+    and late-game rival acquisition.
 
 ---
 
 ## Suggested order
+
+Historical note: all numbered items above have now shipped. Keep this section as
+context for how the rollout was staged, not as an active task list.
 
 Start with **Phase 1** — all four items are data/content extensions to
 systems that already work (`ASSET_SLOTS`, `BUSINESS_MARKET_EVENTS`,

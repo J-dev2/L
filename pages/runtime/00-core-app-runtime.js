@@ -75,6 +75,15 @@ function legacyNetWorth(s = state) {
         return sum + Math.max(0, Number(b.valuation || b.value || 0) || 0) + Math.max(0, Number(b.cashInBusiness || b.companyCash || 0) || 0);
       }, 0)
     : 0;
+  // Family trust corpus + child trust funds + estate trust cash are real protected assets;
+  // count them so funding the trust does not make net worth drop. (Matches finance-ledger.)
+  const ft = f.familyTrustV1839 || {};
+  const trustFundsTotal = (f.trustFunds && typeof f.trustFunds === "object")
+    ? Object.keys(f.trustFunds).reduce((sum, k) => sum + (Number(f.trustFunds[k]) || 0), 0) : 0;
+  const trustAssets =
+    Math.max(0, Number(ft.corpus) || 0) +
+    Math.max(0, trustFundsTotal) +
+    Math.max(0, Number(s.estateV1831 && s.estateV1831.assets && s.estateV1831.assets.trustCash) || 0);
   const assets =
     (Number(s.money) || 0) + (Number(s.savings) || 0) + (Number(s.ira) || 0) + (Number(s.retirement401k) || 0) +
     (Number(f.superSaver) || 0) + (Number(f.brokerage) || 0) + (Number(f.brokerageCash) || 0) +
@@ -84,7 +93,7 @@ function legacyNetWorth(s = state) {
     (Number(f.personalFirmCash) || Number(f.firmCashV1828) || Number(f.firmCash) || 0) +
     (Number(firm.cash) || Number(firm.managed) || Number(firm.capital) || Number(firm.balance) || Number(firm.account) || 0) +
     ownedHome + carsValue + rentalValue +
-    newBizValue +
+    newBizValue + trustAssets +
     ((f.businesses || []).reduce ? (f.businesses || []).reduce((sum, b) => b && b._migratedToBizV1861 ? sum : sum + Math.max(0, Number(b.value) || 0) + Math.max(0, Number(b.retainedEarnings) || 0), 0) : 0);
   const debt =
     (Number(s.debt) || 0) + (Number(f.creditCardDebt) || 0) + (Number(f.assetBackedLoan) || 0) +
@@ -4584,7 +4593,8 @@ function renderDeath() {
         <div><span class="mono">Generation</span><b>${state.legacy.generation}</b></div>
       </div>
       <div class="death-actions">
-        ${children > 0 ? `<button class="primary" onclick="continueAsHeir()">Continue the Legacy</button>` : ""}
+        <button class="primary" onclick="continueAsHeir()">${children > 0 ? "Continue the Legacy" : "Continue the Family Line"}</button>
+        ${(typeof window.waybackLifeSlotV18333 === "function" || typeof window.rewindOneYearV1814 === "function") ? `<button class="secondary wayback-undo" onclick="(window.waybackLifeSlotV18333||window.rewindOneYearV1814)()">↺ Wayback — Undo Death</button>` : ""}
         <button class="secondary" onclick="resetSave()">Begin Another Life</button>
       </div>
     </section>`;
@@ -6319,11 +6329,14 @@ getSuggestedActions = function(s) {
       const rolled = businessAnnualRoll(b, v);
       const assetBonus = typeof window.businessAssetIncomeBonus === "function" ? window.businessAssetIncomeBonus(b) : 0;
       const opsIncomeBonus = (b.ops && b.ops.sales ? .06 : 0) + (b.ops && b.ops.bookkeeper ? .03 : 0);
+      const portfolioEffects = typeof window.businessPortfolioEffectsV1856 === "function" ? window.businessPortfolioEffectsV1856(b) : null;
       const lifecycleMods = lifecycle || (typeof window.ventureYearlyModifiersV1860 === "function" ? window.ventureYearlyModifiersV1860(b) : null);
-      let income = Math.round(rolled.income * (1 + assetBonus + opsIncomeBonus));
+      let income = Math.round(rolled.income * (1 + assetBonus + opsIncomeBonus + (portfolioEffects ? portfolioEffects.incomeBonus || 0 : 0)));
       if (typeof window.applySectorMechanicV1851 === "function") {
         try { income = window.applySectorMechanicV1851(b, v, income, deltas); } catch (e) {}
       }
+      const locationEffects = typeof window.applyBusinessLocationsYearV1857 === "function" ? window.applyBusinessLocationsYearV1857(b, v, income, deltas) : null;
+      if (locationEffects && locationEffects.income) income += locationEffects.income;
       // Operating result drives value growth & reputation. On top of it, a company
       // also throws off a yield proportional to the enterprise value you've built,
       // so a high-value company generates real income instead of being capped at its
@@ -6337,11 +6350,12 @@ getSuggestedActions = function(s) {
       b.years = (b.years || 0) + 1;
       b.lastIncome = income;
       b.lastEnterpriseYieldV1851 = enterpriseYield;
+      if (portfolioEffects) b.lastPortfolioEffectsV1856 = { sameSectorCount: portfolioEffects.sameSectorCount || 0, sectorCount: portfolioEffects.sectorCount || 0, incomeBonus: portfolioEffects.incomeBonus || 0, repBonus: portfolioEffects.repBonus || 0, riskCut: portfolioEffects.riskCut || 0 };
       b.category = b.category || v.category || "Venture";
       const profitPart = Math.max(0, operatingIncome);
       const lossPart = Math.min(0, operatingIncome);
       b.value = Math.max(0, Math.round(((b.value || 0) * (operatingIncome >= 0 ? 1.035 : .92) + profitPart * (v.startup >= 100000 ? 1.35 : 1.05) + lossPart * .35) * (lifecycleMods ? lifecycleMods.valueMult || 1 : 1)));
-      const reputationChange = operatingIncome >= 0 ? Math.max(1, Math.round(operatingIncome / Math.max(10000, v.startup / 3))) : -rand(3, 12);
+      const reputationChange = (operatingIncome >= 0 ? Math.max(1, Math.round(operatingIncome / Math.max(10000, v.startup / 3))) : -rand(3, 12)) + (portfolioEffects ? portfolioEffects.repBonus || 0 : 0);
       b.reputation = clamp((b.reputation || 10) + reputationChange, 0, 100);
       if (b.reputation >= 65 && b.stage === "startup") b.stage = "growing";
       if (b.reputation >= 85 && (b.value || 0) > v.startup * 3) b.stage = "breakout";
@@ -6351,7 +6365,7 @@ getSuggestedActions = function(s) {
       const assetRiskCut = typeof window.businessAssetRiskCut === "function" ? window.businessAssetRiskCut(b) : 0;
       const opsRiskCut = (b.ops && b.ops.manager ? .04 : 0) + (b.ops && b.ops.counsel ? .04 : 0) + (b.ops && b.ops.insurance ? .03 : 0);
       const hasInsurance = !!(b.ops && b.ops.insurance);
-      const risk = clampPct((v.failureRisk || b.failureRisk || .12) + (income < 0 ? .06 : 0) - (b.reputation || 0) / 500 - rolled.stat / 850 - (state.finance.businessCareer ? .02 : 0) - assetRiskCut - opsRiskCut - (b.sectorRiskCutV1851 || 0) - (lifecycleMods ? lifecycleMods.riskCut || 0 : 0), .02, .65);
+      const risk = clampPct((v.failureRisk || b.failureRisk || .12) + (income < 0 ? .06 : 0) - (b.reputation || 0) / 500 - rolled.stat / 850 - (state.finance.businessCareer ? .02 : 0) - assetRiskCut - opsRiskCut - (b.sectorRiskCutV1851 || 0) - (portfolioEffects ? portfolioEffects.riskCut || 0 : 0) + (locationEffects ? locationEffects.riskAdd || 0 : 0) - (locationEffects ? locationEffects.franchiseCut || 0 : 0) - (lifecycleMods ? lifecycleMods.riskCut || 0 : 0), .02, .65);
       if (chance(risk)) {
         const hit = Math.max(3, rand(8, 25) - (hasInsurance ? 10 : 0));
         b.reputation = clamp((b.reputation || 10) - hit, 0, 100);

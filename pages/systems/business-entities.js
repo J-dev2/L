@@ -211,6 +211,282 @@
   }
   window.sectorIdForBusinessV1851 = sectorIdForBusiness;
 
+  var SECTOR_RISK_LINES = {
+    food: { label: "Health inspection risk", up: "Low ratings raise closure and inspection pressure.", down: "Strong ratings reduce health inspection pressure." },
+    nightlife: { label: "Licensing / noise risk", up: "Permits, noise, door incidents, and late nights raise pressure.", down: "Clean operations make licensing and noise problems less likely." },
+    retail: { label: "Inventory risk", up: "Thin or bloated inventory creates shrink, missed sales, and cash drag.", down: "Balanced inventory keeps retail pressure lower." },
+    trades: { label: "Licensing / worksite risk", up: "Idle crews or overloaded jobs raise quality and compliance pressure.", down: "A healthy backlog keeps crews steady and lower risk." },
+    media: { label: "Audience volatility risk", up: "Small or slipping audiences make revenue fragile.", down: "A large audience gives the business a stronger cushion." },
+    tech: { label: "IP / security risk", up: "Weak recurring revenue leaves more room for churn, security, and product pressure.", down: "Sticky recurring revenue lowers product and security pressure." },
+    finance: { label: "Regulatory risk", up: "A thin book or bad performance draws compliance and client pressure.", down: "A healthier book lowers regulatory and client pressure." },
+    realestate: { label: "Vacancy / permitting risk", up: "Vacancies and property churn raise carrying-cost pressure.", down: "Strong occupancy makes the property base safer." },
+    health: { label: "Clinical / staffing risk", up: "Empty rooms or overload create quality, staffing, and regulatory pressure.", down: "A healthy patient load keeps clinical pressure controlled." },
+    logistics: { label: "Capacity / safety risk", up: "Idle or overloaded capacity raises contract and safety pressure.", down: "Good capacity use lowers contract and safety pressure." }
+  };
+
+  var LOCATION_ARCHETYPES_V1857 = {
+    food: {
+      label: "Food network", verb: "Service push", compete: "Launch a chef collab",
+      acquire: "Acquire restaurant rival", locations: ["Restaurant", "Ghost kitchen", "Catering hub", "Taproom"]
+    },
+    nightlife: {
+      label: "Nightlife circuit", verb: "Crowd war", compete: "Book a rival-crushing headliner",
+      acquire: "Acquire venue rival", locations: ["Bar", "Lounge", "Club room", "Live venue", "Event hall"]
+    },
+    retail: {
+      label: "Retail footprint", verb: "Promo fight", compete: "Run a market-share promo",
+      acquire: "Acquire retail rival", locations: ["Storefront", "Outlet", "Fulfillment room", "Flagship shop"]
+    },
+    trades: {
+      label: "Service territory", verb: "Bid war", compete: "Outbid the local competitor",
+      acquire: "Acquire service rival", locations: ["Service yard", "Truck route", "Depot", "Regional crew"]
+    },
+    media: {
+      label: "Entertainment slate", verb: "Talent grab", compete: "Sign talent away from a rival",
+      acquire: "Acquire studio rival", locations: ["Studio", "Production stage", "Creator house", "Label office"]
+    },
+    tech: {
+      label: "Product network", verb: "Feature race", compete: "Ship a competitor-killer feature",
+      acquire: "Acquire product rival", locations: ["Product pod", "Support office", "Data unit", "Cloud unit"]
+    },
+    finance: {
+      label: "Client book", verb: "Mandate chase", compete: "Win a whale client",
+      acquire: "Acquire advisory rival", locations: ["Advisory office", "Fund desk", "Client office"]
+    },
+    realestate: {
+      label: "Property cluster", verb: "Territory grab", compete: "Win a leasing mandate",
+      acquire: "Acquire property rival", locations: ["Leasing office", "Property cluster", "Development site"]
+    },
+    health: {
+      label: "Care network", verb: "Referral race", compete: "Win a referral contract",
+      acquire: "Acquire clinic rival", locations: ["Clinic", "Treatment room", "Patient center"]
+    },
+    logistics: {
+      label: "Route network", verb: "Contract war", compete: "Undercut a freight contract",
+      acquire: "Acquire logistics rival", locations: ["Warehouse", "Fleet yard", "Distribution hub", "Trade lane"]
+    },
+    generic: {
+      label: "Location network", verb: "Market push", compete: "Compete for market share",
+      acquire: "Acquire rival", locations: ["Branch", "Office", "Regional site", "Flagship site"]
+    }
+  };
+
+  function randInt(min, max) {
+    min = round(min); max = round(max);
+    try { if (typeof window.rand === "function") return window.rand(min, max); } catch (e) {}
+    return min + Math.floor(Math.random() * (max - min + 1));
+  }
+
+  function chanceLocal(prob) {
+    try { if (typeof window.chance === "function") return window.chance(prob); } catch (e) {}
+    return Math.random() < prob;
+  }
+
+  function locationProfileV1857(b) {
+    return LOCATION_ARCHETYPES_V1857[sectorIdForBusiness(b)] || LOCATION_ARCHETYPES_V1857.generic;
+  }
+
+  function rivalNameV1857(b) {
+    if (b && b.rivalNameV1852) return b.rivalNameV1852;
+    var sid = sectorIdForBusiness(b) || "generic";
+    var pool = {
+      food: ["Sunrise Diner", "The Copper Fork", "Two Birds Cafe"],
+      nightlife: ["Velvet Room", "Pulse", "After Hours"],
+      retail: ["MarketMile", "Trendline", "Goods & Co."],
+      trades: ["Apex Services", "Reliable & Sons", "TrueBuild"],
+      media: ["Signal Studios", "Echo House", "Frame 9"],
+      tech: ["Cloudpeak", "Forge Labs", "Brightloop"],
+      finance: ["Sterling Partners", "Oakline", "Meridian Advisory"],
+      realestate: ["Keystone Holdings", "Summit Property", "Lakeshore Realty"],
+      health: ["Cedar Health", "NovaCare", "Wellspring"],
+      logistics: ["SwiftHaul", "Velocity Freight", "Ironline Logistics"],
+      generic: ["Apex Co.", "Northgate", "Vantage Group"]
+    }[sid] || ["Apex Co.", "Northgate", "Vantage Group"];
+    b.rivalNameV1852 = pool[randInt(0, pool.length - 1)];
+    return b.rivalNameV1852;
+  }
+
+  function locationOpenCountV1857(b) {
+    var loc = b && b.locationsV1857;
+    var sites = loc && Array.isArray(loc.sites) ? loc.sites : [];
+    return sites.filter(function (site) { return site && site.status !== "closed"; }).length;
+  }
+
+  function nextLocationArchetypeV1857(b) {
+    var profile = locationProfileV1857(b);
+    var list = profile.locations || LOCATION_ARCHETYPES_V1857.generic.locations;
+    var count = Math.max(0, locationOpenCountV1857(b) - 1);
+    return list[count % list.length];
+  }
+
+  function makeLocationSiteV1857(b, opts) {
+    opts = opts || {};
+    var profile = locationProfileV1857(b);
+    var archetype = opts.archetype || nextLocationArchetypeV1857(b);
+    var model = opts.model || "owned";
+    var id = opts.id || ("loc_" + (Date.now ? Date.now() : randInt(10000, 99999)) + "_" + randInt(100, 999));
+    var title = opts.name || (model === "franchise" ? archetype + " partner" : archetype);
+    return {
+      id: String(id),
+      name: title,
+      model: model,
+      archetype: archetype,
+      tier: clamp(opts.tier == null ? 1 : opts.tier, 1, 3),
+      quality: clamp(opts.quality == null ? 58 : opts.quality, 0, 100),
+      staff: clamp(opts.staff == null ? 55 : opts.staff, 0, 100),
+      demand: clamp(opts.demand == null ? 55 : opts.demand, 0, 100),
+      status: opts.status || "open",
+      years: Math.max(0, round(opts.years || 0)),
+      openedAge: opts.openedAge == null ? round(n(stateNow().age)) : round(opts.openedAge),
+      lastIncome: round(opts.lastIncome || 0),
+      note: opts.note || profile.label
+    };
+  }
+
+  function ensureLocationsV1857(b) {
+    if (!b || typeof b !== "object") return null;
+    var loc = b.locationsV1857;
+    var legacyCount = Math.max(1, round(n(b.locations, 1)));
+    if (!loc || typeof loc !== "object" || !Array.isArray(loc.sites)) {
+      loc = b.locationsV1857 = { version: 1857, nextId: 1, sites: [], history: [] };
+      var hqTier = clamp(Math.max(1, n(b.assets && b.assets.location, 0) || 1), 1, 3);
+      loc.sites.push(makeLocationSiteV1857(b, {
+        id: "hq",
+        name: "Headquarters",
+        archetype: locationProfileV1857(b).locations[0],
+        tier: hqTier,
+        quality: clamp(55 + n(b.reputation) * .25 + hqTier * 5, 35, 92),
+        staff: clamp(50 + n(b.assets && b.assets.staff) * 12, 35, 88),
+        demand: clamp(50 + n(b.reputation) * .25, 35, 90),
+        years: n(b.years)
+      }));
+      for (var i = 1; i < legacyCount; i++) {
+        loc.sites.push(makeLocationSiteV1857(b, {
+          id: "legacy_" + i,
+          name: nextLocationArchetypeV1857(b),
+          archetype: nextLocationArchetypeV1857(b),
+          tier: 1,
+          quality: 52,
+          staff: 50,
+          demand: 52,
+          years: Math.max(0, n(b.years) - i)
+        }));
+      }
+    }
+    loc.version = 1857;
+    loc.nextId = Math.max(1, round(loc.nextId));
+    if (!Array.isArray(loc.history)) loc.history = [];
+    loc.sites = loc.sites.filter(Boolean).map(function (site, index) {
+      site.id = site.id || (index === 0 ? "hq" : "loc_" + (++loc.nextId));
+      site.name = String(site.name || site.archetype || (index === 0 ? "Headquarters" : "Location")).slice(0, 48);
+      site.model = site.model === "franchise" ? "franchise" : "owned";
+      site.archetype = site.archetype || nextLocationArchetypeV1857(b);
+      site.tier = clamp(site.tier == null ? 1 : site.tier, 1, 3);
+      site.quality = clamp(site.quality == null ? 55 : site.quality, 0, 100);
+      site.staff = clamp(site.staff == null ? 55 : site.staff, 0, 100);
+      site.demand = clamp(site.demand == null ? 55 : site.demand, 0, 100);
+      site.status = site.status === "closed" ? "closed" : "open";
+      site.years = Math.max(0, round(site.years));
+      site.openedAge = round(site.openedAge == null ? n(stateNow().age) : site.openedAge);
+      site.lastIncome = round(site.lastIncome);
+      return site;
+    });
+    if (!loc.sites.length) loc.sites.push(makeLocationSiteV1857(b, { id: "hq", name: "Headquarters" }));
+    var market = b.marketV1857;
+    if (!market || typeof market !== "object") {
+      var share = clamp(8 + n(b.reputation) * .22 + locationOpenCountV1857(b) * 2, 4, 42);
+      market = b.marketV1857 = { version: 1857, share: round(share), rivalShare: round(clamp(32 - share * .25, 12, 45)), rivalStrength: 55, lastCompeteAge: -1, lastAcquireAge: -1, acquiredRivals: 0 };
+    }
+    market.version = 1857;
+    market.share = clamp(market.share == null ? 12 : market.share, 3, 85);
+    market.rivalShare = clamp(market.rivalShare == null ? 30 : market.rivalShare, 5, 70);
+    market.rivalStrength = clamp(market.rivalStrength == null ? 55 : market.rivalStrength, 10, 95);
+    market.lastCompeteAge = round(market.lastCompeteAge == null ? -1 : market.lastCompeteAge);
+    market.lastAcquireAge = round(market.lastAcquireAge == null ? -1 : market.lastAcquireAge);
+    market.acquiredRivals = Math.max(0, round(market.acquiredRivals));
+    b.locations = locationOpenCountV1857(b);
+    return loc;
+  }
+  window.businessLocationsV1857 = ensureLocationsV1857;
+
+  function locationSummaryV1857(b) {
+    ensureLocationsV1857(b);
+    var loc = b.locationsV1857 || { sites: [] };
+    var sites = (loc.sites || []).filter(function (site) { return site && site.status !== "closed"; });
+    var extra = sites.filter(function (site) { return site.id !== "hq"; });
+    var avg = function (key) {
+      if (!sites.length) return 0;
+      return round(sites.reduce(function (sum, site) { return sum + n(site[key]); }, 0) / sites.length);
+    };
+    var owned = sites.filter(function (site) { return site.model !== "franchise"; }).length;
+    var franchise = sites.filter(function (site) { return site.model === "franchise"; }).length;
+    var market = b.marketV1857 || {};
+    var staffCapacity = 1 + n(b.assets && b.assets.staff) * 1.25 + (b.ops && b.ops.manager ? 1.2 : 0) + (b.ops && b.ops.bookkeeper ? .5 : 0);
+    var sprawl = Math.max(0, (owned + franchise * .45) - staffCapacity);
+    var franchiseCut = franchise ? Math.min(.025, franchise * .006) : 0;
+    var sprawlRisk = Math.min(.09, sprawl * .018);
+    var rivalPressure = clamp((n(market.rivalShare) - n(market.share)) / 800 + n(market.rivalStrength) / 3000, 0, .08);
+    return {
+      openSites: sites.length,
+      extraSites: extra.length,
+      ownedSites: owned,
+      franchiseSites: franchise,
+      avgQuality: avg("quality"),
+      avgStaff: avg("staff"),
+      avgDemand: avg("demand"),
+      lastIncome: round((b.lastLocationEffectsV1857 || {}).income || 0),
+      sprawlRisk: sprawlRisk,
+      franchiseCut: franchiseCut,
+      rivalPressure: rivalPressure,
+      share: n(market.share),
+      rivalShare: n(market.rivalShare),
+      rivalStrength: n(market.rivalStrength),
+      rivalName: rivalNameV1857(b)
+    };
+  }
+  window.businessLocationSummaryV1857 = locationSummaryV1857;
+
+  function sectorRiskEffect(b) {
+    var sid = sectorIdForBusiness(b);
+    var effect = n(b && b.sectorRiskCutV1851);
+    try {
+      var mech = window.SECTOR_MECHANICS && (window.SECTOR_MECHANICS[(window.SECTOR_OF && b && b.id && window.SECTOR_OF[b.id]) || b.category] || null);
+      if (!mech && window.LEDGER_SECTORS && sid) {
+        var def = window.LEDGER_SECTORS.find(function (x) { return x.id === sid; });
+        mech = def && window.SECTOR_MECHANICS && window.SECTOR_MECHANICS[def.name];
+      }
+      if (mech && typeof mech.risk === "function") {
+        var meter = b && b.sectorMeterV1851 == null ? mech.init : b.sectorMeterV1851;
+        effect = mech.risk(clamp(n(meter), 0, 100)) || 0;
+      }
+    } catch (e) {}
+    return { id: sid, effect: effect, meta: SECTOR_RISK_LINES[sid] || null };
+  }
+
+  function portfolioEffectsFor(b) {
+    var list = businesses().filter(function (item) { return item && !item._migratedToBizV1861; });
+    var sid = sectorIdForBusiness(b);
+    var sectorCounts = {};
+    list.forEach(function (item) {
+      var id = sectorIdForBusiness(item) || String(item.category || "Business");
+      sectorCounts[id] = (sectorCounts[id] || 0) + 1;
+    });
+    var same = sid ? n(sectorCounts[sid]) : 0;
+    var sectors = Object.keys(sectorCounts).filter(function (key) { return sectorCounts[key] > 0; }).length;
+    var incomeBonus = same >= 2 ? Math.min(.09, .03 * (same - 1)) : 0;
+    var repBonus = same >= 2 ? Math.min(3, same - 1) : 0;
+    var riskCut = sectors >= 3 ? Math.min(.05, .01 * (sectors - 2)) : 0;
+    return {
+      sameSectorCount: same,
+      sectorCount: sectors,
+      incomeBonus: incomeBonus,
+      repBonus: repBonus,
+      riskCut: riskCut,
+      summary: same >= 2 ? "Franchise +" + Math.round(incomeBonus * 100) + "% income, +" + repBonus + " rep/yr" : sectors >= 3 ? "Diversified -" + Math.round(riskCut * 100) + "% risk" : "No portfolio bonus yet"
+    };
+  }
+  window.businessPortfolioEffectsV1856 = portfolioEffectsFor;
+
   // Returns a sector-flavored tier name if one exists, else the generic name.
   function tierLabel(b, slotKey, tierIndex, fallback) {
     try {
@@ -370,6 +646,7 @@
     if (b.assets.staff == null) b.assets.staff = 0;
     if (!Array.isArray(b.assetHistoryV1850)) b.assetHistoryV1850 = [];
     if (!Array.isArray(b.eventHistoryV1850)) b.eventHistoryV1850 = [];
+    ensureLocationsV1857(b);
     try { if (typeof window.ensureSectorMeterV1851 === "function") window.ensureSectorMeterV1851(b); } catch (e) {}
     return b;
   }
@@ -946,6 +1223,298 @@
     saveRender();
   };
 
+  function spendBusinessCostV1857(b, cost) {
+    var s = ensureBusinessState();
+    cost = Math.max(0, round(cost));
+    var fromBiz = Math.min(cost, Math.max(0, n(b.retainedEarnings)));
+    var remaining = cost - fromBiz;
+    if (remaining > Math.max(0, n(s.money))) return null;
+    b.retainedEarnings = Math.max(0, round(n(b.retainedEarnings) - fromBiz));
+    s.money = Math.max(0, round(n(s.money) - remaining));
+    return { total: cost, fromBusiness: fromBiz, fromPersonal: remaining };
+  }
+
+  function locationCostBaseV1857(b) {
+    var v = catalogFor(b.id, b);
+    return Math.max(20000, n(v.startup, 25000));
+  }
+
+  function openLocationCostV1857(b, model) {
+    ensureLocationsV1857(b);
+    var branch = Math.max(0, locationOpenCountV1857(b) - 1);
+    var owned = Math.max(20000, Math.round(locationCostBaseV1857(b) * (.65 + branch * .2)));
+    return model === "franchise" ? Math.round(owned * .4) : owned;
+  }
+
+  function upgradeLocationCostV1857(b, site) {
+    return Math.max(8000, Math.round(locationCostBaseV1857(b) * (.22 + n(site && site.tier) * .12) * (site && site.model === "franchise" ? .55 : 1)));
+  }
+
+  function supportLocationCostV1857(b, site) {
+    return Math.max(2500, Math.round(locationCostBaseV1857(b) * (site && site.model === "franchise" ? .045 : .08)));
+  }
+
+  function competeCostV1857(b) {
+    return Math.max(5000, Math.round(locationCostBaseV1857(b) * .18));
+  }
+
+  function acquireRivalCostV1857(b) {
+    ensureLocationsV1857(b);
+    var v = catalogFor(b.id, b);
+    var market = b.marketV1857 || {};
+    return Math.max(150000, Math.round(n(v.startup, 50000) * 2), Math.round(Math.max(n(b.value), n(v.startup)) * (.45 + n(market.rivalShare) / 100)));
+  }
+
+  function locationByIdV1857(b, locationId) {
+    ensureLocationsV1857(b);
+    return (b.locationsV1857.sites || []).find(function (site) { return String(site.id) === String(locationId); }) || null;
+  }
+
+  function addLocationHistoryV1857(b, text, amount) {
+    ensureLocationsV1857(b);
+    b.locationsV1857.history.unshift({ age: round(n(stateNow().age)), text: text, amount: round(amount || 0) });
+    b.locationsV1857.history = b.locationsV1857.history.slice(0, 12);
+  }
+
+  function canOpenLocationV1857(b, model) {
+    ensureBusiness(b);
+    var open = locationOpenCountV1857(b);
+    var cost = openLocationCostV1857(b, model);
+    var available = n(b.retainedEarnings) + n(stateNow().money);
+    if (n(b.assets && b.assets.location) < 3) return { ok: false, cost: cost, reason: "Needs Flagship Location asset." };
+    if (n(b.reputation) < 70) return { ok: false, cost: cost, reason: "Needs reputation 70+." };
+    if ((b.stage || "startup") === "startup") return { ok: false, cost: cost, reason: "Needs Growing stage or better." };
+    if (model === "franchise" && (open < 3 || n(b.reputation) < 80)) return { ok: false, cost: cost, reason: "Franchise partners unlock at 3+ sites and reputation 80+." };
+    if (available < cost) return { ok: false, cost: cost, reason: "Needs " + compactMoney(cost) + " available." };
+    return { ok: true, cost: cost, reason: "Ready." };
+  }
+
+  window.openBusinessLocationV1857 = function (businessId, model) {
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    ensureBusiness(b);
+    model = model === "franchise" ? "franchise" : "owned";
+    var gate = canOpenLocationV1857(b, model);
+    if (!gate.ok) return toast(gate.reason);
+    var paid = spendBusinessCostV1857(b, gate.cost);
+    if (!paid) return toast("Not enough cash to open this location.");
+    var loc = ensureLocationsV1857(b);
+    var archetype = nextLocationArchetypeV1857(b);
+    var site = makeLocationSiteV1857(b, {
+      id: "loc_" + (++loc.nextId),
+      name: archetype + (model === "franchise" ? " partner" : ""),
+      archetype: archetype,
+      model: model,
+      tier: 1,
+      quality: model === "franchise" ? 62 : 58,
+      staff: model === "franchise" ? 66 : 54,
+      demand: clamp(50 + n(b.marketV1857 && b.marketV1857.share) * .25, 42, 76)
+    });
+    loc.sites.push(site);
+    b.value = Math.max(0, round(n(b.value) + gate.cost * (model === "franchise" ? .35 : .65)));
+    b.reputation = clamp(n(b.reputation) + (model === "franchise" ? 2 : 3), 0, 100);
+    b.locations = locationOpenCountV1857(b);
+    addLocationHistoryV1857(b, "Opened " + site.name + " as a " + (model === "franchise" ? "franchise partner" : "company-owned site") + ".", -paid.total);
+    log("Opened " + site.name + " for " + b.name + ".", { money: -paid.fromPersonal, confidence: 1 });
+    saveRender();
+  };
+
+  window.upgradeBusinessLocationV1857 = function (businessId, locationId) {
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    ensureBusiness(b);
+    var site = locationByIdV1857(b, locationId);
+    if (!site || site.status === "closed") return toast("Location not found.");
+    if (n(site.tier) >= 3) return toast(site.name + " is already at top tier.");
+    var cost = upgradeLocationCostV1857(b, site);
+    var paid = spendBusinessCostV1857(b, cost);
+    if (!paid) return toast("Need " + compactMoney(cost) + " to upgrade this site.");
+    site.tier = clamp(n(site.tier) + 1, 1, 3);
+    site.quality = clamp(n(site.quality) + 12, 0, 100);
+    site.staff = clamp(n(site.staff) + 7, 0, 100);
+    site.demand = clamp(n(site.demand) + 6, 0, 100);
+    b.value = Math.max(0, round(n(b.value) + cost * .7));
+    addLocationHistoryV1857(b, "Upgraded " + site.name + " to tier " + site.tier + ".", -paid.total);
+    log("Upgraded " + site.name + " for " + b.name + ".", { money: -paid.fromPersonal });
+    saveRender();
+  };
+
+  window.supportBusinessLocationV1857 = function (businessId, locationId, mode) {
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    ensureBusiness(b);
+    var site = locationByIdV1857(b, locationId);
+    if (!site || site.status === "closed") return toast("Location not found.");
+    mode = /staff|demand|quality/.test(String(mode)) ? String(mode) : "quality";
+    var cost = supportLocationCostV1857(b, site);
+    var paid = spendBusinessCostV1857(b, cost);
+    if (!paid) return toast("Need " + compactMoney(cost) + " to support this site.");
+    var label = "systems tune-up";
+    if (mode === "staff") { site.staff = clamp(n(site.staff) + 14, 0, 100); site.quality = clamp(n(site.quality) + 4, 0, 100); label = "staff training"; }
+    else if (mode === "demand") { site.demand = clamp(n(site.demand) + 15, 0, 100); b.marketV1857.share = clamp(n(b.marketV1857.share) + 1.2, 3, 85); label = "local campaign"; }
+    else { site.quality = clamp(n(site.quality) + 14, 0, 100); site.staff = clamp(n(site.staff) + 3, 0, 100); }
+    addLocationHistoryV1857(b, "Ran " + label + " at " + site.name + ".", -paid.total);
+    log(label + " improved " + site.name + ".", { money: -paid.fromPersonal });
+    saveRender();
+  };
+
+  window.closeBusinessLocationV1857 = function (businessId, locationId) {
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    ensureBusiness(b);
+    var site = locationByIdV1857(b, locationId);
+    if (!site || site.status === "closed") return toast("Location not found.");
+    if (String(site.id) === "hq") return toast("Headquarters cannot be closed.");
+    site.status = "closed";
+    site.lastIncome = 0;
+    b.locations = locationOpenCountV1857(b);
+    b.reputation = clamp(n(b.reputation) - (n(site.demand) > 60 ? 2 : 0), 0, 100);
+    addLocationHistoryV1857(b, "Closed " + site.name + " to reduce sprawl.", 0);
+    log("Closed " + site.name + " and tightened the network.", {});
+    saveRender();
+  };
+
+  window.competeBusinessMarketShareV1857 = function (businessId) {
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    ensureBusiness(b);
+    var market = b.marketV1857;
+    var ageNow = round(n(stateNow().age));
+    if (round(market.lastCompeteAge) === ageNow) return toast("Already competed for share this year.");
+    var cost = competeCostV1857(b);
+    var paid = spendBusinessCostV1857(b, cost);
+    if (!paid) return toast("Need " + compactMoney(cost) + " to compete for market share.");
+    var summary = locationSummaryV1857(b);
+    var profile = locationProfileV1857(b);
+    var rival = rivalNameV1857(b);
+    var chanceWin = clamp(.34 + n(b.reputation) / 260 + n(summary.avgDemand) / 360 + (n(market.share) - n(market.rivalShare)) / 260 - n(market.rivalStrength) / 500, .18, .82);
+    market.lastCompeteAge = ageNow;
+    if (chanceLocal(chanceWin)) {
+      var gain = randInt(3, 7);
+      market.share = clamp(n(market.share) + gain, 3, 85);
+      market.rivalShare = clamp(n(market.rivalShare) - Math.max(1, gain - 1), 5, 70);
+      market.rivalStrength = clamp(n(market.rivalStrength) - randInt(2, 5), 10, 95);
+      b.reputation = clamp(n(b.reputation) + 4, 0, 100);
+      b.value = Math.max(0, round(n(b.value) * 1.03));
+      (b.locationsV1857.sites || []).forEach(function (site) { if (site.status !== "closed") site.demand = clamp(n(site.demand) + 5, 0, 100); });
+      addLocationHistoryV1857(b, profile.compete + ": gained " + gain + " pts of share from " + rival + ".", -paid.total);
+      log(profile.compete + ". Market share up to " + round(market.share) + "%.", { money: -paid.fromPersonal, confidence: 1 });
+    } else {
+      market.share = clamp(n(market.share) + 1, 3, 85);
+      market.rivalStrength = clamp(n(market.rivalStrength) + randInt(1, 4), 10, 95);
+      b.reputation = clamp(n(b.reputation) - 1, 0, 100);
+      addLocationHistoryV1857(b, profile.compete + " stalled against " + rival + ".", -paid.total);
+      log("The push made noise, but " + rival + " held the line.", { money: -paid.fromPersonal });
+    }
+    saveRender();
+  };
+
+  function canAcquireRivalV1857(b) {
+    ensureBusiness(b);
+    var cost = acquireRivalCostV1857(b);
+    var v = catalogFor(b.id, b);
+    var available = n(b.retainedEarnings) + n(stateNow().money);
+    var open = locationOpenCountV1857(b);
+    if (round(n(b.marketV1857 && b.marketV1857.lastAcquireAge)) === round(n(stateNow().age))) return { ok: false, cost: cost, reason: "Already acquired a rival this year." };
+    if (n(b.reputation) < 85) return { ok: false, cost: cost, reason: "Needs reputation 85+." };
+    if (open < 3 && n(b.value) < n(v.startup, 50000) * 8) return { ok: false, cost: cost, reason: "Needs 3+ sites or major company value." };
+    if (available < cost) return { ok: false, cost: cost, reason: "Needs " + compactMoney(cost) + " available." };
+    return { ok: true, cost: cost, reason: "Ready." };
+  }
+
+  window.acquireBusinessRivalV1857 = function (businessId) {
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    ensureBusiness(b);
+    var gate = canAcquireRivalV1857(b);
+    if (!gate.ok) return toast(gate.reason);
+    var rival = rivalNameV1857(b);
+    var paid = spendBusinessCostV1857(b, gate.cost);
+    if (!paid) return toast("Not enough cash to acquire the rival.");
+    var loc = ensureLocationsV1857(b);
+    var profile = locationProfileV1857(b);
+    var site = makeLocationSiteV1857(b, {
+      id: "acq_" + (++loc.nextId),
+      name: rival + " " + (profile.locations[1] || "site"),
+      archetype: profile.locations[1] || nextLocationArchetypeV1857(b),
+      model: "owned",
+      tier: 2,
+      quality: 63,
+      staff: 60,
+      demand: 66
+    });
+    loc.sites.push(site);
+    var market = b.marketV1857;
+    var shareGain = Math.min(18, Math.max(7, round(n(market.rivalShare) * .45)));
+    market.share = clamp(n(market.share) + shareGain, 3, 85);
+    market.rivalShare = clamp(18 + randInt(0, 9), 5, 70);
+    market.rivalStrength = clamp(42 + randInt(0, 16), 10, 95);
+    market.lastAcquireAge = round(n(stateNow().age));
+    market.acquiredRivals = Math.max(0, round(market.acquiredRivals)) + 1;
+    b.value = Math.max(0, round(n(b.value) + gate.cost * .55));
+    b.reputation = clamp(n(b.reputation) + 6, 0, 100);
+    b.rivalNameV1852 = "";
+    b.locations = locationOpenCountV1857(b);
+    addLocationHistoryV1857(b, "Acquired " + rival + " and absorbed " + site.archetype + ".", -paid.total);
+    log("Acquired " + rival + ". Market share jumped to " + round(market.share) + "%.", { money: -paid.fromPersonal, confidence: 2 });
+    saveRender();
+  };
+
+  window.applyBusinessLocationsYearV1857 = function (b, v, operatingIncome, deltas) {
+    ensureBusiness(b);
+    var loc = ensureLocationsV1857(b);
+    var summary = locationSummaryV1857(b);
+    var market = b.marketV1857;
+    var income = 0;
+    var closed = 0;
+    var sprawl = Math.max(0, summary.sprawlRisk * 55);
+    (loc.sites || []).forEach(function (site) {
+      if (!site || site.status === "closed") return;
+      site.years = Math.max(0, round(n(site.years) + 1));
+      if (site.id === "hq") {
+        site.demand = clamp(n(site.demand) + (n(market.share) - n(market.rivalShare)) / 60 + randInt(-1, 1), 0, 100);
+        return;
+      }
+      var modelMult = site.model === "franchise" ? .42 : 1;
+      var base = Math.max(2000, n(v && v.startup, locationCostBaseV1857(b)) * (.08 + n(site.tier) * .045));
+      var health = clamp((n(site.quality) * .38 + n(site.staff) * .28 + n(site.demand) * .34) / 62, .35, 1.8);
+      var marketMult = clamp(.76 + n(market.share) / 95, .72, 1.55);
+      var ageMult = 1 + Math.min(6, n(site.years)) * .025;
+      var roll = .86 + Math.random() * .28;
+      var siteIncome = round(base * health * marketMult * ageMult * modelMult * roll);
+      income += siteIncome;
+      site.lastIncome = siteIncome;
+      var strain = sprawl * (site.model === "franchise" ? .45 : 1);
+      site.quality = clamp(n(site.quality) + randInt(-2, 2) - strain, 0, 100);
+      site.staff = clamp(n(site.staff) + randInt(-2, 2) - strain * .8, 0, 100);
+      site.demand = clamp(n(site.demand) + (n(market.share) - n(market.rivalShare)) / 80 + randInt(-2, 3), 0, 100);
+      if ((n(site.quality) < 24 || n(site.demand) < 22) && chanceLocal(.1 + summary.sprawlRisk)) {
+        site.status = "closed";
+        site.lastIncome = 0;
+        closed++;
+        b.reputation = clamp(n(b.reputation) - 3, 0, 100);
+        b.value = Math.max(0, round(n(b.value) * .985));
+        addLocationHistoryV1857(b, site.name + " closed after quality and demand collapsed.", 0);
+      }
+    });
+    var demandDrift = ((summary.avgDemand || 50) - 55) / 85;
+    market.share = clamp(n(market.share) + demandDrift + summary.extraSites * .12 - n(market.rivalStrength) / 650 + (Math.random() * 1.3 - .55), 3, 85);
+    market.rivalShare = clamp(n(market.rivalShare) + (n(market.rivalStrength) - 50) / 170 - demandDrift * .5 + (Math.random() * 1.2 - .55), 5, 70);
+    market.rivalStrength = clamp(n(market.rivalStrength) + (n(market.rivalShare) > n(market.share) ? 1 : -1) + randInt(-1, 1), 10, 95);
+    var effects = {
+      income: round(income),
+      riskAdd: summary.sprawlRisk + summary.rivalPressure,
+      franchiseCut: summary.franchiseCut,
+      closed: closed,
+      openSites: locationOpenCountV1857(b),
+      share: round(market.share),
+      rivalShare: round(market.rivalShare)
+    };
+    b.locations = effects.openSites;
+    b.lastLocationEffectsV1857 = effects;
+    return effects;
+  };
+
   window.setEntrepreneurshipPathV1841 = function (path) {
     var s = ensureBusinessState();
     var f = s.finance;
@@ -990,8 +1559,55 @@
   }
 
   function riskFor(b) {
+    return businessRiskBreakdown(b).risk;
+  }
+
+  function businessRiskBreakdown(b) {
+    ensureBusiness(b);
     var v = catalogFor(b.id, b);
-    return clamp(n(b.failureRisk, n(v.failureRisk, .14)) - n(b.reputation) / 500 - (b.ops && b.ops.manager ? .04 : 0) - (b.ops && b.ops.counsel ? .04 : 0) - (b.ops && b.ops.insurance ? .03 : 0) - businessAssetRiskCut(b), .02, .7);
+    var base = n(b.failureRisk, n(v.failureRisk, .14));
+    var repCut = n(b.reputation) / 500;
+    var ops = [
+      { key: "manager", label: "Operator", cut: b.ops && b.ops.manager ? .04 : 0 },
+      { key: "counsel", label: "Business counsel", cut: b.ops && b.ops.counsel ? .04 : 0 },
+      { key: "insurance", label: "Insurance", cut: b.ops && b.ops.insurance ? .03 : 0 }
+    ];
+    var assetCut = businessAssetRiskCut(b);
+    var sector = sectorRiskEffect(b);
+    var portfolio = portfolioEffectsFor(b);
+    var location = locationSummaryV1857(b);
+    var opsCut = ops.reduce(function (sum, item) { return sum + n(item.cut); }, 0);
+    var risk = clamp(base - repCut - opsCut - assetCut - n(sector.effect) - n(portfolio.riskCut) + n(location.sprawlRisk) + n(location.rivalPressure) - n(location.franchiseCut), .02, .7);
+    return { risk: risk, base: base, reputationCut: repCut, ops: ops, assetCut: assetCut, sector: sector, portfolio: portfolio, location: location };
+  }
+  window.businessRiskBreakdownV1856 = businessRiskBreakdown;
+
+  function riskLine(label, value, note, kind) {
+    var sign = value > 0 ? "-" : value < 0 ? "+" : "";
+    var shown = sign + Math.abs(Math.round(value * 100)) + "%";
+    return '<div class="v1856-risk-line ' + esc(kind || "") + '"><span>' + esc(label) + '</span><b>' + esc(shown) + '</b><em>' + esc(note || "") + '</em></div>';
+  }
+
+  function riskPanel(b) {
+    var rb = businessRiskBreakdown(b);
+    var sector = rb.sector || {};
+    var sectorMeta = sector.meta;
+    var sectorKind = n(sector.effect) >= 0 ? "good" : "bad";
+    var lines = [
+      riskLine("Base pressure", -rb.base, "Baseline failure pressure for this venture type.", "bad"),
+      riskLine("Reputation cushion", rb.reputationCut, "Reputation lowers yearly failure pressure.", "good")
+    ];
+    rb.ops.forEach(function (item) {
+      if (item.cut) lines.push(riskLine(item.label, item.cut, "Operations support lowers pressure.", "good"));
+    });
+    if (rb.assetCut) lines.push(riskLine("Asset stability", rb.assetCut, "Better location, equipment, and staff lower pressure.", "good"));
+    if (sectorMeta) lines.push(riskLine(sectorMeta.label, n(sector.effect), n(sector.effect) >= 0 ? sectorMeta.down : sectorMeta.up, sectorKind));
+    if (rb.portfolio.riskCut) lines.push(riskLine("Diversification", rb.portfolio.riskCut, rb.portfolio.sectorCount + " sectors owned lowers portfolio-wide pressure.", "good"));
+    if (rb.portfolio.incomeBonus) lines.push('<div class="v1856-risk-line gold"><span>Franchise effect</span><b>+' + Math.round(rb.portfolio.incomeBonus * 100) + '% income</b><em>' + esc(rb.portfolio.sameSectorCount + " companies in this sector boost yearly income and reputation.") + '</em></div>');
+    if (rb.location && rb.location.sprawlRisk) lines.push(riskLine("Location sprawl", -rb.location.sprawlRisk, rb.location.openSites + " open sites strain staff, systems, and quality.", "bad"));
+    if (rb.location && rb.location.franchiseCut) lines.push(riskLine("Franchise controls", rb.location.franchiseCut, rb.location.franchiseSites + " partner sites lower owned-operator pressure.", "good"));
+    if (rb.location && rb.location.rivalPressure) lines.push(riskLine("Rival pressure / market share", -rb.location.rivalPressure, rb.location.rivalName + " controls " + round(rb.location.rivalShare) + "% vs your " + round(rb.location.share) + "%.", "bad"));
+    return '<div class="v1856-risk-panel"><div class="v1856-risk-head"><span>Risk line items</span><b class="' + (rb.risk >= .24 ? "bad" : rb.risk <= .08 ? "good" : "gold") + '">' + pct(rb.risk) + '</b></div>' + lines.join("") + '</div>';
   }
 
   var STAGE_ICONS = { startup: "🌱", growing: "📈", breakout: "🚀" };
@@ -1065,18 +1681,22 @@
     var list = businesses();
     var last = n(s.finance.lastEntrepreneurIncome || s.finance.lastBusinessIncome);
     var score = enterpriseScore();
+    var p = list[0] ? portfolioEffectsFor(list[0]) : { summary: "No portfolio bonus yet" };
     return '<section class="v1840-hero"><div><div class="section-label">💼 Business command center</div><h2>Business Office</h2><p>Companies, entity cash, owner payouts, business taxes, acquisitions, family enterprise, trust ownership, and succession live in one cleaner desk.</p><div class="v1840-chip-row">' +
-      '<span>' + list.length + ' businesses</span><span class="' + (last >= 0 ? "good" : "bad") + '">Last income ' + signedMoney(last) + '</span><span>Company cash ' + compactMoney(totalCompanyCash()) + '</span><span class="' + (legalTrustActive() ? "good" : "gold") + '">' + (legalTrustActive() ? "Trust active" : "No trust") + '</span><span>Dynasty ' + score + '/100</span>' +
+      '<span>' + list.length + ' businesses</span><span class="' + (last >= 0 ? "good" : "bad") + '">Last income ' + signedMoney(last) + '</span><span>Company cash ' + compactMoney(totalCompanyCash()) + '</span><span>' + esc(p.summary) + '</span><span class="' + (legalTrustActive() ? "good" : "gold") + '">' + (legalTrustActive() ? "Trust active" : "No trust") + '</span><span>Dynasty ' + score + '/100</span>' +
       '</div></div><strong>' + compactMoney(totalBusinessValue()) + '<span>business value</span></strong></section>';
   }
 
   function kpis() {
+    var list = businesses();
+    var p = list[0] ? portfolioEffectsFor(list[0]) : { summary: "Own businesses to unlock.", sectorCount: 0 };
     return '<section class="v1840-kpi-row">' +
       metric("💰 Company value", compactMoney(totalBusinessValue()), "Business value plus company cash.", "gold") +
       metric("🏦 Company cash", compactMoney(totalCompanyCash()), "Money inside companies, not personal checking.", "good") +
       metric("⚠️ Entity tax debt", compactMoney(totalEntityDebt()), "Taxes owed by companies.", totalEntityDebt() ? "bad" : "good") +
       metric("📋 Compliance due", compactMoney(totalCompliance()), "Admin/legal bills paid from company cash.", totalCompliance() ? "gold" : "good") +
       metric("🏛️ Trust stake", compactMoney(trustBusinessValue()), "Business ownership titled to family trust.", trustBusinessValue() ? "good" : "gold") +
+      metric("Portfolio edge", list.length ? p.summary : "None yet", "Same-sector holdings franchise; 3+ sectors diversify risk.", list.length > 1 ? "good" : "gold") +
       '</section>';
   }
 
@@ -1098,11 +1718,12 @@
     var cards = list.map(function (b) {
       ensureBusiness(b);
       var risk = riskFor(b);
+      var pf = portfolioEffectsFor(b);
       var selected = focus && String(focus.id) === String(b.id);
       return '<button class="v1840-company-card ' + (selected ? "selected" : "") + '" onclick="event.preventDefault();event.stopPropagation();setBusinessFocusV1840(\'' + esc(b.id) + '\')">' +
         '<span>' + categoryIcon(b.category) + ' ' + esc(b.category || "Business") + '</span><b>' + esc(b.name) + '</b><em>' + stageIcon(b.stage) + ' ' + esc(structureName(b.entityType)) + ' / ' + esc(b.stage || "startup") + ' / ' + round(b.years) + ' yrs</em>' +
         reputationBar(b.reputation) +
-        '<div class="v1840-company-stats"><i>' + compactMoney(businessValue(b)) + '</i><i>' + compactMoney(b.retainedEarnings) + ' cash</i><i class="' + (risk >= .24 ? "bad" : risk <= .08 ? "good" : "gold") + '">' + pct(risk) + ' risk</i></div>' +
+        '<div class="v1840-company-stats"><i>' + compactMoney(businessValue(b)) + '</i><i>' + compactMoney(b.retainedEarnings) + ' cash</i><i class="' + (risk >= .24 ? "bad" : risk <= .08 ? "good" : "gold") + '">' + pct(risk) + ' risk</i><i class="' + (pf.incomeBonus || pf.riskCut ? "good" : "gold") + '">' + esc(pf.summary) + '</i></div>' +
         '</button>';
     }).join("");
     return '<section class="panel v1840-business-rail"><div class="v1840-panel-head"><div><div class="section-label">🏢 Owned companies</div><h3>Portfolio rail</h3></div><span>Click a company to focus details below.</span></div><div class="v1840-rail">' + cards + '</div></section>';
@@ -1142,6 +1763,57 @@
     }).join("");
   }
 
+  function locationsPanelV1857(b) {
+    ensureBusiness(b);
+    var loc = ensureLocationsV1857(b);
+    var summary = locationSummaryV1857(b);
+    var profile = locationProfileV1857(b);
+    var market = b.marketV1857 || {};
+    var ageNow = round(n(stateNow().age));
+    var ownedGate = canOpenLocationV1857(b, "owned");
+    var franchiseGate = canOpenLocationV1857(b, "franchise");
+    var acquireGate = canAcquireRivalV1857(b);
+    var nextType = nextLocationArchetypeV1857(b);
+    var competeUsed = round(market.lastCompeteAge) === ageNow;
+    var siteCards = (loc.sites || []).map(function (site) {
+      var closed = site.status === "closed";
+      var upgradeCost = upgradeLocationCostV1857(b, site);
+      var supportCost = supportLocationCostV1857(b, site);
+      return '<div class="v1857-site-card ' + (closed ? "closed" : "") + '">' +
+        '<span>' + esc(site.model === "franchise" ? "Franchise partner" : "Company-owned") + '</span>' +
+        '<b>' + esc(site.name) + '</b>' +
+        '<em>' + esc(site.archetype) + ' / Tier ' + round(site.tier) + ' / ' + round(site.years) + ' yrs' + (closed ? ' / Closed' : '') + '</em>' +
+        '<div class="v1857-site-stats"><i>Quality ' + round(site.quality) + '</i><i>Staff ' + round(site.staff) + '</i><i>Demand ' + round(site.demand) + '</i><i>' + compactMoney(site.lastIncome) + '/yr</i></div>' +
+        '<div class="v1840-action-strip">' +
+        actionButton("Upgrade " + compactMoney(upgradeCost), "upgradeBusinessLocationV1857('" + esc(b.id) + "','" + esc(site.id) + "')", "gold", closed || n(site.tier) >= 3) +
+        actionButton("Systems " + compactMoney(supportCost), "supportBusinessLocationV1857('" + esc(b.id) + "','" + esc(site.id) + "','quality')", "blue", closed) +
+        actionButton("Staff", "supportBusinessLocationV1857('" + esc(b.id) + "','" + esc(site.id) + "','staff')", "", closed) +
+        actionButton("Demand", "supportBusinessLocationV1857('" + esc(b.id) + "','" + esc(site.id) + "','demand')", "green", closed) +
+        actionButton("Close", "closeBusinessLocationV1857('" + esc(b.id) + "','" + esc(site.id) + "')", "red", closed || String(site.id) === "hq") +
+        '</div></div>';
+    }).join("");
+    var historyRows = (loc.history || []).slice(0, 4).map(function (h) {
+      return '<div class="v1857-history-row"><span>Age ' + esc(h.age) + '</span><b>' + esc(h.text) + '</b><em>' + (n(h.amount) ? signedMoney(h.amount) : "") + '</em></div>';
+    }).join("") || '<div class="v1840-note">No location moves yet.</div>';
+    return '<div class="v1857-location-panel">' +
+      '<div class="v1840-panel-head"><div><div class="section-label">Network + market share</div><h3>' + esc(profile.label) + '</h3><p>Open sector-specific sites, sign franchise partners, fight ' + esc(summary.rivalName) + ', or acquire the rival outright.</p></div><strong>' + round(summary.share) + '%<span>market share</span></strong></div>' +
+      '<div class="v1840-metric-grid">' +
+      metric("Open sites", String(summary.openSites), summary.ownedSites + " owned / " + summary.franchiseSites + " franchise.", summary.openSites >= 3 ? "good" : "gold") +
+      metric("Location income", signedMoney(summary.lastIncome), "Added by extra sites last year. HQ is the base business.", n(summary.lastIncome) >= 0 ? "good" : "bad") +
+      metric("Network health", round((summary.avgQuality + summary.avgStaff + summary.avgDemand) / 3) + "/100", "Quality " + summary.avgQuality + ", staff " + summary.avgStaff + ", demand " + summary.avgDemand + ".", summary.avgQuality >= 60 && summary.avgStaff >= 60 ? "good" : "gold") +
+      metric("Rival", summary.rivalName, round(summary.rivalShare) + "% share / strength " + round(summary.rivalStrength) + ".", summary.rivalShare > summary.share ? "bad" : "gold") +
+      '</div>' +
+      '<div class="v1857-market-actions"><div><span>Next site</span><b>' + esc(nextType) + '</b><em>' + (ownedGate.ok ? "Owned site ready." : ownedGate.reason) + '</em></div><div class="v1840-action-strip">' +
+      actionButton("Open Owned " + compactMoney(ownedGate.cost), "openBusinessLocationV1857('" + esc(b.id) + "','owned')", "gold", !ownedGate.ok) +
+      actionButton("Sign Franchise " + compactMoney(franchiseGate.cost), "openBusinessLocationV1857('" + esc(b.id) + "','franchise')", "green", !franchiseGate.ok) +
+      actionButton(profile.compete + " " + compactMoney(competeCostV1857(b)), "competeBusinessMarketShareV1857('" + esc(b.id) + "')", "blue", competeUsed) +
+      actionButton(profile.acquire + " " + compactMoney(acquireGate.cost), "acquireBusinessRivalV1857('" + esc(b.id) + "')", "red", !acquireGate.ok) +
+      '</div></div>' +
+      '<div class="v1857-site-grid">' + siteCards + '</div>' +
+      '<div class="v1857-location-history"><div class="section-label">Location history</div>' + historyRows + '</div>' +
+      '</div>';
+  }
+
   function focusDesk() {
     var b = focusBusiness();
     if (!b) return "";
@@ -1176,7 +1848,9 @@
       metric("Protection", pct(n(st.shield) + (b.ops && b.ops.counsel ? .12 : 0) + (b.ops && b.ops.insurance ? .1 : 0)), "Entity and ops shield.", "gold") +
       '</div>' +
       '<div class="row"><div><div class="row-title">⭐ Reputation: ' + round(b.reputation) + '/100</div><div class="row-sub">' + reputationBar(b.reputation) + '</div></div></div>' +
+      riskPanel(b) +
       sectorMeterRow(b) +
+      locationsPanelV1857(b) +
       (typeof window.renderBizChallengesPanelV1853 === "function" ? window.renderBizChallengesPanelV1853(b) : "") +
       '<div class="v1840-action-strip">' +
       actionButton("Work", "workVenture('" + esc(b.id) + "')", "blue", typeof window.workVenture !== "function" || (stateNow().actionsTaken || {})["venture_" + b.id]) +
@@ -1508,7 +2182,7 @@
       ".v1840-business-shell{display:grid;gap:14px;padding:4px 0 96px;color:#f6ead8;min-width:0}.v1840-business-shell *{box-sizing:border-box}.v1840-business-shell .panel{min-width:0;overflow:hidden;border:1px solid rgba(216,173,109,.22);border-radius:12px;background:linear-gradient(135deg,rgba(34,30,23,.96),rgba(22,19,15,.96));padding:14px}.v1840-business-shell .section-label{font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.16em;color:#d8b16e;font-size:10px;margin-bottom:9px}",
       ".v1840-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:end;border:1px solid rgba(143,175,108,.46);border-radius:16px;background:radial-gradient(circle at 12% 10%,rgba(143,175,108,.22),transparent 30%),radial-gradient(circle at 82% 0,rgba(216,173,109,.18),transparent 28%),linear-gradient(135deg,rgba(24,42,29,.98),rgba(43,31,21,.98));padding:18px;box-shadow:0 22px 58px rgba(0,0,0,.28)}.v1840-hero h2{font-size:38px;margin:0 0 6px;letter-spacing:0}.v1840-hero p{margin:0;color:#d9c8aa;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.55}.v1840-hero strong{font-size:40px;color:#f0ca7b;text-align:right}.v1840-hero strong span{display:block;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.15em;font-size:9px;color:#bba988}",
       ".v1840-chip-row,.v1840-action-strip{display:flex;gap:7px;flex-wrap:wrap}.v1840-chip-row{margin-top:12px}.v1840-chip-row span{border:1px solid rgba(255,255,255,.13);border-radius:999px;background:rgba(255,255,255,.045);padding:6px 9px;color:#d8b16e;font-family:'JetBrains Mono',monospace;font-size:10px}.v1840-chip-row .good{color:#b9dc8a;border-color:rgba(185,220,138,.36)}.v1840-chip-row .bad{color:#e9927d;border-color:rgba(233,146,125,.40)}",
-      ".v1840-kpi-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px}.v1840-metric{border:1px solid rgba(255,255,255,.11);border-radius:12px;background:rgba(255,255,255,.045);padding:11px;min-width:0}.v1840-metric span{display:block;color:#aa9a82;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.11em;font-size:9px}.v1840-metric b{display:block;color:#fff3df;font-size:20px;margin-top:5px;overflow-wrap:anywhere}.v1840-metric em{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-style:normal;font-size:10px;line-height:1.4;margin-top:5px}.v1840-metric.good b,.v1840-history em.good{color:#b9dc8a}.v1840-metric.bad b,.v1840-history em.bad{color:#e9927d}.v1840-metric.gold b{color:#f0ca7b}",
+      ".v1840-kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:9px}.v1840-metric{border:1px solid rgba(255,255,255,.11);border-radius:12px;background:rgba(255,255,255,.045);padding:11px;min-width:0}.v1840-metric span{display:block;color:#aa9a82;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.11em;font-size:9px}.v1840-metric b{display:block;color:#fff3df;font-size:20px;margin-top:5px;overflow-wrap:anywhere}.v1840-metric em{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-style:normal;font-size:10px;line-height:1.4;margin-top:5px}.v1840-metric.good b,.v1840-history em.good{color:#b9dc8a}.v1840-metric.bad b,.v1840-history em.bad{color:#e9927d}.v1840-metric.gold b{color:#f0ca7b}",
       ".v1840-main-grid{display:grid;grid-template-columns:1fr;gap:14px;align-items:start}.v1840-panel-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:12px}.v1840-panel-head h3{font-size:23px;margin:0 0 4px}.v1840-panel-head p,.v1840-panel-head span{font-family:'JetBrains Mono',monospace;color:#b9a98e;font-size:10px;line-height:1.45;margin:0}.v1840-panel-head strong{color:#f0ca7b;font-size:32px;text-align:right}.v1840-panel-head strong span{display:block;text-transform:uppercase;letter-spacing:.14em;font-family:'JetBrains Mono',monospace;font-size:8px;color:#b9a98e}",
       ".v1840-mode-grid,.v1840-two-col{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.v1840-mode-card{border:1px solid rgba(255,255,255,.11);border-radius:12px;background:rgba(255,255,255,.045);padding:12px;min-width:0}.v1840-mode-card.active{border-color:rgba(240,202,123,.58);background:rgba(216,173,109,.09)}.v1840-mode-card span,.v1840-option span,.v1840-company-card span,.v1840-launch-card span,.v1841-path-card span,.v1841-requirement span{display:block;color:#d8b16e;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.12em;font-size:9px}.v1840-mode-card b,.v1840-option b,.v1840-company-card b,.v1840-launch-card b,.v1841-path-card b,.v1841-requirement b{display:block;color:#fff3df;font-size:17px;line-height:1.1;margin-top:5px}.v1840-mode-card em,.v1840-option em,.v1840-company-card em,.v1840-launch-card em,.v1841-path-card em,.v1841-requirement em{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.4;font-style:normal;margin-top:7px}",
       ".v1840-rail{display:flex;gap:10px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;padding:2px 2px 10px;margin-top:8px}.v1840-option-rail,.v1841-path-grid,.v1841-requirement-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:8px}.v1840-company-card,.v1840-launch-card{flex:0 0 250px;scroll-snap-align:start;border:1px solid rgba(255,255,255,.11);border-radius:12px;background:rgba(255,255,255,.045);color:#f6ead8;text-align:left;padding:12px;min-height:142px}.v1840-option,.v1841-path-card,.v1841-requirement{min-width:0;border:1px solid rgba(255,255,255,.11);border-radius:12px;background:rgba(255,255,255,.045);color:#f6ead8;text-align:left;padding:12px;min-height:132px}.v1841-path-card i,.v1841-requirement i{display:block;margin-top:9px;color:#f0ca7b;font:10px 'JetBrains Mono',monospace;font-style:normal}.v1841-requirement i.good{color:#b9dc8a}.v1840-company-card.selected,.v1840-launch-card.ready,.v1840-option.active,.v1841-path-card.active{border-color:rgba(240,202,123,.64);background:linear-gradient(135deg,rgba(65,48,26,.82),rgba(25,21,17,.96))}.v1840-company-card:disabled,.v1840-launch-card:disabled,.v1840-option:disabled{opacity:.52}.v1840-company-stats{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}.v1840-company-stats i{border:1px solid rgba(255,255,255,.10);border-radius:999px;padding:4px 7px;font-style:normal;color:#f0ca7b;font-family:'JetBrains Mono',monospace;font-size:9px}.v1840-company-stats i.good{color:#b9dc8a}.v1840-company-stats i.bad{color:#e9927d}",
@@ -1520,6 +2194,8 @@
       ".v1840-launch-group{margin-top:12px}.v1840-launch-group-label{font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.12em;color:#d8b16e;font-size:10px;margin-bottom:8px}",
       ".v1840-launch-controls{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}.v1840-launch-controls input{flex:1 1 220px;min-width:0;border:1px solid rgba(216,173,109,.45);background:rgba(0,0,0,.36);color:#f6ead8;border-radius:9px;padding:10px;font:12px 'JetBrains Mono',monospace}.v1840-launch-controls select{flex:0 0 auto;border:1px solid rgba(216,173,109,.45);background:rgba(0,0,0,.36);color:#f6ead8;border-radius:9px;padding:10px;font:12px 'JetBrains Mono',monospace}",
       ".v1851-sector-meter{border:1px solid rgba(126,160,172,.30)!important;border-radius:12px;background:rgba(126,160,172,.07);padding:11px}.v1851-sector-meter .row-title{color:#dcecf0;font-size:13px}.v1851-sector-meter .good{color:#b9dc8a}.v1851-sector-meter .bad{color:#e9927d}.v1851-sector-meter .gold{color:#f0ca7b}",
+      ".v1856-risk-panel{border:1px solid rgba(233,146,125,.28);border-radius:12px;background:linear-gradient(135deg,rgba(95,45,35,.18),rgba(255,255,255,.025));padding:11px;margin:10px 0}.v1856-risk-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:7px}.v1856-risk-head span{font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.12em;color:#d8b16e;font-size:9px}.v1856-risk-head b{font-size:20px;color:#f0ca7b}.v1856-risk-head b.good{color:#b9dc8a}.v1856-risk-head b.bad{color:#e9927d}.v1856-risk-line{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;border-top:1px solid rgba(255,255,255,.07);padding:7px 0 0;margin-top:7px}.v1856-risk-line span{color:#f6ead8;font:10px 'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.08em}.v1856-risk-line b{color:#f0ca7b;font:12px 'JetBrains Mono',monospace}.v1856-risk-line.good b{color:#b9dc8a}.v1856-risk-line.bad b{color:#e9927d}.v1856-risk-line em{grid-column:1/-1;color:#b9a98e;font:10px 'JetBrains Mono',monospace;font-style:normal;line-height:1.35}",
+      ".v1857-location-panel{border:1px solid rgba(126,160,172,.28);border-radius:12px;background:linear-gradient(135deg,rgba(27,42,48,.34),rgba(255,255,255,.025));padding:12px;margin:10px 0}.v1857-market-actions{display:grid;grid-template-columns:minmax(180px,.55fr) minmax(0,1fr);gap:10px;align-items:center;border:1px solid rgba(255,255,255,.09);border-radius:10px;background:rgba(255,255,255,.035);padding:10px;margin:10px 0}.v1857-market-actions span,.v1857-site-card span{display:block;color:#d8b16e;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.12em;font-size:9px}.v1857-market-actions b,.v1857-site-card b{display:block;color:#fff3df;font-size:16px;margin-top:4px}.v1857-market-actions em,.v1857-site-card em{display:block;color:#b9a98e;font:10px 'JetBrains Mono',monospace;font-style:normal;line-height:1.4;margin-top:5px}.v1857-site-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:9px;margin-top:10px}.v1857-site-card{border:1px solid rgba(255,255,255,.11);border-radius:12px;background:rgba(255,255,255,.04);padding:11px;min-width:0}.v1857-site-card.closed{opacity:.62}.v1857-site-stats{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}.v1857-site-stats i{border:1px solid rgba(255,255,255,.10);border-radius:999px;padding:4px 7px;color:#dcecf0;font:9px 'JetBrains Mono',monospace;font-style:normal}.v1857-location-history{margin-top:10px}.v1857-history-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;border-top:1px solid rgba(255,255,255,.07);padding:8px 0}.v1857-history-row span,.v1857-history-row b,.v1857-history-row em{font:9px 'JetBrains Mono',monospace;font-style:normal}.v1857-history-row span{color:#aa9a82}.v1857-history-row b{color:#f6ead8}.v1857-history-row em{color:#f0ca7b}",
       ".v1851-cash-explain{border:1px solid rgba(240,202,123,.30);border-radius:10px;background:rgba(240,202,123,.06);padding:10px;margin:0 0 10px;color:#e9d9bb;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.5}.v1851-cash-explain b{color:#f0ca7b}",
       ".v1851-cash-group{border:1px solid rgba(255,255,255,.09);border-radius:10px;background:rgba(255,255,255,.025);padding:9px;margin-top:8px}.v1851-cash-group>.v1851-cash-label{display:block;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.1em;font-size:9px;color:#d8b16e;margin-bottom:6px}.v1851-cash-group .v1840-action-strip{margin:0}",
       "@media(max-width:1060px){.v1840-main-grid,.v1840-mode-grid,.v1840-two-col{grid-template-columns:1fr}.v1840-kpi-row,.v1840-metric-grid{display:flex;overflow-x:auto;padding-bottom:9px}.v1840-metric{flex:0 0 190px}.v1840-hero{grid-template-columns:1fr}.v1840-hero strong{text-align:left}.v1840-company-card,.v1840-launch-card{flex-basis:78vw}.v1840-custom-row{grid-template-columns:1fr}.v1840-trust-head{display:block}.v1840-trust-head span{text-align:left;display:block;margin-top:4px}}"

@@ -89,9 +89,13 @@
 
     // ===== scale graph + public desk render =====
     S.finance.bizV1860 = B; B.activeBizId = pub.uid; // back to the public company
+    window.bizSetPanelV1862("overview");
     var panel = window.renderEntrepreneurHubV1861();
     ok("scale_graph_renders", panel.indexOf("🚀 Scale") >= 0 && panel.indexOf("Revenue / employee") >= 0);
-    ok("public_desk_renders", panel.indexOf("Public company") >= 0 && panel.indexOf("Invest in yourself") >= 0);
+    // Dashboard 2.0: the public desk now lives behind the Public Market tab
+    window.bizSetPanelV1862("public");
+    var pubPanel = window.renderEntrepreneurHubV1861();
+    ok("public_desk_renders", pubPanel.indexOf("Public company") >= 0 && pubPanel.indexOf("Invest in yourself") >= 0);
     ok("panel_no_throw", panel.length > 800);
 
     out.summary = { total: Object.keys(out.pass).length, passed: Object.keys(out.pass).filter(function (k) { return out.pass[k]; }).length, failed: out.fail.length };

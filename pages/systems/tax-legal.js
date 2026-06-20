@@ -725,10 +725,19 @@
       n(s.debt) + n(f.taxDebt) + n(f.creditCardDebt) +
       n(f.debts && f.debts.medical) + n(f.debts && f.debts.education) + n(f.debts && f.debts.secured);
     var legacyEstate = 0;
-    try { if (typeof legacyNetWorth === "function") legacyEstate = Math.max(0, round(legacyNetWorth(s))); } catch (e) {}
+    // legacyNetWorth now includes the family trust, but the trust carries to the heir
+    // separately (applyLegacyCarryV1846) — subtract it so it is not also paid out as cash.
+    try { if (typeof legacyNetWorth === "function") legacyEstate = Math.max(0, round(legacyNetWorth(s) - trustCarryValueV1846(s, heirKey))); } catch (e) {}
     var base = Math.max(0, Math.max(legacyEstate, personalAssets - personalDebts));
     var heirTrust = Math.max(0, round((((f.trustFunds || {})[heirKey]) || 0)));
-    var rate = inheritanceRate == null ? .45 : Math.max(0, Math.min(.45, n(inheritanceRate)));
+    // A strong family trust / estate plan sharply reduces the death haircut on the
+    // (non-trust) personal estate — that is the whole point of "the best money can buy".
+    // Trust corpus itself already carries 100% separately via applyLegacyCarryV1846.
+    var estTypeProt = ({ revocable: .18, asset: .42, irrevocable: .46, dynasty: .72, family_office: .82 })[(s.estateV1831 || {}).trustType] || 0;
+    var trustProt = Math.max(0, Math.min(0.85, Math.max(n((f.familyTrustV1839 || {}).protection), estTypeProt)));
+    var baseRate = inheritanceRate == null ? .45 : Math.max(0, Math.min(.6, n(inheritanceRate)));
+    // No trust -> baseRate (45% on death). Dynasty (~.72) -> ~85%. Family office (~.82) -> ~90%.
+    var rate = Math.max(0, Math.min(0.97, baseRate + (1 - baseRate) * trustProt));
     return Math.max(0, round(base * rate) + heirTrust);
   }
 
@@ -849,6 +858,18 @@
     return entries[0];
   }
 
+  // When the player dies with no living child, a relative of the family line
+  // steps forward so the dynasty can always continue. Returns an heir-like stub.
+  function generatedSuccessorV1862(old) {
+    var oldLegacy = (old || {}).legacy || {};
+    var familyName = oldLegacy.familyName || ((old || {}).name || "").split(" ").pop() || "Legacy";
+    var gender = Math.random() < .5 ? "male" : "female";
+    var first = "";
+    try { if (typeof randomName === "function") first = String(randomName(gender) || "").split(" ")[0]; } catch (e) {}
+    if (!first) first = gender === "female" ? "Robin" : "Sam";
+    return { name: first + " " + familyName, gender: gender, generated: true };
+  }
+
   function storePreSuccessionBackupV1847(old, heirKey) {
     var payload = { at: Date.now(), slot: 1, heirKey: heirKey || "", source: old };
     try { payload.slot = typeof activeSlot !== "undefined" ? activeSlot : Number(localStorage.getItem("ledger-active-slot") || 1); } catch (e) {}
@@ -861,10 +882,14 @@
     var old = cloneV1846(stateNow());
     if (!old) return;
     var heirEntry = selectedHeirEntryV1846(old);
-    if (!heirEntry) return toast("No living child is available to continue the family line.");
-    var heirKey = heirEntry[0];
-    var heir = heirEntry[1] || {};
-    var cashInheritance = personalInheritanceCashV1846(old, heirKey, old.alive === false ? .45 : .18);
+    var hasDirectHeir = !!heirEntry;
+    var heirKey = hasDirectHeir ? heirEntry[0] : "";
+    var heir = hasDirectHeir ? (heirEntry[1] || {}) : generatedSuccessorV1862(old);
+    // A named, living child inherits the most. With no direct heir, a relative
+    // steps in to keep the line alive but receives a smaller share of the estate.
+    var deadRate = hasDirectHeir ? .45 : .25;
+    var livingRate = hasDirectHeir ? .18 : .10;
+    var cashInheritance = personalInheritanceCashV1846(old, heirKey, old.alive === false ? deadRate : livingRate);
     var oldScore = 0;
     try { if (typeof ledgerLegacyScore === "function") oldScore = round(ledgerLegacyScore(old)); } catch (e) {}
     var oldLegacy = old.legacy || {};
@@ -898,6 +923,7 @@
     stateNow().legacy.previousLivesV1816 = previousLives;
     stateNow().legacy.milestones = [];
     var carried = applyLegacyCarryV1846(old, heirKey);
+    if (!hasDirectHeir) log("With no direct heir, " + nextName + " — a relative of the " + familyName + " line — steps forward to continue it.", { money: 0 });
     log("You carry the " + familyName + " line forward with " + compactMoney(cashInheritance) + " cash, " + compactMoney(carried.trust) + " protected trust cash, " + compactMoney(carried.business) + " family business value, and " + compactMoney(carried.protectedInvestmentOffice || 0) + " protected investment office capital.", { money: 0 });
     try { if (typeof save === "function") save(); } catch (e3) {}
     try { if (typeof render === "function") render(); } catch (e4) {}
