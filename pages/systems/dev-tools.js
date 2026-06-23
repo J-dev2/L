@@ -35,6 +35,62 @@
     if ("stress" in s.stats) s.stats.stress = 0;
     refresh(); toast("Stats maxed.");
   }
+
+  function setIQ() {
+    var s = S();
+    if (!s || !s.traits) return toast("No game loaded / traits missing.");
+    var raw = prompt("Set IQ (55-200):", String((s.traits && s.traits.iq != null) ? s.traits.iq : 100));
+    if (raw == null) return;
+    var v = Math.max(55, Math.min(200, Math.round(Number(raw))));
+    if (!Number.isFinite(v)) return toast("Enter a valid number.");
+    s.traits.iq = v;
+
+    // Mirror the core runtime patterns:
+    // - iqPotential should be >= iq and within 200.
+    // - learningSpeed derived from iq.
+    s.traits.iqPotential = Math.max(v, Math.min(200, v + 8));
+    s.traits.learningSpeed = Math.max(.65, Math.min(2.8, 1 + (s.traits.iq - 100) / 75));
+
+    refresh();
+    toast("IQ set to " + v);
+  }
+
+  function addChildWithGender(gender) {
+    var s = S();
+    if (!s) return toast("No game loaded.");
+    if (!s.relationships) s.relationships = {};
+    var last = (String(s.name || "").split(" ").pop() || "Legacy");
+    var g = gender === "male" ? "male" : "female";
+
+    // Reuse the core runtime patterns as closely as possible.
+    // (Names live in the core runtime scope, but here we only need last name + role shape.)
+    // If the core randomName() is not available, we still create a valid relationship.
+    var first = (typeof window.randomName === "function")
+      ? String(window.randomName(g)).replace(/ \w+$/, "")
+      : (g === "male" ? "Junior" : "Legacy");
+
+    var child = {
+      name: first + " " + last,
+      role: "Child",
+      bond: typeof rand === "function" ? rand(82, 82) : 82,
+      trust: typeof rand === "function" ? rand(70, 70) : 70,
+      alive: true,
+      age: 0
+    };
+
+    var idx = 0;
+    Object.keys(s.relationships).forEach(function (k) {
+      if (String(k).indexOf("child") === 0) {
+        var n = Number(String(k).replace(/^child/, ""));
+        if (Number.isFinite(n) && n >= idx) idx = n + 1;
+      }
+    });
+
+    var key = "child" + idx;
+    s.relationships[key] = child;
+    refresh();
+    toast("Added a " + g + " child: " + child.name);
+  }
   function ageUpN(n) { for (var i = 0; i < n; i++) { call("ageUp"); if (!S() || S().alive === false) break; } paint(); }
 
   function spawnCompany() {
@@ -109,6 +165,12 @@
       btn("Set age…", "setage") + btn("Max stats", "maxstats") + btn("Age up ×5", "ageup5") + btn("Age up ×1", "ageup1") +
       '</div></div>' +
 
+      '<div class="ld-sec"><h3>IQ & Family (Dev)</h3><div class="ld-row">' +
+      btn("Set IQ…", "setiq", "gold") +
+      btn("Add male child", "addchildm") +
+      btn("Add female child", "addchildf") +
+      '</div><div class="ld-read" style="margin-top:8px">Spawns a child relationship in your active save and updates IQ traits.</div></div>' +
+
       '<div class="ld-sec"><h3>Entrepreneurship</h3><div class="ld-read">' + bizLine() + '</div><div class="ld-row">' +
       btn("Spawn company", "spawn", "gold") + btn("Make IPO-ready", "ipo") + btn("Grow ×1 yr", "grow1") + btn("Grow ×5 yrs", "grow5") +
       '</div></div>' +
@@ -128,6 +190,9 @@
     give100k: function () { giveMoney(100000); },
     give1m: function () { giveMoney(1000000); },
     give1b: function () { giveMoney(1000000000); },
+    setiq: function () { setIQ(); },
+    addchildm: function () { addChildWithGender("male"); },
+    addchildf: function () { addChildWithGender("female"); },
     setage: setAge,
     maxstats: maxStats,
     ageup5: function () { ageUpN(5); },

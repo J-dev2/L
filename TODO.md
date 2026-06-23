@@ -1,0 +1,10 @@
+- [ ] Implement dev-tools UI feature:
+  - [ ] Add “Set IQ…” action (prompt IQ, clamp 55–200, update state.traits.iq/iqPotential/learningSpeed)
+  - [ ] Add “Add child” actions (male/female) (promptless buttons; create new child relationship with last name from player)
+  - [ ] Wire actions into DEV panel actions registry and DOM panel HTML
+  - [ ] Ensure actions require an active game (window.state exists)
+  - [ ] Ensure each action triggers refresh() + doSave()/toast via existing helpers
+- [ ] Manual critical-path testing:
+  - [ ] Open `play.html?dev=1` unlock dev tools
+  - [ ] Set IQ and confirm top ribbon IQ reflects change
+  - [ ] Add male/female child and confirm People hub shows new child
