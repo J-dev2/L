@@ -53,6 +53,14 @@ function showStatDeltas(deltas) {
 }
 function legacyNetWorth(s = state) {
   if (!s) return 0;
+  // Migrate legacy rentals into the v18.62 real-estate portfolio first so they aren't counted
+  // twice (the migration clears s.rentals), then count property as live equity below.
+  try { if (typeof window.reEnsureV1862 === "function") window.reEnsureV1862(); } catch (e) {}
+  const reEquityNW = (typeof window.reEquityV1862 === "function") ? Math.max(0, Number(window.reEquityV1862()) || 0) : 0;
+  // Car garage (v18.67): ensure migrates the legacy state.car into the garage (and clears s.car), then
+  // count garage equity (resale value - loans). After migration carsValue below is 0 (no double count).
+  try { if (typeof window.carEnsureV1867 === "function") window.carEnsureV1867(); } catch (e) {}
+  const carEquityNW = (typeof window.carEquityV1867 === "function") ? (Number(window.carEquityV1867()) || 0) : 0;
   const f = s.finance || {};
   const debts = f.debts || {};
   const stocks = f.stocksV18 || {};
@@ -92,9 +100,9 @@ function legacyNetWorth(s = state) {
     (Number(f.managerFirmsV1829 && f.managerFirmsV1829.capital) || 0) +
     (Number(f.personalFirmCash) || Number(f.firmCashV1828) || Number(f.firmCash) || 0) +
     (Number(firm.cash) || Number(firm.managed) || Number(firm.capital) || Number(firm.balance) || Number(firm.account) || 0) +
-    ownedHome + carsValue + rentalValue +
+    ownedHome + carsValue + rentalValue + reEquityNW + carEquityNW +
     newBizValue + trustAssets +
-    ((f.businesses || []).reduce ? (f.businesses || []).reduce((sum, b) => b && b._migratedToBizV1861 ? sum : sum + Math.max(0, Number(b.value) || 0) + Math.max(0, Number(b.retainedEarnings) || 0), 0) : 0);
+    ((f.businesses || []).reduce ? (f.businesses || []).reduce((sum, b) => (b && (b._migratedToBizV1861 || b.founderActiveV1860)) ? sum : sum + Math.max(0, Number(b.value) || 0) + Math.max(0, Number(b.retainedEarnings) || 0), 0) : 0);
   const debt =
     (Number(s.debt) || 0) + (Number(f.creditCardDebt) || 0) + (Number(f.assetBackedLoan) || 0) +
     (Number(f.taxDebt) || 0) + (Number(f.medicalDebt) || 0) + (Number(f.schoolDebt) || Number(f.educationDebt) || 0) +
@@ -2249,7 +2257,14 @@ function ageUp() {
     addLog("Your college debt accrued interest.", { debt: interest });
   }
   const home = homes.find(h => h.id === state.home);
-  if (home?.annualCost) state.money -= home.annualCost;
+  // If the player lives in an owned property (real-estate v18.66+), that residence's
+  // mortgage/maintenance is handled by the property system - don't also charge legacy home upkeep.
+  let livesInOwnedPropertyV1866 = false;
+  try { livesInOwnedPropertyV1866 = typeof window.rePrimaryResidenceV1866 === "function" && !!window.rePrimaryResidenceV1866(); } catch (e) {}
+  if (home?.annualCost && !livesInOwnedPropertyV1866) state.money -= home.annualCost;
+  // Initialize the v18.62 portfolio before legacy rentals pay, so migrated
+  // saves do not receive one extra old-rental payout on their first age-up.
+  try { if (typeof window.reEnsureV1862 === "function") window.reEnsureV1862(); } catch (e) {}
   // Rental property income
   if (state.rentals && state.rentals.length > 0) {
     let grossRent = 0;
@@ -2269,6 +2284,11 @@ function ageUp() {
       addLog(`Rental income: ${money(grossRent)} collected, ${money(totalUpkeep)} upkeep. Net ${money(netRent)}.`, { money: netRent });
     }
   }
+  // Real-estate investment portfolio (v18.62): appreciation, rent, mortgage paydown, condition.
+  try { if (typeof window.reYearlyTickV1862 === "function") window.reYearlyTickV1862(); } catch (e) {}
+  // Car garage (v18.67): depreciation/appreciation, condition, upkeep, loan paydown. Runs first so it
+  // can migrate the legacy single car into the garage and clear state.car (no double upkeep below).
+  try { if (typeof window.carYearlyTickV1867 === "function") window.carYearlyTickV1867(); } catch (e) {}
   const car = cars.find(c => c.id === state.car);
   if (car?.annualCost) state.money -= car.annualCost;
   state.clubs = state.clubs.filter(id => {
@@ -3110,7 +3130,7 @@ function getVisibleHubs() {
     { id: "career", icon: "💼", label: "Career", disabled: age < 14 },
     { id: "money", icon: "💰", label: "Money", disabled: age < 13 },
     { id: "health", icon: "❤️", label: "Health" },
-    { id: "home", icon: "🏠", label: "Home", disabled: age < 16 },
+    { id: "home", icon: "🏠", label: "Real Estate", disabled: age < 16 },
     { id: "more", icon: "⋯", label: "More" }
   ];
 }
@@ -3179,7 +3199,7 @@ function getSuggestedActions(s) {
 function renderHubOverlay(hubId) {
   const titles = {
     people: "People", school: "School", career: "Career", money: "Money",
-    health: "Health", home: "Home", more: "More", stats: "All Stats"
+    health: "Health", home: "Real Estate", vehicles: "Vehicles", more: "More", stats: "All Stats"
   };
   return `<div class="hub-overlay" onclick="if(event.target===this)closeHub()">
     <div class="hub-sheet">
@@ -3200,6 +3220,7 @@ function renderHubContent(hubId) {
     case "money": return renderMoney();
     case "health": return renderHealth();
     case "home": return renderHome();
+    case "vehicles": return (typeof window.renderGarageV1867 === "function" ? window.renderGarageV1867() : `<div class="row"><div class="row-title">Garage unavailable</div></div>`);
     case "more": return renderMore();
     case "stats": return renderAllStats();
     default: return `<div class="row"><div class="row-title">Coming soon</div></div>`;
@@ -3690,18 +3711,8 @@ function renderHome() {
     </div>`;
   }).join("");
 
-  return `<section class="panel"><div class="section-label">🏠 Living Situation</div>${homeRows}</section>
-    <section class="panel"><div class="section-label">🚗 Car</div>${carRows}${state.car ? `<button class="secondary" onclick="sellCar()">Sell Current Car</button>` : ""}</section>
-    <section class="panel">
-      <div class="section-label">🏘️ Rental Portfolio</div>
-      <div class="row-sub" style="margin-bottom:8px">Owned: ${ownedRentals.length} ${ownedRentals.length === 1 ? "property" : "properties"} - Projected net ${money(portfolio)}/yr ${ownedRentals.length > 0 ? "(before 10% vacancy risk)" : ""}</div>
-      ${ownedRentalsHtml}
-    </section>
-    ${state.age >= 18 ? `<section class="panel">
-      <div class="section-label">📈 Investment Properties (Available)</div>
-      <div class="row-sub" style="margin-bottom:8px">Buy to add to your portfolio. Income collected every age-up.</div>
-      ${availRentalsHtml}
-    </section>` : ""}`;
+  return `${typeof renderLivingSituationV1862 === "function" ? renderLivingSituationV1862() : `<section class="panel"><div class="section-label">🏠 Living Situation</div>${homeRows}</section>`}
+    ${typeof renderRealEstateV1862 === "function" ? renderRealEstateV1862() : ""}`;
 }
 
 function renderMoney() {
@@ -4903,14 +4914,41 @@ function fundChildTrust(childKey, amount) {
 }
 
 const __ledgerAddChildBeforeTrust = addChild;
+function partnerIQV1862() {
+  try {
+    var rels = (state && state.relationships) || {};
+    var p = Object.keys(rels).map(function (k) { return rels[k]; }).find(function (r) {
+      return r && /partner|spouse|wife|husband|girlfriend|boyfriend|fianc/i.test(String(r.role || ""));
+    });
+    if (p) {
+      var iq = Number(p.iqV1862 || p.iq || p.smarts || p.intelligence) || 0;
+      if (!iq) { iq = Math.round(96 + (Math.random() * 24 - 12)); p.iqV1862 = iq; } // stable latent IQ once
+      return Math.max(55, Math.min(200, iq));
+    }
+  } catch (e) {}
+  return 100;
+}
+// Children inherit IQ from both parents (midparent) with regression to the mean + variation,
+// so two smart parents tend to have a smart kid. Stored on the child; applied when they become heir.
+function childInheritedIQV1862() {
+  var parentIQ = Math.max(55, Math.min(200, Number(state.traits && state.traits.iq) || 100));
+  var partnerIQ = partnerIQV1862();
+  var mid = (parentIQ + partnerIQ) / 2;
+  var iq = Math.round(100 + (mid - 100) * 0.72 + (Math.random() * 16 - 8));
+  return Math.max(55, Math.min(200, iq));
+}
 addChild = function() {
   const before = new Set(Object.keys((state && state.relationships) || {}));
   __ledgerAddChildBeforeTrust();
   ensureStateShape();
   Object.keys(state.relationships || {}).forEach(key => {
-    if (!before.has(key) && state.relationships[key].role === "Child") state.finance.trustFunds[key] = 0;
+    if (!before.has(key) && state.relationships[key].role === "Child") {
+      state.finance.trustFunds[key] = 0;
+      try { state.relationships[key].iqV1862 = childInheritedIQV1862(); } catch (e) {}
+    }
   });
 };
+try { window.childInheritedIQV1862 = childInheritedIQV1862; } catch (e) {}
 
 function attendRecruitingShowcase() {
   ensureStateShape();
@@ -5369,7 +5407,7 @@ getSuggestedActions = function(s) {
   renderHubOverlay = function(hubId) {
     const titles = {
       people: "People", school: "School", career: "Career", money: "Money",
-      health: "Health", home: "Home", more: "More", stats: "All Stats"
+      health: "Health", home: "Real Estate", vehicles: "Vehicles", more: "More", stats: "All Stats"
     };
     return `<div class="hub-overlay hub-${hubId}" onclick="if(event.target===this)closeHub()">
       <div class="hub-sheet hub-sheet-${hubId}">
@@ -5872,7 +5910,7 @@ getSuggestedActions = function(s) {
   const previousRenderHubOverlayForMoneyHotfix = typeof renderHubOverlay === "function" ? renderHubOverlay : null;
   renderHubOverlay = function (hubId) {
     if (hubId !== "money" && previousRenderHubOverlayForMoneyHotfix) return previousRenderHubOverlayForMoneyHotfix(hubId);
-    const titles = { money: "Money", people: "People", school: "School", career: "Career", health: "Health", home: "Home", more: "More", stats: "All Stats", lifehub: "Life" };
+    const titles = { money: "Money", people: "People", school: "School", career: "Career", health: "Health", home: "Real Estate", vehicles: "Vehicles", more: "More", stats: "All Stats", lifehub: "Life" };
     return `<div class="hub-overlay hub-${hubId}" onclick="if(event.target===this)closeHub()">
       <div class="hub-sheet hub-sheet-${hubId}">
         <div class="hub-head">
@@ -6324,8 +6362,25 @@ getSuggestedActions = function(s) {
         return;
       }
       const lookupId = typeof window.ventureCatalogLookupIdV1860 === "function" ? window.ventureCatalogLookupIdV1860(b) : (b.baseId || b.id);
-      const v = entrepreneurshipCatalog.find(x => x.id === lookupId || x.id === b.id);
-      if (!v) return;
+      let v = entrepreneurshipCatalog.find(x => x.id === lookupId || x.id === b.id);
+      if (!v) {
+        // Old-save / drifted catalog id (e.g. a venture the sector rework renamed or
+        // removed). Don't silently zero the business — synthesize a sensible venture from
+        // its own stored data so an established, valuable company keeps earning instead of
+        // making $0 forever with a stale "Last income" reading.
+        const synthStartup = Math.max(2500, Math.round((b.value || 0) / 4) || 2500);
+        v = {
+          id: b.id,
+          name: b.name,
+          category: b.category || "Venture",
+          startup: synthStartup,
+          yearlyMin: -Math.round(synthStartup * .4),
+          yearlyMax: Math.max(5000, Math.round(synthStartup * .9), Math.round((b.value || 0) * .12)),
+          scaleStat: b.scaleStat || "discipline",
+          failureRisk: b.failureRisk || .14,
+          _synthV1862: true
+        };
+      }
       const rolled = businessAnnualRoll(b, v);
       const assetBonus = typeof window.businessAssetIncomeBonus === "function" ? window.businessAssetIncomeBonus(b) : 0;
       const opsIncomeBonus = (b.ops && b.ops.sales ? .06 : 0) + (b.ops && b.ops.bookkeeper ? .03 : 0);
@@ -6355,6 +6410,10 @@ getSuggestedActions = function(s) {
       const profitPart = Math.max(0, operatingIncome);
       const lossPart = Math.min(0, operatingIncome);
       b.value = Math.max(0, Math.round(((b.value || 0) * (operatingIncome >= 0 ? 1.035 : .92) + profitPart * (v.startup >= 100000 ? 1.35 : 1.05) + lossPart * .35) * (lifecycleMods ? lifecycleMods.valueMult || 1 : 1)));
+      // Yearly trend history for the focused-company Trends graph (capped).
+      if (!Array.isArray(b.historyV1862)) b.historyV1862 = [];
+      b.historyV1862.push({ age: state.age, value: Math.round(b.value || 0), income: Math.round(income), rep: Math.round(b.reputation || 0) });
+      if (b.historyV1862.length > 40) b.historyV1862 = b.historyV1862.slice(-40);
       const reputationChange = (operatingIncome >= 0 ? Math.max(1, Math.round(operatingIncome / Math.max(10000, v.startup / 3))) : -rand(3, 12)) + (portfolioEffects ? portfolioEffects.repBonus || 0 : 0);
       b.reputation = clamp((b.reputation || 10) + reputationChange, 0, 100);
       if (b.reputation >= 65 && b.stage === "startup") b.stage = "growing";
@@ -6732,7 +6791,7 @@ getSuggestedActions = function(s) {
 
   const prevRenderHubOverlayV4 = typeof renderHubOverlay === "function" ? renderHubOverlay : null;
   renderHubOverlay = function (hubId) {
-    const titles = { money: "Money", business: "Entrepreneurship", people: "People", school: "School", career: "Career", health: "Health", home: "Home", more: "More", stats: "All Stats", lifehub: "Life" };
+    const titles = { money: "Money", business: "Entrepreneurship", people: "People", school: "School", career: "Career", health: "Health", home: "Real Estate", vehicles: "Vehicles", more: "More", stats: "All Stats", lifehub: "Life" };
     return `<div class="hub-overlay hub-${hubId}" onclick="if(event.target===this)closeHub()">
       <div class="hub-sheet hub-sheet-${hubId}">
         <div class="hub-head"><h2>${titles[hubId] || hubId}</h2><button class="hub-close" onclick="closeHub()">×</button></div>
@@ -7358,7 +7417,7 @@ getSuggestedActions = function(s) {
   };
 
   renderHubOverlay = function (hubId) {
-    const titles = { money: "Money", business: "Entrepreneurship", people: "People", school: "School", career: "Career", health: "Health", home: "Home", more: "More", stats: "All Stats", lifehub: "Life" };
+    const titles = { money: "Money", business: "Entrepreneurship", people: "People", school: "School", career: "Career", health: "Health", home: "Real Estate", vehicles: "Vehicles", more: "More", stats: "All Stats", lifehub: "Life" };
     return `<div class="hub-overlay hub-${hubId} v5-fixed-hub" onclick="if(event.target===this)closeHub()">
       <div class="hub-sheet hub-sheet-${hubId}">
         <div class="hub-head"><h2>${titles[hubId] || hubId}</h2><button class="hub-close" onclick="closeHub()">×</button></div>
@@ -7907,7 +7966,7 @@ getSuggestedActions = function(s) {
 
   const prevRenderHubContentV6 = renderHubContent;
   renderHubContent = function(hubId){ if(hubId === "business") return renderEntrepreneurHubV6(); return prevRenderHubContentV6 ? prevRenderHubContentV6(hubId) : ""; };
-  renderHubOverlay = function(hubId){ const titles={money:"Money",business:"Entrepreneurship",people:"People",school:"School",career:"Career",health:"Health",home:"Home",more:"More",stats:"All Stats",lifehub:"Life"}; return `<div class="hub-overlay hub-${hubId} v6-fixed-hub" onclick="if(event.target===this)closeHub()"><div class="hub-sheet hub-sheet-${hubId}"><div class="hub-head"><h2>${titles[hubId]||hubId}</h2><button class="hub-close" onclick="closeHub()">×</button></div><div class="v6-hub-body">${renderHubContent(hubId)}</div></div></div>`; };
+  renderHubOverlay = function(hubId){ const titles={money:"Money",business:"Entrepreneurship",people:"People",school:"School",career:"Career",health:"Health",home:"Real Estate",more:"More",stats:"All Stats",lifehub:"Life"}; return `<div class="hub-overlay hub-${hubId} v6-fixed-hub" onclick="if(event.target===this)closeHub()"><div class="hub-sheet hub-sheet-${hubId}"><div class="hub-head"><h2>${titles[hubId]||hubId}</h2><button class="hub-close" onclick="closeHub()">×</button></div><div class="v6-hub-body">${renderHubContent(hubId)}</div></div></div>`; };
 
   renderMoney = function(){
     ensureStateShape(); const net=typeof financeNetWorth==="function"?financeNetWorth():((state.money||0)+(state.savings||0)); const cf=cashFlowV6(); const plan=selectedHealthInsurancePlan(); const c=countryV6(state.finance.taxCountry||"us"), r=regionV6(c.id,state.finance.taxRegion||defaultRegionV6(c.id));
@@ -7991,7 +8050,7 @@ getSuggestedActions = function(s) {
 
   const previousRenderHubOverlayV7 = typeof renderHubOverlay === "function" ? renderHubOverlay : null;
   renderHubOverlay = function (hubId) {
-    const titles = { money:"Money", business:"Entrepreneurship", people:"People", school:"School", career:"Career", health:"Health", home:"Home", more:"More", stats:"All Stats", lifehub:"Life" };
+    const titles = { money:"Money", business:"Entrepreneurship", people:"People", school:"School", career:"Career", health:"Health", home:"Real Estate", vehicles:"Vehicles", more:"More", stats:"All Stats", lifehub:"Life" };
     return `<div class="hub-overlay hub-${hubId} v7-fixed-hub" onclick="if(event.target===this)closeHub()">
       <div class="hub-sheet hub-sheet-${hubId}">
         <div class="hub-head"><h2>${titles[hubId] || hubId}</h2><button class="hub-close" onclick="closeHub()">×</button></div>
@@ -8420,7 +8479,7 @@ getSuggestedActions = function(s) {
   const previousRenderHubOverlayV8 = typeof renderHubOverlay === "function" ? renderHubOverlay : null;
   renderHubOverlay = function (hubId) {
     if (typeof applyAdaptiveUiV8 === "function") applyAdaptiveUiV8();
-    const titles = { money:"Money", business:"Entrepreneurship", people:"People", school:"School", career:"Career", health:"Health", home:"Home", more:"More", stats:"All Stats", lifehub:"Life" };
+    const titles = { money:"Money", business:"Entrepreneurship", people:"People", school:"School", career:"Career", health:"Health", home:"Real Estate", vehicles:"Vehicles", more:"More", stats:"All Stats", lifehub:"Life" };
     return `<div class="hub-overlay hub-${hubId} v7-fixed-hub v8-adaptive-hub" onclick="if(event.target===this)closeHub()">
       <div class="hub-sheet hub-sheet-${hubId}">
         <div class="hub-head"><h2>${titles[hubId] || hubId}</h2>
@@ -8605,7 +8664,7 @@ getSuggestedActions = function(s) {
   renderHubOverlay = function (hubId) {
     if (typeof applyAdaptiveUiV9 === "function") applyAdaptiveUiV9();
     const s = settingsV9();
-    const titles = { money:"Money", business:"Entrepreneurship", people:"People", school:"School", career:"Career", health:"Health", home:"Home", more:"More", stats:"All Stats", lifehub:"Life" };
+    const titles = { money:"Money", business:"Entrepreneurship", people:"People", school:"School", career:"Career", health:"Health", home:"Real Estate", vehicles:"Vehicles", more:"More", stats:"All Stats", lifehub:"Life" };
     const active = function (kind, value) { return kind === value ? " active" : ""; };
     const stop = "event.stopPropagation();";
     return `<div class="hub-overlay hub-${hubId} v7-fixed-hub v8-adaptive-hub v9-scroll-stable-hub" onclick="if(event.target===this)closeHub()">
@@ -8880,7 +8939,7 @@ getSuggestedActions = function(s) {
 
   const previousRenderHubOverlayV10 = typeof renderHubOverlay === "function" ? renderHubOverlay : null;
   renderHubOverlay = function (hubId) {
-    const titles = { money:"Money", business:"Entrepreneurship", people:"People", school:"School", career:"Career", health:"Health", home:"Home", more:"More", stats:"All Stats", lifehub:"Life" };
+    const titles = { money:"Money", business:"Entrepreneurship", people:"People", school:"School", career:"Career", health:"Health", home:"Real Estate", vehicles:"Vehicles", more:"More", stats:"All Stats", lifehub:"Life" };
     let controls = "";
     try {
       const s = (function(){ return { width: localStorage.getItem("ledgerHubWidthV9") || "wide", height: localStorage.getItem("ledgerHubHeightV9") || "normal" }; })();
@@ -9294,7 +9353,7 @@ getSuggestedActions = function(s) {
   window.renderHubContent = renderHubContent;
 
   function titleForHubV11(id) {
-    const titles = { money:"Money", brokerage:"Brokerage", business:"Entrepreneurship", people:"People", school:"School", career:"Career", health:"Health", home:"Home", more:"More", stats:"All Stats", lifehub:"Life" };
+    const titles = { money:"Money", brokerage:"Brokerage", business:"Entrepreneurship", people:"People", school:"School", career:"Career", health:"Health", home:"Real Estate", vehicles:"Vehicles", more:"More", stats:"All Stats", lifehub:"Life" };
     return titles[id] || id;
   }
   function escAttrV11(s) { return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
@@ -11047,7 +11106,7 @@ getSuggestedActions = function(s) {
   }, true);
 
   function titleForHub16(id) {
-    var titles = { money:"Money", brokerage:"Brokerage", business:"Entrepreneurship", people:"People", school:"School", career:"Career", health:"Health", home:"Home", more:"More", stats:"All Stats", lifehub:"Life" };
+    var titles = { money:"Money", brokerage:"Brokerage", business:"Entrepreneurship", people:"People", school:"School", career:"Career", health:"Health", home:"Real Estate", vehicles:"Vehicles", more:"More", stats:"All Stats", lifehub:"Life" };
     return titles[id] || id;
   }
   function controls16() {
@@ -12754,7 +12813,8 @@ getSuggestedActions = function(s) {
       { id:"career", icon:"💼", label:"Career", disabled: state && state.age < 14 },
       { id:"money", icon:"💰", label:"Money", disabled: state && state.age < 13 },
       { id:"health", icon:"❤️", label:"Health" },
-      { id:"home", icon:"🏠", label:"Home", disabled: state && state.age < 16 },
+      { id:"home", icon:"🏠", label:"Real Estate", disabled: state && state.age < 16 },
+      { id:"vehicles", icon:"🚗", label:"Vehicles", disabled: state && state.age < 16 },
       { id:"brokerage", icon:"📈", label:"Stocks", disabled: state && state.age < 13 },
       { id:"business", icon:"🏢", label:"Business", disabled: state && state.age < 10 },
       { id:"stats", icon:"📊", label:"Stats" },
@@ -14430,7 +14490,7 @@ getSuggestedActions = function(s) {
 
   var style = document.createElement("style");
   style.textContent = [
-    ".hub-overlay .hub-sheet{overflow:hidden!important}.hub-overlay .v16-hub-body,.hub-overlay .v11-hub-body,.hub-overlay .v10-hub-body,.hub-overlay .v9-hub-body{overflow:auto!important;min-width:0!important}",
+    ".hub-overlay .hub-sheet{overflow:hidden!important;max-width:var(--ledger-hub-width, min(1180px, calc(100vw - 18px)))!important;width:var(--ledger-hub-width, min(1180px, calc(100vw - 18px)))!important;max-height:var(--ledger-hub-height, calc(100vh - 20px))!important}.hub-overlay .v16-hub-body,.hub-overlay .v11-hub-body,.hub-overlay .v10-hub-body,.hub-overlay .v9-hub-body{overflow:auto!important;min-width:0!important;zoom:var(--ledger-ui-scale, 1)}",
     ".hub-overlay.hub-money .v1813-financial-snapshot{grid-column:1/-1!important;border-color:rgba(126,160,172,.42)!important;background:linear-gradient(135deg,rgba(22,39,44,.98),rgba(45,35,24,.96) 60%,rgba(34,24,31,.94))!important}",
     ".v1813-snapshot-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.v1813-snapshot-tile{border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:12px;min-width:0;background:linear-gradient(160deg,rgba(255,255,255,.055),rgba(0,0,0,.16))}.v1813-snapshot-tile.good{border-color:rgba(185,220,138,.36)}.v1813-snapshot-tile.bad{border-color:rgba(233,146,125,.38)}.v1813-snapshot-tile.gold{border-color:rgba(240,202,123,.38)}.v1813-snapshot-tile.blue{border-color:rgba(126,160,172,.44)}",
     ".v1813-insurance-current{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;border:1px solid rgba(126,160,172,.26);border-radius:12px;padding:12px;margin-bottom:10px;background:rgba(126,160,172,.08)}.v1813-insurance-current b,.v1813-card-top b{display:block;color:#fff3df}.v1813-insurance-current span,.v1813-insurance-hover{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.45;margin-top:4px}.v1813-insurance-current strong{font-family:'JetBrains Mono',monospace;color:#b9dc8a;font-size:24px}.v1813-insurance-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:9px}.v1813-insurance-card{border:1px solid rgba(255,255,255,.10);border-radius:12px;background:linear-gradient(180deg,#2b251f,#1b1712);color:#f6ead8;text-align:left;padding:12px}.v1813-insurance-card.selected{border-color:rgba(185,220,138,.58);box-shadow:inset 0 0 0 1px rgba(185,220,138,.14)}.v1813-insurance-card:disabled{opacity:.45}.v1813-card-top{display:flex;justify-content:space-between;gap:8px}.v1813-card-top span{font-family:'JetBrains Mono',monospace;color:#b9dc8a;font-size:9px;text-transform:uppercase}",
@@ -15624,8 +15684,8 @@ getSuggestedActions = function(s) {
       { id:"managed", label:"Outside managers", value:(f.externalManager || {}).capital || 0, note:"Managed account" },
       { id:"firm", label:"Personal firm capital", value:f.managedPortfolio || 0, note:"Family office / hedge fund track" },
       { id:"retire", label:"Pension / retirement", value:(state.ira || 0) + (state.retirement401k || 0), note:"IRA and 401(k)" },
-      { id:"property", label:"Property equity", value:homeValue1818() + rentalValue1818(), note:"Home plus rentals" },
-      { id:"collection", label:"Car / collection", value:carValue1818() + (Number(f.collectionValue) || 0), note:"Owned objects and vehicles" }
+      { id:"property", label:"Property equity", value:homeValue1818() + rentalValue1818(), note:"Real Estate plus rentals" },
+      { id:"collection", label:"Vehicles / collection", value:carValue1818() + (Number(f.collectionValue) || 0), note:"Owned objects and vehicles" }
     ].map(function (x) { x.value = Math.max(0, Math.round(Number(x.value) || 0)); return x; });
     var debts = [
       { id:"education", label:"Education debt", value:state.debt || 0, note:"School loans" },
@@ -15659,7 +15719,7 @@ getSuggestedActions = function(s) {
       { label:"Taxes", value:taxVal, note:"Federal, country, state, sales, business" },
       { label:"Lifestyle", value:cf.lifestyleCost || cf.living || 0, note:"Normal yearly spending" },
       { label:"Housing", value:cf.housingCost || 0, note:"Rent, mortgage, home costs" },
-      { label:"Car / transport", value:cf.carCost || 0, note:"Vehicle upkeep" },
+      { label:"Vehicles / transport", value:cf.carCost || 0, note:"Vehicle upkeep" },
       { label:"Health insurance", value:cf.insuranceCost || state.finance.lastInsuranceCost || 0, note:"Premiums and uncovered care" },
       { label:"Debt interest", value:cf.debtInterest || 0, note:"Credit, secured, education" },
       { label:"Auto transfers", value:cf.transfers || 0, note:"Saving/investing moves" }
@@ -15925,8 +15985,8 @@ getSuggestedActions = function(s) {
       { label:"Outside managers", value:Math.max(0, (f.externalManager || {}).capital || 0), note:"Managed account" },
       { label:"Personal firm capital", value:Math.max(0, f.managedPortfolio || 0), note:"Own investment office" },
       { label:"Pension / retirement", value:Math.max(0, (state.ira || 0) + (state.retirement401k || 0)), note:"IRA and 401(k)" },
-      { label:"Property equity", value:propertyValue1819(), note:"Home plus rentals" },
-      { label:"Car / collection", value:carValue1819() + Math.max(0, Number(f.collectionValue) || 0), note:"Owned objects and vehicles" }
+      { label:"Property equity", value:propertyValue1819(), note:"Real Estate plus rentals" },
+      { label:"Vehicles / collection", value:carValue1819() + Math.max(0, Number(f.collectionValue) || 0), note:"Owned objects and vehicles" }
     ];
     var debts = [
       { label:"Negative checking", value:Math.max(0, -(state.money || 0)), note:"Overdrawn cash account" },
@@ -15958,7 +16018,7 @@ getSuggestedActions = function(s) {
       { label:"Taxes", value:taxVal, note:"Federal, country, state, sales, business" },
       { label:"Lifestyle", value:cf.lifestyleCost || cf.living || 0, note:"Normal yearly spending" },
       { label:"Housing", value:cf.housingCost || 0, note:"Rent, mortgage, home costs" },
-      { label:"Car / transport", value:cf.carCost || 0, note:"Vehicle upkeep" },
+      { label:"Vehicles / transport", value:cf.carCost || 0, note:"Vehicle upkeep" },
       { label:"Health insurance", value:cf.insuranceCost || state.finance.lastInsuranceCost || 0, note:"Premiums and uncovered care" },
       { label:"Debt interest", value:cf.debtInterest || 0, note:"Credit, secured, education" },
       { label:"Auto transfers", value:cf.transfers || 0, note:"Saving/investing moves" }

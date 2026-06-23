@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-06-20T18:04:20.867Z",
+  "builtAt": "2026-06-22T23:51:53.203Z",
   "source": "outputs/ledger18_modular_v18_35",
   "entries": [
     {
@@ -23,7 +23,7 @@
         },
         {
           "src": "pages/runtime/00-core-app-runtime.js",
-          "bytes": 1266562
+          "bytes": 1271275
         },
         {
           "src": "pages/patches/01-patch-v18-24.js",
@@ -55,7 +55,7 @@
         },
         {
           "src": "pages/patches/08-patch-v18-31.js",
-          "bytes": 44502
+          "bytes": 47508
         },
         {
           "src": "pages/patches/09-patch-v18-32.js",
@@ -67,7 +67,7 @@
         },
         {
           "src": "pages/patches/11-patch-v18-33-2.js",
-          "bytes": 16321
+          "bytes": 16349
         },
         {
           "src": "pages/patches/12-patch-v18-33-3.js",
@@ -79,11 +79,11 @@
         },
         {
           "src": "pages/patches/14-patch-v18-33-5.js",
-          "bytes": 8490
+          "bytes": 8578
         },
         {
           "src": "pages/patches/15-patch-v18-33-6.js",
-          "bytes": 6237
+          "bytes": 6314
         },
         {
           "src": "pages/patches/16-patch-v18-33-7.js",
@@ -111,7 +111,7 @@
         },
         {
           "src": "pages/systems/business-entities.js",
-          "bytes": 153253
+          "bytes": 183375
         },
         {
           "src": "pages/systems/business-sectors.js",
@@ -131,7 +131,7 @@
         },
         {
           "src": "pages/systems/tax-legal.js",
-          "bytes": 82769
+          "bytes": 84931
         },
         {
           "src": "pages/systems/money-banking.js",
@@ -139,7 +139,15 @@
         },
         {
           "src": "pages/systems/finance-ledger.js",
-          "bytes": 48641
+          "bytes": 51187
+        },
+        {
+          "src": "pages/systems/property-estate.js",
+          "bytes": 119909
+        },
+        {
+          "src": "pages/systems/car-collection.js",
+          "bytes": 37514
         },
         {
           "src": "pages/systems/shopping-mall.js",
@@ -151,7 +159,7 @@
         },
         {
           "src": "pages/systems/venture-lifecycle.js",
-          "bytes": 23181
+          "bytes": 23355
         },
         {
           "src": "pages/systems/entrepreneur.js",
@@ -175,7 +183,7 @@
         },
         {
           "src": "pages/systems/more-command.js",
-          "bytes": 45706
+          "bytes": 46136
         },
         {
           "src": "pages/hubs/00-hub-registry.js",
@@ -226,7 +234,7 @@
           "bytes": 12612
         }
       ],
-      "bytes": 3104736
+      "bytes": 3305638
     },
     {
       "entry": "index.html",

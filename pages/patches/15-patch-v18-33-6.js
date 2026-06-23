@@ -51,7 +51,8 @@
       business: hub18336("business", "🏢", "Business"),
       law: hub18336("law", "⚖", "Legal"),
       health: hub18336("health", "❤", "Health"),
-      home: hub18336("home", "⌂", "Home"),
+      home: hub18336("home", "⌂", "Real Estate"),
+      vehicles: hub18336("vehicles", "🚗", "Vehicles"),
       stats: hub18336("stats", "▦", "Stats"),
       more: hub18336("more", "...", "More")
     };
@@ -64,7 +65,7 @@
   }
   function allHubs18336() {
     var map = hubMap18336();
-    return ["lifehub", "people", "school", "career", "finance", "money", "brokerage", "business", "law", "health", "home", "stats", "more"].map(function (id) { return map[id]; });
+    return ["lifehub", "people", "school", "career", "finance", "money", "brokerage", "business", "law", "health", "home", "vehicles", "stats", "more"].map(function (id) { return map[id]; });
   }
   function nav18336(active) {
     active = norm18336(active);

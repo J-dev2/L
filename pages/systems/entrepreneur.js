@@ -573,6 +573,7 @@
   }
   function compactMoneyV1861(v) {
     v = num(v); var sign = v < 0 ? "-" : ""; var a = Math.abs(v);
+    if (a >= 1e12) return sign + "$" + (a / 1e12).toFixed(a >= 1e13 ? 0 : 1) + "T";
     if (a >= 1e9) return sign + "$" + (a / 1e9).toFixed(a >= 1e10 ? 0 : 1) + "B";
     if (a >= 1e6) return sign + "$" + (a / 1e6).toFixed(a >= 1e7 ? 0 : 1) + "M";
     if (a >= 1e3) return sign + "$" + (a / 1e3).toFixed(a >= 1e4 ? 0 : 1) + "K";
@@ -974,6 +975,7 @@
       '</div>';
   }
   function renderRecruitRailV1862(biz) {
+    if (biz._hiringRoleV1868 && BIZ_ROLES[biz._hiringRoleV1868]) return renderHiringV1868(biz, biz._hiringRoleV1868);
     var cash = num(biz.cashInBusiness);
     var cards = Object.keys(BIZ_ROLES).slice(0, 8).map(function (id) {
       var r = BIZ_ROLES[id];
@@ -982,10 +984,71 @@
       return '<div class="biz1862-role' + (disabled ? " off" : "") + '">' +
         '<div class="biz1862-role-head"><span class="biz1862-role-emoji">' + escH(r.emoji || "") + '</span><b>' + escH(r.title) + '</b></div>' +
         '<span class="biz1862-role-boost">Boosts ' + escH(boost) + '</span>' +
-        '<div class="biz1862-role-foot"><em>' + compactMoneyV1861(r.salMin) + '–' + compactMoneyV1861(r.salMax) + '</em>' + actionBtn("Hire", "bizHireV1861('" + id + "')", "green", disabled) + '</div>' +
+        '<div class="biz1862-role-foot"><em>' + compactMoneyV1861(r.salMin) + '–' + compactMoneyV1861(r.salMax) + '</em>' + actionBtn("Interview", "bizOpenHiringV1868('" + id + "')", "green", disabled) + '</div>' +
         '</div>';
     }).join("");
-    return '<div class="biz1862-subsection"><div class="section-label">Recruit — open roles</div><div class="biz1862-recruit">' + cards + '</div></div>';
+    return '<div class="biz1862-subsection"><div class="section-label">Recruit — interview for a role</div><div class="biz1862-recruit">' + cards + '</div></div>';
+  }
+  // --- Interview + hire (v18.68): each role surfaces distinct candidates you interview, then hire ---
+  var HIRE_TRAITS_V1868 = [
+    { id: "tenx",    label: "10x Performer",        emoji: "🚀", perf: [80, 98], culture: [40, 70], risk: 0.20, salMult: [1.30, 1.70], blurb: "Brilliant output, and knows their worth." },
+    { id: "culture", label: "Culture Champion",     emoji: "🤝", perf: [55, 78], culture: [80, 98], risk: 0.05, salMult: [0.90, 1.10], blurb: "Lifts the whole team, low drama." },
+    { id: "rising",  label: "Rising Star",          emoji: "⭐", perf: [45, 68], culture: [60, 85], risk: 0.10, salMult: [0.70, 0.95], blurb: "Hungry, cheap, lots of upside." },
+    { id: "merc",    label: "Mercenary",            emoji: "💸", perf: [75, 95], culture: [25, 50], risk: 0.32, salMult: [1.40, 1.90], blurb: "Great results, will leave for more." },
+    { id: "steady",  label: "Steady Hand",          emoji: "🧱", perf: [55, 72], culture: [60, 80], risk: 0.06, salMult: [0.95, 1.15], blurb: "Reliable, no surprises." },
+    { id: "rough",   label: "Diamond in the Rough", emoji: "💎", perf: [40, 92], culture: [45, 82], risk: 0.14, salMult: [0.55, 0.85], blurb: "Unpolished — could be a steal or a dud. Interview to find out." }
+  ];
+  function traitById1868(id) { for (var i = 0; i < HIRE_TRAITS_V1868.length; i++) if (HIRE_TRAITS_V1868[i].id === id) return HIRE_TRAITS_V1868[i]; return HIRE_TRAITS_V1868[4]; }
+  function makeCandidateV1868(role, roleId, idx, stageMulti) {
+    var t = HIRE_TRAITS_V1868[Math.floor(Math.random() * HIRE_TRAITS_V1868.length)];
+    var perf = clamp01(Math.round(t.perf[0] + Math.random() * (t.perf[1] - t.perf[0])));
+    var culture = clamp01(Math.round(t.culture[0] + Math.random() * (t.culture[1] - t.culture[0])));
+    var salMult = t.salMult[0] + Math.random() * (t.salMult[1] - t.salMult[0]);
+    var salary = Math.round((role.salMin + Math.random() * (role.salMax - role.salMin)) * salMult * stageMulti);
+    return {
+      id: "c_" + roleId + "_" + idx + "_" + age() + "_" + Math.floor(Math.random() * 100000),
+      name: pickOne(['Jamie', 'Alex', 'Sam', 'Jordan', 'Taylor', 'Morgan', 'Casey', 'Riley', 'Avery', 'Drew', 'Noa', 'Sage', 'Quinn', 'Reese']) + ' ' + pickOne(['Smith', 'Jones', 'Lee', 'Park', 'Chen', 'Brown', 'Davis', 'Wilson', 'Frost', 'Vance', 'Ortiz', 'Khan']),
+      traitId: t.id, performance: perf, cultureFit: culture, leaveRisk: t.risk, salaryAsk: salary,
+      revealed: { skill: false, refs: false }
+    };
+  }
+  function ensureCandidatesV1868(biz, roleId) {
+    if (!biz._candidatesV1868 || typeof biz._candidatesV1868 !== "object") biz._candidatesV1868 = {};
+    var pool = biz._candidatesV1868[roleId];
+    if (pool && pool.year === age() && Array.isArray(pool.list) && pool.list.length) return pool;
+    var role = BIZ_ROLES[roleId]; if (!role) return null;
+    var stageMulti = ({ idea: 0.80, 'pre-revenue': 0.85, early: 0.90, growth: 1.0, scale: 1.15, mature: 1.20 })[biz.stage] || 1.0;
+    var count = 2 + Math.floor(Math.random() * 2); // 2-3 candidates
+    var list = [];
+    for (var i = 0; i < count; i++) list.push(makeCandidateV1868(role, roleId, i, stageMulti));
+    biz._candidatesV1868[roleId] = { year: age(), list: list };
+    return biz._candidatesV1868[roleId];
+  }
+  function renderHiringV1868(biz, roleId) {
+    var role = BIZ_ROLES[roleId];
+    var pool = ensureCandidatesV1868(biz, roleId);
+    if (!role || !pool || !pool.list.length) {
+      return '<div class="biz1862-subsection"><div class="section-label">Candidates</div><div class="biz1861-spark-empty">No candidates right now — check back next year.</div><div style="margin-top:8px">' + actionBtn("Back to roles", "bizCloseHiringV1868()", "blue", false) + '</div></div>';
+    }
+    var cash = num(biz.cashInBusiness);
+    var cards = pool.list.map(function (c) {
+      var t = traitById1868(c.traitId);
+      var skillTxt = c.revealed.skill ? ('<b class="' + (c.performance >= 75 ? "good" : c.performance >= 55 ? "warn" : "bad") + '">' + c.performance + '/100</b>') : '<i style="opacity:.7">interview to reveal</i>';
+      var refsTxt = c.revealed.refs ? ('Culture <b>' + c.cultureFit + '</b> · flight risk <b class="' + (c.leaveRisk >= 0.2 ? "bad" : "good") + '">' + Math.round(c.leaveRisk * 100) + '%</b>') : '<i style="opacity:.7">check references to reveal</i>';
+      var canHire = cash >= c.salaryAsk * 0.5;
+      return '<div class="biz1862-role">' +
+        '<div class="biz1862-role-head"><span class="biz1862-role-emoji">' + escH(t.emoji) + '</span><b>' + escH(c.name) + '</b></div>' +
+        '<span class="biz1862-role-boost">' + escH(t.label) + ' — ' + escH(t.blurb) + '</span>' +
+        '<div style="font-size:12px;margin:6px 0;line-height:1.5">Skill: ' + skillTxt + '<br>' + refsTxt + '</div>' +
+        '<div class="biz1862-role-foot"><em>asks ' + compactMoneyV1861(c.salaryAsk) + '/yr</em></div>' +
+        '<div class="biz1862-role-foot" style="flex-wrap:wrap;gap:4px;margin-top:4px">' +
+          actionBtn("Interview $1K", "bizInterviewCandidateV1868('" + roleId + "','" + c.id + "','skill')", "blue", c.revealed.skill || cash < 1000) +
+          actionBtn("Refs $2.5K", "bizInterviewCandidateV1868('" + roleId + "','" + c.id + "','refs')", "blue", c.revealed.refs || cash < 2500) +
+          actionBtn("Hire", "bizHireCandidateV1868('" + roleId + "','" + c.id + "')", "green", !canHire) +
+          actionBtn("Pass", "bizRejectCandidateV1868('" + roleId + "','" + c.id + "')", "red", false) +
+        '</div></div>';
+    }).join("");
+    return '<div class="biz1862-subsection"><div class="section-label">' + escH(role.emoji || "") + ' Interviewing — ' + escH(role.title) + '</div><div class="biz1862-recruit">' + cards + '</div><div style="margin-top:8px">' + actionBtn("Back to roles", "bizCloseHiringV1868()", "blue", false) + '</div></div>';
   }
   function renderRosterV1862(biz) {
     var emps = biz.employees || [];
@@ -1411,9 +1474,10 @@
     else { gross = num(biz.customers) * num(biz._avgSellingPrice, 200); }
     if (biz.franchiseActive && num(biz.franchiseUnits) > 0) gross += num(biz.franchiseUnits) * gross * 0.35 * 0.065;
     // Cap revenue BEFORE computing gross profit so revenue and profit stay consistent
-    // (profit can never exceed revenue). Ceiling raised to $5B so a great company can
-    // scale into the billions instead of freezing at the old $500M.
-    gross = Math.min(gross, 5000000000);
+    // (profit can never exceed revenue). This is a high $1T safety net, NOT a balance wall:
+    // a dominant company can scale into the hundreds of billions, and the sales engine's
+    // soft saturation is what keeps real year-over-year growth sane.
+    gross = Math.min(gross, 1e12);
     var grossProfit = gross * gm;
     var staffCosts = (biz.employees || []).reduce(function (s, e) { return s + num(e.salary); }, 0);
     var coFounderCosts = (biz.coFounders || []).length * 60000;
@@ -1444,7 +1508,10 @@
     var profitFactor = biz.annualProfit > 0 ? 1.3 : biz.annualProfit < -gross * 0.3 ? 0.6 : 0.9;
     var brandFactor = 1 + num(biz.brand, 30) / 200;
     var revMult = BASE_MULT * profitFactor * brandFactor;
-    biz.valuation = Math.min(10000000000, Math.max(0, gross * revMult + biz.cashInBusiness * 0.5));
+    // No hard valuation ceiling: valuation scales with revenue x multiple + cash, so a
+    // company that keeps earning keeps getting more valuable (was clamped to $10B, which
+    // froze growth past ~$10B even while revenue and profit climbed).
+    biz.valuation = Math.max(0, gross * revMult + biz.cashInBusiness * 0.5);
     biz.brand = clamp01(num(biz.brand) + (biz.nps > 30 ? 2 : biz.nps < 0 ? -1 : 0.5) + (biz.annualProfit > 0 ? 1 : 0));
     B.founderReputation = clamp01(num(B.founderReputation, 30) + (biz.annualProfit > 50000 ? 2 : biz.annualProfit > 0 ? 1 : -1) + num(B.yearsAsFounder) * 0.1);
     if (!Array.isArray(biz.revenueHistory)) biz.revenueHistory = [];

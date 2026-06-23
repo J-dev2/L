@@ -355,7 +355,9 @@
       var html = prevRenderHubContentV1860.apply(this, arguments) || "";
       try {
         var id = String(hubId || "").toLowerCase();
-        if (id === "business" || id === "entrepreneurship") html += fundingSection();
+        // Business hub now has a per-company "Capital" popup (openBizModalV1862(id,'capital')),
+        // so the global all-companies Founder Capital list is only appended on entrepreneurship.
+        if (id === "entrepreneurship") html += fundingSection();
       } catch (e) {}
       return html;
     };

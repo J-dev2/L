@@ -41,7 +41,15 @@ only pulls scripts referenced in `play.html` / `index.html`).
 | `trust.js`      | Family trust create/fund, net worth, succession carry, death haircut | 18 |
 | `wayback.js`    | Checkpoint create/restore + death-screen "Undo Death" | 11 |
 | `devtools.js`   | Hidden dev-tools gate/unlock + panel tools (run with `&dev=1`) | 17 |
-| `business-locations.js` | Business #10 locations/franchises/rival share | 22 |
+| `business-locations.js` | Business #10 locations/franchises/rival share | 23 |
+| `business-income.js` | Old/drifted-catalog business still earns (no silent $0) | 2 |
+| `estate-trust.js` | Death settlement honors the Legal family trust (plan/protected/tax) | 4 |
+| `trust-nav.js` | Trust/business actions re-render the current hub (no hub jump) | 2 |
+| `networth-genetics.js` | Net worth consistent across hubs (fund counted, bridge once) + child IQ inheritance | 9 |
+| `heir-age.js` | Continue-as-heir starts at the child's age (not 0) + UI size buttons drive CSS vars | 6 |
+| `property.js` | Real-estate: mortgage/cash buy, appreciation, paydown, renovate, sell, equity, migration, living popup, limited rotating market, improvements | 30 |
+| `business-tabs.js` | Mini-tabs (Overview/Trends/Capital/Network), New Business btn, entrepreneur-bridge hidden | 16 |
+| `business-modals.js` | Popups: per-company + global (family/new) + rotating acquisition market (≥3) | 23 |
 | `pacing.js`, `fundgrad.js` | Older startup-founder pacing/grant probes | — |
 
 Keep these green after entrepreneurship/stock/finance/legal changes. When the intended

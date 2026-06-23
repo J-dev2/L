@@ -49,15 +49,21 @@
     window.openBusinessLocationV1857(locked.id, "owned");
     ok("locked_cannot_open_without_flagship", window.businessLocationsV1857(locked).sites.length === beforeLocked);
 
-    var html0 = window.renderBusinessHubV1840 ? window.renderBusinessHubV1840() : "";
-    ok("nightlife_archetypes_render", html0.indexOf("Nightlife circuit") >= 0 && html0.indexOf("Bar") >= 0, html0.slice(0, 80));
-    ok("market_share_renders", html0.indexOf("market share") >= 0 && html0.indexOf("Blue Hour Group") >= 0);
+    // Network controls now live in the focused-company "Network" management popup, built by
+    // buildBizModalV1862(id,'network'); the hub itself only shows the active tab.
+    var netHtml = window.buildBizModalV1862 ? (window.buildBizModalV1862(focus.id, "network").html || "") : "";
+    ok("nightlife_archetypes_render", netHtml.indexOf("Nightlife circuit") >= 0 && netHtml.indexOf("Bar") >= 0, netHtml.slice(0, 80));
+    ok("market_share_renders", netHtml.indexOf("market share") >= 0);
+    if (window.setCompanyTabV1862) window.setCompanyTabV1862("network");
+    var companyHtml = window.renderBusinessHubV1840 ? window.renderBusinessHubV1840() : "";
+    ok("company_network_subtab", companyHtml.indexOf("Network + market share") >= 0 && companyHtml.indexOf("Blue Hour Group") >= 0);
 
     var loc0 = window.businessLocationsV1857(focus);
+    var sitesBeforeOpen = loc0.sites.filter(function (s) { return s.status !== "closed"; }).length;
     var cashBeforeOpen = cash();
     window.openBusinessLocationV1857(focus.id, "owned");
     var loc1 = window.businessLocationsV1857(focus);
-    ok("open_owned_adds_site", loc1.sites.filter(function (s) { return s.status !== "closed"; }).length === loc0.sites.length + 1);
+    ok("open_owned_adds_site", loc1.sites.filter(function (s) { return s.status !== "closed"; }).length === sitesBeforeOpen + 1);
     ok("open_owned_deducts_cash_once", cash() < cashBeforeOpen, "before=" + cashBeforeOpen + " after=" + cash());
     ok("opened_sector_site_named", loc1.sites.some(function (s) { return /Lounge|Club room|Live venue|Event hall|Bar/.test(s.archetype); }));
 
@@ -77,6 +83,8 @@
     window.competeBusinessMarketShareV1857(focus.id);
     ok("compete_once_per_year", cash() === cashAfterCompete);
 
+    // franchise partners unlock at 3+ open sites — add another owned site to clear the gate
+    window.openBusinessLocationV1857(focus.id, "owned");
     window.openBusinessLocationV1857(focus.id, "franchise");
     ok("franchise_adds_partner", window.businessLocationsV1857(focus).sites.some(function (s) { return s.model === "franchise" && s.status !== "closed"; }));
 
@@ -101,8 +109,8 @@
     ok("year_tick_stores_location_effects", !!focus.lastLocationEffectsV1857 && typeof focus.lastLocationEffectsV1857.income === "number");
     ok("risk_breakdown_has_location", !!window.businessRiskBreakdownV1856(focus).location);
 
-    var html1 = window.renderBusinessHubV1840 ? window.renderBusinessHubV1840() : "";
-    ok("ui_has_location_controls", html1.indexOf("Network + market share") >= 0 && html1.indexOf("Acquire") >= 0 && html1.indexOf("Open Owned") >= 0);
+    var netHtml1 = window.buildBizModalV1862 ? (window.buildBizModalV1862(focus.id, "network").html || "") : "";
+    ok("ui_has_location_controls", netHtml1.indexOf("Network + market share") >= 0 && netHtml1.indexOf("Acquire") >= 0 && netHtml1.indexOf("Open Owned") >= 0);
 
     out.summary = { total: Object.keys(out.pass).length, passed: Object.keys(out.pass).filter(function (k) { return out.pass[k]; }).length, failed: out.fail.length };
   } catch (e) {

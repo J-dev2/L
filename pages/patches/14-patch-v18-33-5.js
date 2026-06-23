@@ -46,7 +46,8 @@
       law:"Legal",
       more:"More",
       health:"Health",
-      home:"Home",
+      home:"Real Estate",
+      vehicles:"Vehicles",
       stats:"Stats"
     };
     return map[id] || id.replace(/\b\w/g, function (m) { return m.toUpperCase(); });
@@ -92,7 +93,8 @@
     hubs.forEach(function (h) { seen[h.id] = true; });
     [
       hub18335("health", "Health", "Health"),
-      hub18335("home", "Home", "Home"),
+      hub18335("home", "⌂", "Real Estate"),
+      hub18335("vehicles", "🚗", "Vehicles"),
       hub18335("stats", "Stats", "Stats")
     ].forEach(function (h) {
       if (!seen[h.id]) {

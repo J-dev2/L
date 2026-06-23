@@ -219,7 +219,7 @@
   }
   function titleFor(id) {
     id = normHub(id);
-    var map = { lifehub:"Life", people:"People", career:"Career", school:"Education", education:"Education", finance:"Finance", money:"Money", brokerage:"Stocks", business:"Business", law:"Law Office", health:"Health", home:"Home", more:"More", stats:"All Stats", tax:"Tax Office" };
+    var map = { lifehub:"Life", people:"People", career:"Career", school:"Education", education:"Education", finance:"Finance", money:"Money", brokerage:"Stocks", business:"Business", law:"Law Office", health:"Health", home:"Real Estate", vehicles:"Vehicles", more:"More", stats:"All Stats", tax:"Tax Office" };
     return map[id] || id.replace(/\b\w/g, function (m) { return m.toUpperCase(); });
   }
   function visibleHubs() {

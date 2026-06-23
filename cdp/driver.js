@@ -23,6 +23,9 @@ function send(ws, id, method, params) {
   });
   await send(ws, mid++, "Page.enable", {});
   await send(ws, mid++, "Runtime.enable", {});
+  // Always run against fresh source — Chrome can cache file:// scripts across navigations,
+  // which made edited probes/patches appear unchanged.
+  try { await send(ws, mid++, "Network.enable", {}); await send(ws, mid++, "Network.setCacheDisabled", { cacheDisabled: true }); } catch (e) {}
   const loaded = new Promise((resolve) => {
     const onMsg = (ev) => { let m; try { m = JSON.parse(ev.data); } catch (e) { return; } if (m.method === "Page.loadEventFired") { ws.removeEventListener("message", onMsg); resolve(); } };
     ws.addEventListener("message", onMsg);

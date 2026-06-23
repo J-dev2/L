@@ -187,21 +187,57 @@
     if (!s) return null;
     const e = ensure().estateV1831;
     const t = TRUST_TYPES[e.trustType] || TRUST_TYPES.none;
+    // The Legal hub's family trust (familyTrustV1839) is a SEPARATE system from the estate-plan
+    // trust above. Honor it here too: its corpus is protected, and it cuts probate/estate tax —
+    // otherwise a player who built a Dynasty Family Trust in Legal still shows "No Trust" and gets
+    // taxed on the whole estate.
+    const lt = (s.finance && s.finance.familyTrustV1839) || {};
+    const legalActive = !!lt.created;
+    const legalProtection = legalActive ? clamp(n(lt.protection), 0, .85) : 0;
+    let legalProtectedValue = 0;
+    if (legalActive) {
+      try { legalProtectedValue = typeof window.legalProtectedAssetsV1839 === "function" ? n(window.legalProtectedAssetsV1839()) : n(lt.corpus); }
+      catch (err) { legalProtectedValue = n(lt.corpus); }
+    }
+    // Business-hub family trust (shares titled to a trust) is yet another path — count it too.
+    let businessTrustValue = 0;
+    try { businessTrustValue = typeof window.businessTrustValueV1840 === "function" ? n(window.businessTrustValueV1840()) : 0; } catch (err) { businessTrustValue = 0; }
     const gross = Math.max(0, Math.round(baseNetWorth(s) + n(e.assets.trustCash)));
-    const protectedValue = Math.min(gross, Math.max(0, assignedTrustValue(s)));
+    const protectedValue = Math.min(gross, Math.max(0, assignedTrustValue(s)) + Math.max(0, legalProtectedValue));
+    // Any real trust/estate structure that's actually shielding wealth — used for the honest label.
+    const anyTrust = legalActive || e.trustType !== "none" || businessTrustValue > 0 || n(e.assets.trustCash) > 0 || protectedValue > 0;
     const unprotected = Math.max(0, gross - protectedValue);
-    const probateRate = e.hasWill ? Math.min(t.probate, .055) : t.probate;
+    // A created legal trust avoids most probate even without an estate-plan trust.
+    const baseProbate = legalActive ? Math.min(t.probate, .012) : t.probate;
+    const probateRate = e.hasWill ? Math.min(baseProbate, .055) : baseProbate;
     const probateLoss = Math.round(unprotected * probateRate);
     const exemption = e.familyOffice ? 10000000 : 5000000;
-    const estateTaxBase = Math.max(0, gross - exemption);
-    const estateTaxRate = .20 * (1 - clamp(t.estateTaxCut + (e.familyOffice ? .18 : 0) + (e.clauses.charityRemainder ? .08 : 0), 0, .82));
+    const estateTaxBase = Math.max(0, unprotected - exemption); // trust-protected assets aren't in the taxable estate
+    const effEstateTaxCut = Math.max(n(t.estateTaxCut), legalProtection * .8);
+    const estateTaxRate = .20 * (1 - clamp(effEstateTaxCut + (e.familyOffice ? .18 : 0) + (e.clauses.charityRemainder ? .08 : 0), 0, .85));
     const estateTax = Math.round(estateTaxBase * estateTaxRate);
     const maintenance = Math.max(0, n(e.maintenanceDue));
     const netTransfer = Math.max(0, gross - probateLoss - estateTax - maintenance);
     const kids = childrenList(s).length;
     const childShare = kids > 0 ? Math.round(netTransfer / kids) : 0;
     const dynastyScore = Math.round(netTransfer / 25000 + protectionScore(s) * 8 + kids * 120 + (e.familyOffice ? 500 : 0));
-    return { gross, protectedValue, unprotected, probateRate, probateLoss, estateTaxBase, estateTaxRate, estateTax, maintenance, netTransfer, kids, childShare, protection:protectionScore(s), dynastyScore };
+    // Plan label: estate-plan trust name > legal family-trust name > any-protection "Family Trust" > "No Trust".
+    // Guard with TRUST_TYPES lookup: an unset trustType is `undefined` (NOT "none"), which previously
+    // slipped past `!== "none"` and printed "No Trust" even with a real Legal trust active.
+    // Re-read trustType fresh here: a Legal family trust can sync into estateV1831.trustType
+    // DURING this function (after `t` was captured up top), so use the current value for the label.
+    const curTrust = TRUST_TYPES[e.trustType] || TRUST_TYPES.none;
+    const hasEstateTrust = !!(e.trustType && e.trustType !== "none" && TRUST_TYPES[e.trustType]);
+    const planName = hasEstateTrust ? curTrust.name
+      : legalActive ? (lt.planName || trustPlanNameV1839(lt) || "Family Trust")
+      : (businessTrustValue > 0 || n(e.assets.trustCash) > 0 || protectedValue > 0) ? "Family Trust"
+      : "No Trust";
+    return { gross, protectedValue, unprotected, probateRate, probateLoss, estateTaxBase, estateTaxRate, estateTax, maintenance, netTransfer, kids, childShare, protection:protectionScore(s), dynastyScore, legalActive, anyTrust, planName, businessTrustValue };
+  }
+  // Best-effort readable name for a familyTrustV1839 plan id.
+  function trustPlanNameV1839(lt) {
+    var map = { starter: "Starter Family Trust", growth: "Family Trust", legacy: "Legacy Family Trust", dynasty: "Dynasty Family Trust", office: "Family Office Trust" };
+    return map[String(lt && lt.plan)] || (lt && lt.plan ? "Family Trust" : "");
   }
   function addHistory(action, amount) {
     const s = ensure(); if (!s) return;
@@ -552,7 +588,7 @@
     const e = s.estateV1831;
     const t = TRUST_TYPES[e.trustType] || TRUST_TYPES.none;
     const x = estateSettlement(s);
-    return `<section class="v1831-death-panel"><div class="v1831-death-title">Family Trust Settlement</div><div class="legacy"><div><span class="mono">Plan</span><b>${esc(t.name)}</b></div><div><span class="mono">Protected</span><b>${money(x.protectedValue)}</b></div><div><span class="mono">Probate Loss</span><b>${money(x.probateLoss)}</b></div><div><span class="mono">Estate Tax</span><b>${money(x.estateTax)}</b></div><div><span class="mono">Net To Heirs</span><b>${money(x.netTransfer)}</b></div><div><span class="mono">Each Child</span><b>${money(x.childShare)}</b></div></div><div class="cause">${e.hasWill || e.trustType !== "none" ? "Your estate plan reduced the leak between final net worth and the next generation." : "No meaningful estate plan existed, so probate and delays reduced the family transfer."}</div></section>`;
+    return `<section class="v1831-death-panel"><div class="v1831-death-title">Family Trust Settlement</div><div class="legacy"><div><span class="mono">Plan</span><b>${esc(x.planName || t.name)}</b></div><div><span class="mono">Protected</span><b>${money(x.protectedValue)}</b></div><div><span class="mono">Probate Loss</span><b>${money(x.probateLoss)}</b></div><div><span class="mono">Estate Tax</span><b>${money(x.estateTax)}</b></div><div><span class="mono">Net To Heirs</span><b>${money(x.netTransfer)}</b></div><div><span class="mono">Each Child</span><b>${money(x.childShare)}</b></div></div><div class="cause">${e.hasWill || x.anyTrust ? "Your estate plan and family trust reduced the leak between final net worth and the next generation." : "No meaningful estate plan existed, so probate and delays reduced the family transfer."}</div></section>`;
   }
   const previousRenderDeath = window.renderDeath || (typeof renderDeath === "function" ? renderDeath : null);
   if (previousRenderDeath && !window.__ledgerDeath1831Wrapped) {

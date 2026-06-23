@@ -65,10 +65,21 @@
     return toast(message);
   }
 
-  function saveRender() {
+  function saveRender(hubId) {
     try { if (typeof save === "function") save(); } catch (e) {}
     try {
-      if (typeof window.renderHubInPlaceV16 === "function") return window.renderHubInPlaceV16("law");
+      if (typeof window.renderHubInPlaceV16 === "function") {
+        // Stay on whatever hub the player is actually viewing (trust controls are surfaced in
+        // several hubs); only fall back to "law" when no hub overlay is open.
+        var cur = hubId || "law", pos = null;
+        try {
+          var ov = document.querySelector(".hub-overlay");
+          if (ov && ov.dataset && ov.dataset.hubId) cur = ov.dataset.hubId;
+          var bd = ov && ov.querySelector(".v16-hub-body");
+          if (bd) pos = { hubId: cur, top: bd.scrollTop, left: bd.scrollLeft };
+        } catch (e0) {}
+        return window.renderHubInPlaceV16(cur, pos);
+      }
     } catch (e2) {}
     try { if (typeof render === "function") render(); } catch (e3) {}
   }
@@ -443,9 +454,11 @@
       fund.lastReturn = net;
       fund.lastFee = fee + taxDrag;
       fund.years = round(n(fund.years) + 1);
+      fund.totalReturn = round(n(fund.totalReturn) + net); // lifetime fund earnings (visibility)
     }
     trust.lastReturn = net;
     trust.lastFee = fee + taxDrag;
+    trust.totalReturn = round(n(trust.totalReturn) + net); // lifetime trust earnings (visibility)
     trust.lastResolvedAge = round(s.age);
     trust.history.unshift({ age: round(s.age), event: "Annual trust return", amount: net });
     trust.history = trust.history.slice(0, 8);
@@ -588,11 +601,23 @@
     var fund = trust.familyFund || {};
     var room = Math.max(0, round(n(trust.corpus) - n(fund.capital)));
     var spec = riskSpec();
+    // Full wealth UNDER the trust = funded corpus + businesses titled to the trust + child trusts +
+    // estate trust cash. Titled businesses are protected by the trust but stay counted as the business,
+    // so showing only `corpus` made huge titled wealth look like "nothing in the trust". Display-only.
+    var sNow = stateNow();
+    var titledBizUnderTrust = round(trustBusinessCarryValueV1846(sNow));
+    var childTrustsUnderTrust = round(childTrustCarryV1846(sNow, "", true));
+    var estateTrustCash = round(n((((sNow || {}).estateV1831 || {}).assets || {}).trustCash));
+    var totalUnderTrust = round(n(trust.corpus) + titledBizUnderTrust + childTrustsUnderTrust + estateTrustCash);
     return '<section class="panel v1839-family-fund"><div class="v1839-panel-head"><div><div class="section-label">📈 Step 2: Grow it</div><h3>Trust investment sleeve</h3><p>The family fund invests trust capital without removing it from the protected family structure.</p></div><strong class="' + ((fund.lastReturn || 0) >= 0 ? "good" : "bad") + '">' + signedMoney(fund.lastReturn || 0) + '<span>last return</span></strong></div><div class="v1839-metric-grid compact">' +
       metric("Allocated", compactMoney(fund.capital || 0), "Trust corpus assigned to active management.", fund.active ? "good" : "gold") +
       metric("Room", compactMoney(room), "Unallocated trust corpus.", room ? "gold" : "good") +
       metric("Mandate", spec.label, "Expected " + pct(spec.rate) + " before volatility.", "gold") +
       metric("Years", String(round(fund.years || 0)), "Family fund operating history.", "good") +
+      metric("Trust corpus", compactMoney(n(trust.corpus)), "Funded, liquid trust capital right now (the cash sleeve).", "gold") +
+      metric("Under trust (total)", compactMoney(totalUnderTrust), "Everything the trust protects: funded corpus + businesses titled to the trust + child trusts. Your full family wealth under the trust, even when it isn't all liquid corpus.", "gold") +
+      (titledBizUnderTrust > 0 ? metric("Titled businesses", compactMoney(titledBizUnderTrust), "Value of businesses you have titled to the trust - protected by it, but still run as businesses (not corpus cash). This is why the corpus alone can look small.", "good") : "") +
+      metric("Total earned", compactMoney(n(trust.totalReturn)), "Lifetime returns the trust + fund have added to the corpus.", n(trust.totalReturn) >= 0 ? "good" : "bad") +
       '</div><div class="v1839-action-row">' +
       button(fund.active ? "Fund Active" : "Start Family Fund", "allocateFamilyFundV1839(250000)", "green", !trust.created || !round(trust.corpus) || (fund.active && room <= 0)) +
       button("Allocate 25%", "allocateFamilyFundV1839('quarter')", "green", !trust.created || room <= 0) +
@@ -922,6 +947,39 @@
     stateNow().legacy.lastInheritance = cashInheritance;
     stateNow().legacy.previousLivesV1816 = previousLives;
     stateNow().legacy.milestones = [];
+    // Genetics: the heir inherits IQ from the family line instead of a fresh random roll. A named
+    // child carries the IQ it was born with (from both parents); a generated relative regresses
+    // from the deceased's IQ. Smart parents → smarter heirs.
+    try {
+      var inheritedIQ = (hasDirectHeir && heir && Number(heir.iqV1862)) ? Number(heir.iqV1862) : null;
+      if (inheritedIQ == null) {
+        var pIQ = Number((old.traits || {}).iq) || 100;
+        inheritedIQ = Math.round(100 + (pIQ - 100) * 0.7 + (Math.random() * 16 - 8));
+      }
+      inheritedIQ = Math.max(55, Math.min(200, inheritedIQ));
+      var st = stateNow();
+      st.traits = st.traits || {};
+      st.traits.iq = inheritedIQ;
+      st.traits.iqPotential = Math.max(inheritedIQ, Math.min(200, inheritedIQ + 8));
+    } catch (eIQ) {}
+    // Continue at the heir's ACTUAL age — taking over a living/named child continues THEIR life at
+    // their current age (e.g. 23), not a reset to age 0 / preschool. A generated relative steps in
+    // as a young adult (18) rather than a newborn.
+    try {
+      var heirAge = hasDirectHeir ? Math.max(0, Math.round(Number(heir.age) || 0)) : 18;
+      if (heirAge >= 1) {
+        var sa = stateNow();
+        sa.age = heirAge;
+        sa.birthYear = 2026 - heirAge;
+        sa.school = sa.school || {};
+        sa.flags = sa.flags || {};
+        if (heirAge >= 18) {
+          if (!sa.education || sa.education === "Preschool") sa.education = "High School";
+          sa.flags.collegeDecisionDone = true;
+          sa.inSchool = false;
+        }
+      }
+    } catch (eAge) {}
     var carried = applyLegacyCarryV1846(old, heirKey);
     if (!hasDirectHeir) log("With no direct heir, " + nextName + " — a relative of the " + familyName + " line — steps forward to continue it.", { money: 0 });
     log("You carry the " + familyName + " line forward with " + compactMoney(cashInheritance) + " cash, " + compactMoney(carried.trust) + " protected trust cash, " + compactMoney(carried.business) + " family business value, and " + compactMoney(carried.protectedInvestmentOffice || 0) + " protected investment office capital.", { money: 0 });

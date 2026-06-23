@@ -40,6 +40,29 @@ Checkpoints 2–14 (2026-06-20) are current and reflect shipped source. The old
 Checkpoint 1 (bottom) is historical — e.g. it says scroll-nav Part E was not done,
 but that work is implemented. Trust the newest checkpoint and verify against source.
 
+Latest is **Checkpoint 29 (2026-06-22)**: `pages/systems/property-estate.js` is now **v18.66**.
+CP27 added property class/prestige tiers (Economy→Prestige, net-worth-gated); CP28 fixed the Flip-plan
+button (real flip project) and added **tenant screening / background checks**; CP29 added **tenant
+relationships + romance** (visit tenants to build a relationship that renews their lease, gifts/encounter
+events, flirt→ask-out romance with abstract adult-gated intimacy); CP30 made **living in an owned property
+grant a real lifestyle bonus** (happiness/looks by class+condition, no legacy double-charge); CP31 added
+**tenant personalities + flavor lines + story moments** (6 personas, now mechanically distinct via
+`PERSONA_BIAS`). CP32 added a **NEW car & garage system** (`pages/systems/car-collection.js`, v18.67):
+buy cash/finance, depreciation/appreciation (classics gain), condition + repairs, a garage with resale
+equity in net worth, and a daily-driver looks/happiness bonus; it replaces the old single-car UI and
+migrates the legacy `state.car` once. CP33 grew the catalog to **100 cars (emoji icons) across 8
+colour-coded classes** (added Off-Road + Electric), added **tenant persona emojis**, **class-coloured
+card accents** across both systems, and a **tenant Evict** action (`reEvictTenantV1866`). The property system is well ahead of the older
+notes (CP26 says v18.62; source was already v18.63 before CP27) — **verify source, not the notes**. CP27–CP32
+`dist` rebuild and the CDP probes were NOT run (node/headless-Chrome sandbox out of disk space) — run
+`node build/build-ledger18.js` (now also bundles `car-collection.js` — note the new `<script>` in play.html),
+then `cdp/property.js` (~73 checks) and `cdp/cars.js` (~22 checks). CP26 #4 (fully fold the legacy
+`homes`/`rentals` catalogs into the property system) is the main remaining property item. CP34 split
+**Vehicles into its own hub/page** (out of Real Estate) and renamed the leftover **"Home" hub label to
+"Real Estate"** across the active nav/title sources (15/14/11 patches + runtime + More menu). Future
+backlog (logged, not built): **Entrepreneurship team hiring** — interview + hire role-based staff
+(mirror the tenant-screening pattern) in `pages/systems/entrepreneur.js`.
+
 ## Entrepreneurship
 
 The Entrepreneurship rebuild is the latest major feature work.

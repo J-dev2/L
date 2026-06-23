@@ -83,9 +83,21 @@
   function legacyBusinessValue(s) {
     var list = Array.isArray((s.finance || {}).businesses) ? s.finance.businesses : [];
     return list.reduce(function (sum, b) {
-      if (!b || b._migratedToBizV1861) return sum;
+      // Skip entrepreneur-port companies: migrated firms and the active-founder bridge are
+      // counted once via bizV1860Value, so including them here would double-count.
+      if (!b || b._migratedToBizV1861 || b.founderActiveV1860) return sum;
       return sum + Math.max(0, n(b && b.value)) + Math.max(0, n(b && b.retainedEarnings));
     }, 0);
+  }
+
+  // Personal firm / fund capital — mirror legacyNetWorth so the big "financial company" fund
+  // shows here too (the ledger previously only counted personalFirm.cash and missed it).
+  function firmCapitalV1862(f) {
+    f = f || {};
+    var firm = f.personalFirm || f.personalFund || {};
+    return Math.max(0, n(f.managedPortfolio)) +
+      Math.max(0, n(f.personalFirmCash) || n(f.firmCashV1828) || n(f.firmCash)) +
+      Math.max(0, n(firm.cash) || n(firm.managed) || n(firm.capital) || n(firm.balance) || n(firm.account));
   }
 
   function homeValue() {
@@ -130,9 +142,33 @@
     }, 0)));
   }
 
+  function realEstateStats() {
+    try {
+      if (typeof window.reEnsureV1863 === "function") window.reEnsureV1863();
+      else if (typeof window.reEnsureV1862 === "function") window.reEnsureV1862();
+    } catch (e) {}
+    var stats = null;
+    try {
+      if (typeof window.rePortfolioStatsV1863 === "function") stats = window.rePortfolioStatsV1863();
+      else if (typeof window.rePortfolioStatsV1862 === "function") stats = window.rePortfolioStatsV1862();
+    } catch (e2) {}
+    stats = stats || {};
+    var value = Math.max(0, n(stats.value));
+    var debt = Math.max(0, n(stats.debt));
+    var equity = Number.isFinite(Number(stats.equity)) ? n(stats.equity) : value - debt;
+    return {
+      value: Math.max(0, round(value)),
+      debt: Math.max(0, round(debt)),
+      equity: round(equity),
+      annualCashFlow: round(n(stats.annualCashFlow))
+    };
+  }
+
   function assetRows() {
     var s = ensureFinance();
     var f = s.finance || {};
+    var re = realEstateStats();
+    var reEquity = re.value; // Keep the existing row slot, but pair it with the mortgage debt row below.
     var investedStocks = stockValue();
     var childTrusts = Object.keys(f.trustFunds || {}).reduce(function (sum, key) { return sum + Math.max(0, n(f.trustFunds[key])); }, 0);
     return [
@@ -141,15 +177,15 @@
       { id: "super", label: "Super Saver / ISA", value: Math.max(0, n(f.superSaver)), note: "Higher-yield reserve." },
       { id: "brokerageCash", label: "Brokerage cash", value: Math.max(0, n(f.brokerage) + n(f.brokerageCash)), note: "Uninvested cash in Stocks." },
       { id: "stocks", label: "Real stocks", value: investedStocks, note: "Market value of current holdings." },
-      { id: "firm", label: "Personal firm capital", value: Math.max(0, n(f.managedPortfolio) + n(f.personalFirm && f.personalFirm.cash) + n(f.firmCashV1828)), note: "Own fund office / managed account." },
+      { id: "firm", label: "Personal firm capital", value: firmCapitalV1862(f), note: "Own fund office / managed account." },
       { id: "manager", label: "Outside manager capital", value: Math.max(0, n(f.externalManager && f.externalManager.capital) + n(f.managerFirmsV1829 && f.managerFirmsV1829.capital)), note: "Professionally managed capital." },
       { id: "business", label: "Operating businesses", value: Math.max(0, legacyBusinessValue(s) + bizV1860Value(s)), note: "Companies you own and run, including migrated entrepreneur-port firms." },
       { id: "ventureLoans", label: "Owner loans to ventures", value: Math.max(0, (typeof window.ventureOwnerLoanTotalV1860 === "function" ? n(window.ventureOwnerLoanTotalV1860()) : 0)), note: "Cash you lent your own companies; repaid yearly with interest." },
       { id: "familyTrust", label: "Family trust", value: Math.max(0, n(f.familyTrustV1839 && f.familyTrustV1839.corpus)), note: "Protected trust corpus managed in Legal." },
       { id: "childTrusts", label: "Child trusts", value: Math.max(0, childTrusts), note: "Heir accounts funded through Legal." },
       { id: "retirement", label: "Retirement", value: Math.max(0, n(s.ira) + n(s.retirement401k)), note: "IRA, 401(k), and pension money." },
-      { id: "property", label: "Property equity", value: Math.max(0, homeValue() + rentalValue()), note: "Home and rental property value." },
-      { id: "collection", label: "Car / collection", value: Math.max(0, carValue() + n(f.collectionValue) + n(f.shoppingCollectionV1854)), note: "Owned vehicles, luxury items, and art." },
+      { id: "property", label: "Property equity", value: Math.max(0, homeValue() + rentalValue() + reEquity), note: "Primary residence plus Real Estate portfolio value; portfolio mortgages are listed under debts." },
+      { id: "collection", label: "Vehicles / collection", value: Math.max(0, carValue() + n(f.collectionValue) + n(f.shoppingCollectionV1854)), note: "Owned vehicles, luxury items, and art." },
       { id: "family", label: "Family support", value: Math.max(0, n((s.parentFinances || {}).liquid)), note: "Accessible family support when modeled." }
     ].map(function (row) { row.value = Math.max(0, round(row.value)); return row; });
   }
@@ -157,11 +193,13 @@
   function debtRows() {
     var s = ensureFinance();
     var f = s.finance || {};
+    var re = realEstateStats();
     return [
       { id: "negativeChecking", label: "Negative checking", value: Math.max(0, -n(s.money)), note: "Cash account below zero.", key: "money", stateKey: true },
       { id: "education", label: "Education debt", value: Math.max(0, n(s.debt)), note: "School loans and tuition balances.", key: "debt", stateKey: true },
       { id: "creditCardDebt", label: "Credit card balance", value: Math.max(0, n(f.creditCardDebt)), note: "Unsecured borrowing.", key: "creditCardDebt" },
       { id: "assetBackedLoan", label: "Secured borrowing", value: Math.max(0, n(f.assetBackedLoan)), note: "Loans backed by savings or investments.", key: "assetBackedLoan" },
+      { id: "propertyMortgage", label: "Property mortgage debt", value: Math.max(0, re.debt), note: "Mortgages attached to Real Estate portfolio properties." },
       { id: "personalLine", label: "Personal line of credit", value: Math.max(0, n((f.personalLineV1860 || {}).balance)), note: "Score-gated revolving line. Manage in Money." },
       { id: "taxDebt", label: "Tax debt", value: Math.max(0, n(f.taxDebt || f.debts.taxDebt || s.taxDebt)), note: "Unpaid taxes. Full tools live in Legal.", key: "taxDebt", syncTax: true },
       { id: "medicalDebt", label: "Medical debt", value: Math.max(0, n(f.medicalDebt || s.medicalDebt)), note: "Uncovered care.", key: "medicalDebt" },
@@ -176,6 +214,7 @@
     var totalDebts = debts.reduce(function (sum, row) { return sum + Math.max(0, row.value); }, 0);
     return { assets: assets, debts: debts, totalAssets: totalAssets, totalDebts: totalDebts, netWorth: totalAssets - totalDebts };
   }
+  try { window.financeLedgerTotalsV1836 = totals; } catch (e) {}
 
   function rawCashFlow() {
     var cf = {};
@@ -232,6 +271,14 @@
         rental += Math.max(0, round(n(r && r.rent) - n(r && r.upkeep)));
       });
     } catch (e) {}
+    var reFlow = n(f.lastRealEstateCashFlowV1863 || f.lastRealEstateCashFlowV1862);
+    try {
+      if (!reFlow && typeof window.rePortfolioStatsV1863 === "function") {
+        reFlow = n(window.rePortfolioStatsV1863().annualCashFlow);
+      } else if (!reFlow && typeof window.rePortfolioStatsV1862 === "function") {
+        reFlow = n(window.rePortfolioStatsV1862().annualCashFlow);
+      }
+    } catch (e2) {}
     var investCash = investmentCashIncome();
     var paper = investmentPaperReturn();
     var interest = Math.max(0, round(cf.savingsInterest || f.lastSavingsInterest));
@@ -241,7 +288,8 @@
       { label: "Business income", value: business, note: "Companies, NIL, side deals, and owner income." },
       { label: "Investment cash", value: investCash, note: "Dividends, distributions, realized gains, and fund fees." },
       { label: "Investment growth", value: paper, note: paper >= 0 ? "Paper or account growth inside assets." : "Market or managed-account drawdown." },
-      { label: "Rental net income", value: rental, note: "Rent after upkeep." },
+      { label: "Legacy rental net", value: rental, note: "Old rental records before migration." },
+      { label: "Real estate cash flow", value: reFlow, note: "Portfolio rent minus upkeep and mortgages." },
       { label: "Interest / yield", value: interest, note: "Savings and Super Saver yield." }
     ].map(function (row) { row.value = round(row.value); return row; });
     var taxes = taxValue(cf);
@@ -249,7 +297,7 @@
       { label: "Taxes", value: taxes, note: "Income, investment, state/country, and true-up taxes." },
       { label: "Lifestyle", value: Math.max(0, round(cf.lifestyleCost || cf.living)), note: "Normal yearly spending." },
       { label: "Housing", value: Math.max(0, round(cf.housingCost)), note: "Rent, mortgage, or home costs." },
-      { label: "Car / transport", value: Math.max(0, round(cf.carCost)), note: "Vehicle and transit costs." },
+      { label: "Vehicles / transport", value: Math.max(0, round(cf.carCost)), note: "Vehicle and transit costs." },
       { label: "Insurance", value: Math.max(0, round(cf.insuranceCost || f.lastInsuranceCost)), note: "Health and other premiums." },
       { label: "Debt interest", value: Math.max(0, round(cf.debtInterest)), note: "Interest on loans and credit." },
       { label: "Transfers to assets", value: Math.max(0, round(cf.transfers || cf.autoSave || 0)), note: "Savings and investing moves, not true losses." }

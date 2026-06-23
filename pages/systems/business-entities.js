@@ -71,7 +71,18 @@
   function saveRender(hubId) {
     try { if (typeof save === "function") save(); } catch (e) {}
     try {
-      if (typeof window.renderHubInPlaceV16 === "function") return window.renderHubInPlaceV16(hubId || "business");
+      if (typeof window.renderHubInPlaceV16 === "function") {
+        // Stay on the hub the player is actually viewing (business trust controls also appear in the
+        // Legal/Money hubs); only fall back to "business" when no hub overlay is open.
+        var cur = hubId || "business", pos = null;
+        try {
+          var ov = document.querySelector(".hub-overlay");
+          if (ov && ov.dataset && ov.dataset.hubId) cur = ov.dataset.hubId;
+          var bd = ov && ov.querySelector(".v16-hub-body");
+          if (bd) pos = { hubId: cur, top: bd.scrollTop, left: bd.scrollLeft };
+        } catch (e0) {}
+        return window.renderHubInPlaceV16(cur, pos);
+      }
     } catch (e2) {}
     try { if (typeof render === "function") render(); } catch (e3) {}
   }
@@ -706,6 +717,50 @@
     return (stateNow().finance && stateNow().finance.businesses || []).find(function (b) { return String(b.id) === String(id); }) || null;
   }
 
+  // Companies the Business hub should actually manage. The active Entrepreneurship startup is
+  // mirrored into finance.businesses (founderActiveV1860 / _migratedToBizV1861) so net worth counts
+  // it — but its income is run by the Entrepreneurship module, so it would show a misleading $0 here.
+  // Hide those from the Business hub; they live in Entrepreneurship.
+  function isEntrepreneurPortV1862(b) { return !!(b && (b.founderActiveV1860 || b._migratedToBizV1861)); }
+  function businessesVisibleV1862() {
+    return businesses().filter(function (b) { return b && !isEntrepreneurPortV1862(b); });
+  }
+
+  function hashV1862(str, seed) {
+    var h = (seed | 0) || 0;
+    str = String(str);
+    for (var i = 0; i < str.length; i++) { h = (h * 31 + str.charCodeAt(i)) | 0; }
+    return h >>> 0;
+  }
+  // Rotating acquisition market: always >=3 companies for sale, growing to 10 with age, varied
+  // sectors, refreshed each year (seeded by age so it's stable within a year). Drawn from the
+  // V6 acquisition list plus the launch catalog (buyCompany/bizBlueprint resolve either).
+  function acquisitionMarketV1862() {
+    var s = ensureBusinessState();
+    var age = n(s.age, 18);
+    var seed = Math.floor(age);
+    var owned = businesses();
+    var pool = [];
+    (acquisitionCatalog() || []).forEach(function (v) { if (v && v.id) pool.push(v); });
+    (businessCatalog() || []).forEach(function (v) {
+      if (!v || !v.id || String(v.id).indexOf("acq_") === 0) return;
+      pool.push({ id: v.id, name: v.name, category: v.category, minAge: v.minAge, startup: v.startup, buy: n(v.buy) || Math.round(n(v.startup) * 2.2), desc: v.desc, failureRisk: v.failureRisk });
+    });
+    var seen = {}, uniq = [];
+    pool.forEach(function (v) {
+      var id = String(v.id);
+      if (seen[id]) return; seen[id] = 1;
+      if (owned.some(function (b) { return String(b.baseId || b.id) === id; })) return;
+      uniq.push(v);
+    });
+    uniq.sort(function (a, b) { return hashV1862(a.id, seed) - hashV1862(b.id, seed); });
+    var count = Math.max(3, Math.min(10, 3 + Math.floor((age - 18) / 5)));
+    var picked = [], cats = {};
+    uniq.forEach(function (v) { if (picked.length >= count) return; var c = v.category || "Business"; if (!cats[c]) { cats[c] = 1; picked.push(v); } });
+    uniq.forEach(function (v) { if (picked.length >= count) return; if (picked.indexOf(v) < 0) picked.push(v); });
+    return picked;
+  }
+
   function businessValue(b) {
     ensureBusiness(b);
     return Math.max(0, round(n(b.value) + n(b.retainedEarnings)));
@@ -807,7 +862,9 @@
 
   function focusBusiness() {
     var s = ensureBusinessState();
-    return businessById(s.finance.businessOfficeV1840.focusId) || businesses()[0] || null;
+    var b = businessById(s.finance.businessOfficeV1840.focusId);
+    if (b && !isEntrepreneurPortV1862(b)) return b;
+    return businessesVisibleV1862()[0] || null;
   }
 
   function actionButton(label, action, kind, disabled) {
@@ -1710,7 +1767,7 @@
   }
 
   function businessRail() {
-    var list = businesses();
+    var list = businessesVisibleV1862();
     if (!list.length) {
       return '<section class="panel v1840-business-rail"><div class="section-label">🏢 Owned companies</div><div class="v1840-empty">No business yet. Use the launch or acquisition rail below when you meet the requirements.</div></section>';
     }
@@ -1814,77 +1871,378 @@
       '</div>';
   }
 
-  function focusDesk() {
-    var b = focusBusiness();
-    if (!b) return "";
-    ensureBusiness(b);
-    var st = STRUCTURES[b.entityType] || STRUCTURES.soleprop;
-    var id = safeId(b.id);
-    var distMax = Math.max(0, round(b.retainedEarnings));
-    var entityDebt = Math.max(0, round(b.entityTaxDebt));
-    var compliance = Math.max(0, round(b.complianceDue));
+  // ---- Focused company: pick one from the rail, then page its own mini-tabs --------------
+  // Overview (at-a-glance + actions + popups), Capital (all money), Network (sites/market share).
+  var COMPANY_TABS_V1862 = [["overview", "Overview"], ["trends", "Trends"], ["capital", "Capital"], ["network", "Network"]];
+  function companyTabV1862() {
+    var office = businessOfficeV1862();
+    var t = String(office.companyTabV1862 || "overview").toLowerCase();
+    if (!COMPANY_TABS_V1862.some(function (x) { return x[0] === t; })) t = "overview";
+    office.companyTabV1862 = t;
+    return t;
+  }
+  window.setCompanyTabV1862 = function (tab) {
+    var office = businessOfficeV1862();
+    var t = String(tab || "overview").toLowerCase();
+    if (!COMPANY_TABS_V1862.some(function (x) { return x[0] === t; })) t = "overview";
+    office.companyTabV1862 = t;
+    saveRender("business");
+  };
+
+  function companyOverviewBodyV1862(b) {
+    var eid = esc(b.id);
     var signatureAction = ventureSignatureAction(b);
     var signatureUsed = !!(stateNow().actionsTaken || {})["venture_signature_" + b.id];
     var secondAction = ventureSecondAction(b);
     var secondUsed = !!(stateNow().actionsTaken || {})["venture_second_" + b.id];
+    var riskNow = riskFor(b);
+    var riskKind = riskNow >= .24 ? "bad" : riskNow <= .08 ? "good" : "gold";
+    var repKind = b.reputation >= 65 ? "good" : b.reputation < 35 ? "bad" : "gold";
+    return '<div class="v1840-metric-grid">' +
+      metric("Company cash", compactMoney(b.retainedEarnings), "Inside the business.", "good") +
+      metric("Last income", signedMoney(b.lastIncome), n(b.lastEnterpriseYieldV1851) > 0 ? "Ops + " + compactMoney(b.lastEnterpriseYieldV1851) + " yield." : "Last year's result.", n(b.lastIncome) >= 0 ? "good" : "bad") +
+      metric("Auto dividend / yr", compactMoney(b.lastDividend), n(b.lastDividend) > 0 ? "Paid to checking yearly." : "Reach Growing stage to unlock.", n(b.lastDividend) > 0 ? "good" : "gold") +
+      metric("⭐ Reputation", round(b.reputation) + "/100", "Lowers risk; speeds growth.", repKind) +
+      '</div>' +
+      '<details class="v1840-disc v1840-risk-disc"><summary><span>⚠️ Failure risk</span><b class="' + riskKind + '">' + pct(riskNow) + '</b><i>breakdown</i></summary>' + riskPanel(b) + '</details>' +
+      sectorMeterRow(b) +
+      (typeof window.renderBizChallengesPanelV1853 === "function" ? window.renderBizChallengesPanelV1853(b) : "") +
+      '<div class="v1840-action-strip v1840-primary-actions">' +
+      actionButton("Work", "workVenture('" + eid + "')", "blue", typeof window.workVenture !== "function" || (stateNow().actionsTaken || {})["venture_" + b.id]) +
+      actionButton("Market", "bizAction('" + eid + "','market')", "blue", typeof window.bizAction !== "function" || (stateNow().actionsTaken || {})["biz_" + b.id + "_market"]) +
+      actionButton("Upgrade", "bizAction('" + eid + "','equipment')", "gold", typeof window.bizAction !== "function" || (stateNow().actionsTaken || {})["biz_" + b.id + "_equipment"]) +
+      (signatureAction ? actionButton(signatureAction.icon + " " + signatureAction.label, "runVentureSignatureActionV1850('" + eid + "')", "gold", signatureUsed || typeof window.runVentureSignatureActionV1850 !== "function") : "") +
+      (secondAction ? actionButton(secondAction.icon + " " + secondAction.label, "runVentureSecondActionV1852('" + eid + "')", "green", secondUsed || typeof window.runVentureSecondActionV1852 !== "function") : "") +
+      actionButton("Sell", "sellVenture('" + eid + "')", "red", typeof window.sellVenture !== "function") +
+      '</div>' +
+      '<div class="section-label v1840-manage-label">⚙️ Manage</div>' +
+      '<div class="v1840-manage-grid">' +
+      manageBtn("🏗️ Structure", b.id, "structure") +
+      manageBtn("👥 Team", b.id, "team") +
+      manageBtn("🛠️ Assets", b.id, "assets") +
+      manageBtn("👨‍👩‍👧 Family", b.id, "family") +
+      '</div>';
+  }
+
+  // Capital sub-tab: all money in one place (founder capital, company cash, taxes) inline.
+  function companyCapitalBodyV1862(b) {
+    return '<div class="section-label">💰 Founder capital</div>' + bizCapitalBodyV1862(b) +
+      '<div class="section-label" style="margin-top:14px">💵 Company cash</div>' + bizCashBodyV1862(b) +
+      '<div class="section-label" style="margin-top:14px">🧾 Taxes &amp; compliance</div>' + bizTaxesBodyV1862(b);
+  }
+
+  // Tiny inline SVG sparkline (area + line). vals = array of numbers, oldest→newest.
+  function sparkSVGV1862(vals, color) {
+    vals = (vals || []).map(function (x) { return n(x); });
+    if (vals.length < 2) return '<div class="v1840-note">Not enough history yet — play a few more years.</div>';
+    var w = 100, h = 34, min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+    var span = max - min || 1;
+    var pts = vals.map(function (v, i) {
+      var x = (i / (vals.length - 1)) * w;
+      var y = h - ((v - min) / span) * (h - 4) - 2;
+      return x.toFixed(1) + "," + y.toFixed(1);
+    });
+    var line = pts.join(" ");
+    var area = "0," + h + " " + line + " " + w + "," + h;
+    color = color || "#8faf6c";
+    return '<svg class="v1840-spark" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
+      '<polygon points="' + area + '" fill="' + color + '" opacity="0.14"/>' +
+      '<polyline points="' + line + '" fill="none" stroke="' + color + '" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>';
+  }
+
+  function trendCardV1862(label, vals, latestText, color) {
+    return '<div class="v1840-trend-card"><div class="v1840-trend-head"><span>' + esc(label) + '</span><b>' + esc(latestText) + '</b></div>' + sparkSVGV1862(vals, color) + '</div>';
+  }
+
+  // Trends sub-tab: value / income / reputation graphs from the yearly history (historyV1862).
+  function companyTrendsBodyV1862(b) {
+    var hist = Array.isArray(b.historyV1862) ? b.historyV1862 : [];
+    if (hist.length < 2) {
+      return '<div class="v1840-empty">📈 No trend history yet for <b>' + esc(b.name) + '</b>. Age up a few years and value, income, and reputation will chart here.</div>';
+    }
+    var values = hist.map(function (h) { return n(h.value); });
+    var incomes = hist.map(function (h) { return n(h.income); });
+    var reps = hist.map(function (h) { return n(h.rep); });
+    var lastV = values[values.length - 1], firstV = values[0];
+    var growth = firstV > 0 ? Math.round(((lastV - firstV) / firstV) * 100) : 0;
+    return '<div class="v1840-note">Last ' + hist.length + ' years · company value ' + (growth >= 0 ? "▲ +" : "▼ ") + Math.abs(growth) + '% over the tracked period.</div>' +
+      '<div class="v1840-trend-grid">' +
+      trendCardV1862("Company value", values, compactMoney(lastV), "#f0ca7b") +
+      trendCardV1862("Yearly income", incomes, signedMoney(incomes[incomes.length - 1]), incomes[incomes.length - 1] >= 0 ? "#8faf6c" : "#e9927d") +
+      trendCardV1862("Reputation", reps, round(reps[reps.length - 1]) + "/100", "#7ea0ac") +
+      '</div>';
+  }
+
+  function focusDesk() {
+    var b = focusBusiness();
+    if (!b) return '<div class="v1840-empty">No company selected yet. Pick one above, or use <b>+ New Business</b> below to start or buy one.</div>';
+    ensureBusiness(b);
+    var st = STRUCTURES[b.entityType] || STRUCTURES.soleprop;
+    var tab = companyTabV1862();
+    var tabBar = '<div class="biz1862-tabs v1840-company-tabs">' + COMPANY_TABS_V1862.map(function (p) {
+      return '<button class="biz1862-tab ' + (tab === p[0] ? "selected" : "") + '" onclick="event.preventDefault();event.stopPropagation();setCompanyTabV1862(\'' + p[0] + '\')">' + esc(p[1]) + '</button>';
+    }).join("") + '</div>';
+    var body = tab === "capital" ? companyCapitalBodyV1862(b) : tab === "network" ? locationsPanelV1857(b) : tab === "trends" ? companyTrendsBodyV1862(b) : companyOverviewBodyV1862(b);
+    return '<section class="panel v1840-focus-desk"><div class="v1840-panel-head"><div><div class="section-label">🎯 Focused company</div><h3>' + stageIcon(b.stage) + ' ' + esc(b.name) + '</h3><p>' + esc(st.desc) + '</p></div><strong>' + compactMoney(businessValue(b)) + '<span>' + esc(structureName(b.entityType)) + '</span></strong></div>' +
+      tabBar +
+      '<div class="v1840-company-body">' + body + '</div>' +
+      '</section>';
+  }
+
+  function manageBtn(label, bizId, kind) {
+    return '<button class="v1840-manage-btn" onclick="event.preventDefault();event.stopPropagation();openBizModalV1862(\'' + esc(bizId) + '\',\'' + esc(kind) + '\')">' + label + '</button>';
+  }
+
+  function newBusinessButtonV1862() {
+    return '<div class="v1840-newbiz-row"><button class="v1840-newbiz-btn" onclick="event.preventDefault();event.stopPropagation();openBizModalV1862(\'\',\'new\')">＋ New Business</button></div>';
+  }
+
+  // Start/buy from the New Business popup, then CLOSE it and drop the player onto the new
+  // company focused — instead of leaving them staring at the catalog with no feedback.
+  function focusNewestV1862(beforeIds, preferredId) {
+    var list = businesses();
+    var fresh = list.filter(function (b) { return beforeIds.indexOf(String(b.id)) < 0; });
+    var nb = (preferredId && businessById(preferredId)) || fresh[fresh.length - 1] || list[list.length - 1];
+    if (nb) {
+      var office = businessOfficeV1862();
+      office.focusId = nb.id;
+      office.companyTabV1862 = "overview";
+    }
+    return nb;
+  }
+  window.startVentureV1862 = function (id) {
+    var before = businesses().map(function (b) { return String(b.id); });
+    if (typeof window.startVenture === "function") window.startVenture(id);
+    if (businesses().length > before.length) { focusNewestV1862(before, id); window.closeBizModalV1862(); saveRender("business"); }
+  };
+  window.buyCompanyV1862 = function (id) {
+    var before = businesses().map(function (b) { return String(b.id); });
+    if (typeof window.buyCompany === "function") window.buyCompany(id);
+    if (businesses().length > before.length) { focusNewestV1862(before, null); window.closeBizModalV1862(); saveRender("business"); }
+  };
+
+  // ---- New Business popup: clean vertical grid (NO horizontal rails / double-scroll),
+  //      a scratch/buy toggle, search + category filter. Click a card to start/buy.
+  window.setNewBizModeV1862 = function (mode) {
+    window.__ledgerNewBizModeV1862 = mode === "buy" ? "buy" : "scratch";
+    saveRender("business");
+  };
+  function newVentureCardV1862(v, owned, s) {
+    var exists = owned.some(function (b) { return String(b.id) === String(v.id); });
+    var missing = [];
+    if (n(s.age) < n(v.minAge, 18)) missing.push("Age " + n(v.minAge, 18) + "+");
+    if (n(s.money) < n(v.startup)) missing.push(compactMoney(v.startup) + " cash");
+    if (exists) missing.push("Owned");
+    var ready = !missing.length;
+    var risk = n(v.failureRisk, .12);
+    var riskTag = risk >= .30 ? '<i class="bad">High risk</i>' : risk >= .18 ? '<i class="gold">Medium risk</i>' : '<i class="good">Low risk</i>';
+    var hay = esc(String((v.name || "") + " " + (v.desc || "") + " " + (v.category || "")).toLowerCase());
+    return '<button class="v1840-launch-card ' + (ready ? "ready" : "") + '" data-launch-card="1" data-group="' + esc(v.category || "Business") + '" data-search="' + hay + '" onclick="event.preventDefault();event.stopPropagation();startVentureV1862(\'' + esc(v.id) + '\')" ' + (!ready || typeof window.startVenture !== "function" ? "disabled" : "") + '><span>' + categoryIcon(v.category) + ' ' + esc(v.category || "Business") + '</span><b>' + esc(v.name || v.id) + '</b><em>' + esc(v.desc || "Business path.") + '</em><div class="v1840-company-stats">' + riskTag + '</div><strong>' + (ready ? "Start " + compactMoney(v.startup) : missing.join(" / ")) + '</strong></button>';
+  }
+  function bizNewBusinessBodyV1862() {
+    var s = ensureBusinessState();
+    var filter = launchFilterState();
+    var owned = businesses();
+    var mode = String(window.__ledgerNewBizModeV1862 || "scratch");
+    var toggle = '<div class="biz1862-tabs v1840-company-tabs">' +
+      '<button class="biz1862-tab ' + (mode === "scratch" ? "selected" : "") + '" onclick="event.preventDefault();event.stopPropagation();setNewBizModeV1862(\'scratch\')">🚀 Start from scratch</button>' +
+      '<button class="biz1862-tab ' + (mode === "buy" ? "selected" : "") + '" onclick="event.preventDefault();event.stopPropagation();setNewBizModeV1862(\'buy\')">🤝 Buy existing</button>' +
+      '</div>';
+    if (mode === "buy") {
+      var acq = acquisitionMarketV1862();
+      var acards = acq.map(function (v) {
+        var price = n(v.buy || n(v.startup) * 2 || 50000);
+        var missing = [];
+        if (n(s.age) < n(v.minAge, 18)) missing.push("Age " + n(v.minAge, 18) + "+");
+        if (n(s.money) < price) missing.push(compactMoney(price) + " cash");
+        var ready = !missing.length;
+        return '<button class="v1840-launch-card ' + (ready ? "ready" : "") + '" onclick="event.preventDefault();event.stopPropagation();buyCompanyV1862(\'' + esc(v.id) + '\')" ' + (!ready || typeof window.buyCompany !== "function" ? "disabled" : "") + '><span>' + categoryIcon(v.category) + ' ' + esc(v.category || "Acquisition") + '</span><b>' + esc(v.name || v.id) + '</b><em>' + esc(v.desc || "Buy an existing company.") + '</em><strong>' + (ready ? "Buy ~" + compactMoney(price) : missing.join(" / ")) + '</strong></button>';
+      }).join("");
+      return toggle + '<div class="v1840-newbiz-grid">' + (acards || '<div class="v1840-empty">No companies for sale right now.</div>') + '</div>';
+    }
+    var fullCatalog = businessCatalog().filter(function (v) { return v && v.id && String(v.id).indexOf("acq_") !== 0; });
+    if (!fullCatalog.length) return toggle + '<div class="v1840-empty">No ventures available yet.</div>';
+    var catMinCost = {};
+    fullCatalog.forEach(function (v) { var c = v.category || "Business"; var sc = n(v.startup); if (catMinCost[c] == null || sc < catMinCost[c]) catMinCost[c] = sc; });
+    var byCheap = function (a, b) { return n(catMinCost[a]) - n(catMinCost[b]); };
+    var categories = Object.keys(catMinCost).sort(byCheap);
+    var catOptions = '<option value="all"' + (filter.category === "all" ? " selected" : "") + '>All categories</option>' + categories.map(function (c) { return '<option value="' + esc(c) + '"' + (filter.category === c ? " selected" : "") + '>' + esc(categoryIcon(c)) + ' ' + esc(c) + '</option>'; }).join("");
+    var controls = '<div class="v1840-launch-controls"><input type="text" placeholder="🔍 Search ventures..." value="' + esc(filter.search) + '" oninput="setLaunchSearchV1850(this.value)"><select onchange="setLaunchFilterV1850(\'category\', this.value)">' + catOptions + '</select></div>';
+    var shown = filter.category === "all" ? fullCatalog : fullCatalog.filter(function (v) { return (v.category || "Business") === filter.category; });
+    var groups = {}, order = [];
+    shown.forEach(function (v) { var c = v.category || "Business"; if (!groups[c]) { groups[c] = []; order.push(c); } groups[c].push(v); });
+    order.sort(byCheap);
+    var sections = order.map(function (c) {
+      groups[c].sort(function (a, b) { return n(a.startup) - n(b.startup); });
+      return '<div class="v1840-launch-group" data-launch-group="' + esc(c) + '"><div class="v1840-launch-group-label">' + categoryIcon(c) + ' ' + esc(c) + '</div><div class="v1840-newbiz-grid">' + groups[c].map(function (v) { return newVentureCardV1862(v, owned, s); }).join("") + '</div></div>';
+    }).join("");
+    return toggle + controls + (sections || '<div class="v1840-empty">No ventures match that search.</div>');
+  }
+
+  // ---- management popup bodies (lifted from the old inline focus desk) -------
+  function bizCashBodyV1862(b) {
+    ensureBusiness(b);
+    var id = safeId(b.id);
+    var eid = esc(b.id);
+    var distMax = Math.max(0, round(b.retainedEarnings));
+    return '<div class="v1851-cash-explain"><b>' + compactMoney(b.retainedEarnings) + '</b> is held inside the company &mdash; this is <b>not</b> your personal checking. (Taxes &amp; compliance are paid in the <b>Taxes</b> popup.)</div>' +
+      '<div class="v1840-cash-grid">' +
+      '<div class="v1851-cash-group"><span class="v1851-cash-label">🧍 Take it out &rarr; checking</span>' +
+      '<div class="v1840-action-strip">' +
+      actionButton("Distribute All", "distributeBusinessCashV1830('" + eid + "','all')", "green", !distMax || typeof window.distributeBusinessCashV1830 !== "function") +
+      actionButton("Pay $25K Salary", "payOwnerSalaryV1830('" + eid + "',25000)", "blue", !distMax || typeof window.payOwnerSalaryV1830 !== "function") +
+      '</div>' +
+      customRow("v1830-dist-" + id, distMax, "distributeBusinessCashV1830('" + eid + "','custom')", "Distribute", "green", typeof window.distributeBusinessCashV1830 !== "function") +
+      '</div>' +
+      '<div class="v1851-cash-group"><span class="v1851-cash-label">📈 Reinvest &rarr; grows value</span>' +
+      '<div class="v1840-action-strip">' +
+      actionButton("Reinvest Half", "reinvestBusinessCashV1830('" + eid + "','half')", "gold", !distMax || typeof window.reinvestBusinessCashV1830 !== "function") +
+      '</div>' +
+      customRow("v1830-reinvest-" + id, distMax, "reinvestBusinessCashV1830('" + eid + "','custom')", "Reinvest", "gold", typeof window.reinvestBusinessCashV1830 !== "function") +
+      '</div>' +
+      '</div>' +
+      '<div class="v1840-rename-row"><input id="v1840-rename-' + esc(id) + '" placeholder="Rename company"><button class="money-btn" onclick="event.preventDefault();event.stopPropagation();renameBusinessV1840(\'' + eid + '\',\'v1840-rename-' + esc(id) + '\')">Rename</button></div>';
+  }
+
+  // 💰 Founder capital — invest (equity) / lend (owner loan) into THIS company.
+  // Replaces the old global "Founder Capital" list that ignored tabs and duplicated the rail.
+  function bizCapitalBodyV1862(b) {
+    ensureBusiness(b);
+    var eid = esc(b.id);
+    var cid = "v1862-cap-" + safeId(b.id);
+    var money = Math.max(0, round(stateNow().money));
+    return '<div class="v1851-cash-explain">Put your own money in. <b>Invest</b> adds equity (raises value + reputation, no repayment). <b>Lend</b> is an owner loan the business repays yearly with interest. Your checking: <b>' + compactMoney(money) + '</b>.</div>' +
+      '<div class="v1840-action-strip">' +
+      actionButton("Invest $10K", "injectVentureCapitalV1860('" + eid + "',10000)", "green", money < 10000 || typeof window.injectVentureCapitalV1860 !== "function") +
+      actionButton("Invest $100K", "injectVentureCapitalV1860('" + eid + "',100000)", "green", money < 100000 || typeof window.injectVentureCapitalV1860 !== "function") +
+      actionButton("Lend $25K", "lendVentureCapitalV1860('" + eid + "',25000)", "blue", money < 25000 || typeof window.lendVentureCapitalV1860 !== "function") +
+      actionButton("Lend $250K", "lendVentureCapitalV1860('" + eid + "',250000)", "blue", money < 250000 || typeof window.lendVentureCapitalV1860 !== "function") +
+      '</div>' +
+      '<div class="v1840-custom-row"><input id="' + cid + '" inputmode="numeric" placeholder="Custom $">' +
+      actionButton("Invest", "injectVentureCustomV1860('" + eid + "','" + cid + "')", "green", typeof window.injectVentureCustomV1860 !== "function") +
+      actionButton("Lend", "lendVentureCustomV1860('" + eid + "','" + cid + "')", "blue", typeof window.lendVentureCustomV1860 !== "function") +
+      '</div>';
+  }
+
+  // 🧾 Company taxes & admin obligations (paid from company cash).
+  function bizTaxesBodyV1862(b) {
+    ensureBusiness(b);
+    var eid = esc(b.id);
+    var distMax = Math.max(0, round(b.retainedEarnings));
+    var entityDebt = Math.max(0, round(b.entityTaxDebt));
+    var compliance = Math.max(0, round(b.complianceDue));
+    return '<div class="v1851-cash-explain">Company taxes &amp; admin bills are paid from <b>company cash</b> (' + compactMoney(b.retainedEarnings) + '). Entity tax owed: <b>' + compactMoney(entityDebt) + '</b> &middot; Compliance due: <b>' + compactMoney(compliance) + '</b>.</div>' +
+      '<div class="v1840-action-strip">' +
+      actionButton(entityDebt ? "Pay Tax " + compactMoney(entityDebt) : "No tax due", "payBusinessEntityTaxV1830('" + eid + "','all')", "red", !entityDebt || !distMax || typeof window.payBusinessEntityTaxV1830 !== "function") +
+      actionButton(compliance ? "Pay Compliance " + compactMoney(compliance) : "No compliance due", "payBusinessComplianceV1830('" + eid + "')", "gold", !compliance || !distMax || typeof window.payBusinessComplianceV1830 !== "function") +
+      '</div>';
+  }
+
+  function bizStructureBodyV1862(b) {
+    ensureBusiness(b);
     var entityOptions = Object.keys(STRUCTURES).map(function (key) {
       var option = STRUCTURES[key];
       var locked = n(b.value) < option.minValue;
       var active = b.entityType === key;
       return '<button class="v1840-option ' + (active ? "active" : "") + '" onclick="event.preventDefault();event.stopPropagation();setBusinessEntityV1830(\'' + esc(b.id) + '\',\'' + esc(key) + '\')" ' + (active || locked || typeof window.setBusinessEntityV1830 !== "function" ? "disabled" : "") + '><span>' + esc(option.name) + '</span><b>' + compactMoney(option.cost) + '</b><em>' + (locked ? "Needs " + compactMoney(option.minValue) + " value" : esc(option.desc)) + '</em></button>';
     }).join("");
-    var opsBudget = distMax + Math.max(0, round(stateNow().money)); // company + personal
+    return '<div class="v1840-option-rail">' + entityOptions + '</div>';
+  }
+
+  function bizTeamBodyV1862(b) {
+    ensureBusiness(b);
+    var opsBudget = Math.max(0, round(b.retainedEarnings)) + Math.max(0, round(stateNow().money));
     var ops = Object.keys(OPS).map(function (key) {
       var op = OPS[key];
       var active = b.ops && b.ops[key];
       return '<button class="v1840-option ' + (active ? "active" : "") + '" onclick="event.preventDefault();event.stopPropagation();hireBusinessOpsV1830(\'' + esc(b.id) + '\',\'' + esc(key) + '\')" ' + (active || opsBudget < op.cost || typeof window.hireBusinessOpsV1830 !== "function" ? "disabled" : "") + '><span>' + esc(op.name) + '</span><b>' + compactMoney(op.cost) + '</b><em>' + esc(op.note) + '</em></button>';
     }).join("");
-    return '<section class="panel v1840-focus-desk"><div class="v1840-panel-head"><div><div class="section-label">🎯 Focused company</div><h3>' + stageIcon(b.stage) + ' ' + esc(b.name) + '</h3><p>' + esc(st.desc) + '</p></div><strong>' + compactMoney(businessValue(b)) + '<span>' + esc(structureName(b.entityType)) + '</span></strong></div>' +
-      '<div class="v1840-metric-grid">' +
-      metric("Company cash", compactMoney(b.retainedEarnings), "Inside the business. Distribute, reinvest, or pay tax below.", "good") +
-      metric("Last income", signedMoney(b.lastIncome), n(b.lastEnterpriseYieldV1851) > 0 ? "Operations + " + compactMoney(b.lastEnterpriseYieldV1851) + " yield on company value." : "Last year's business result (after the sector meter).", n(b.lastIncome) >= 0 ? "good" : "bad") +
-      metric("Auto dividend / yr", compactMoney(b.lastDividend), b.stage === "startup" ? "Reach Growing stage to start paying an automatic yearly dividend to your checking." : "Paid to your personal checking automatically every year on top of income.", n(b.lastDividend) > 0 ? "good" : "gold") +
-      metric("Entity debt", compactMoney(entityDebt), "Company tax balance.", entityDebt ? "bad" : "good") +
-      metric("Protection", pct(n(st.shield) + (b.ops && b.ops.counsel ? .12 : 0) + (b.ops && b.ops.insurance ? .1 : 0)), "Entity and ops shield.", "gold") +
-      '</div>' +
-      '<div class="row"><div><div class="row-title">⭐ Reputation: ' + round(b.reputation) + '/100</div><div class="row-sub">' + reputationBar(b.reputation) + '</div></div></div>' +
-      riskPanel(b) +
-      sectorMeterRow(b) +
-      locationsPanelV1857(b) +
-      (typeof window.renderBizChallengesPanelV1853 === "function" ? window.renderBizChallengesPanelV1853(b) : "") +
-      '<div class="v1840-action-strip">' +
-      actionButton("Work", "workVenture('" + esc(b.id) + "')", "blue", typeof window.workVenture !== "function" || (stateNow().actionsTaken || {})["venture_" + b.id]) +
-      actionButton("Market", "bizAction('" + esc(b.id) + "','market')", "blue", typeof window.bizAction !== "function" || (stateNow().actionsTaken || {})["biz_" + b.id + "_market"]) +
-      actionButton("Upgrade", "bizAction('" + esc(b.id) + "','equipment')", "gold", typeof window.bizAction !== "function" || (stateNow().actionsTaken || {})["biz_" + b.id + "_equipment"]) +
-      (signatureAction ? actionButton(signatureAction.icon + " " + signatureAction.label, "runVentureSignatureActionV1850('" + esc(b.id) + "')", "gold", signatureUsed || typeof window.runVentureSignatureActionV1850 !== "function") : "") +
-      (secondAction ? actionButton(secondAction.icon + " " + secondAction.label, "runVentureSecondActionV1852('" + esc(b.id) + "')", "green", secondUsed || typeof window.runVentureSecondActionV1852 !== "function") : "") +
-      actionButton("Sell", "sellVenture('" + esc(b.id) + "')", "red", typeof window.sellVenture !== "function") +
-      '</div>' +
-      '<div class="v1840-two-col"><div><div class="section-label">🏗️ Entity structure</div><div class="v1840-option-rail">' + entityOptions + '</div></div><div><div class="section-label">👥 Operations team</div><div class="v1840-option-rail">' + ops + '</div></div></div>' +
-      '<div class="v1840-two-col"><div><div class="section-label">🏗️ Assets</div>' + assetRows(b) + '</div><div><div class="section-label">📜 Asset history</div>' + assetHistoryFeed(b) + '</div></div>' +
-      '<div><div class="section-label">📰 Recent market events</div>' + eventHistoryFeed(b) + '</div>' +
-      '<div class="v1840-two-col"><div><div class="section-label">💵 Company cash: where it can go</div>' +
-      '<div class="v1851-cash-explain"><b>' + compactMoney(b.retainedEarnings) + '</b> is held inside the company &mdash; this is <b>not</b> your personal checking. Move it three ways:</div>' +
-      '<div class="v1851-cash-group"><span class="v1851-cash-label">🧍 Take it out &rarr; your personal checking</span>' +
-      '<div class="v1840-action-strip">' +
-      actionButton("Distribute All", "distributeBusinessCashV1830('" + esc(b.id) + "','all')", "green", !distMax || typeof window.distributeBusinessCashV1830 !== "function") +
-      actionButton("Pay $25K Salary", "payOwnerSalaryV1830('" + esc(b.id) + "',25000)", "blue", !distMax || typeof window.payOwnerSalaryV1830 !== "function") +
-      '</div>' +
-      customRow("v1830-dist-" + id, distMax, "distributeBusinessCashV1830('" + esc(b.id) + "','custom')", "Distribute", "green", typeof window.distributeBusinessCashV1830 !== "function") +
-      '</div>' +
-      '<div class="v1851-cash-group"><span class="v1851-cash-label">📈 Reinvest &rarr; grows company value</span>' +
-      '<div class="v1840-action-strip">' +
-      actionButton("Reinvest Half", "reinvestBusinessCashV1830('" + esc(b.id) + "','half')", "gold", !distMax || typeof window.reinvestBusinessCashV1830 !== "function") +
-      '</div>' +
-      customRow("v1830-reinvest-" + id, distMax, "reinvestBusinessCashV1830('" + esc(b.id) + "','custom')", "Reinvest", "gold", typeof window.reinvestBusinessCashV1830 !== "function") +
-      '</div>' +
-      '<div class="v1851-cash-group"><span class="v1851-cash-label">🧾 Pay company obligations</span>' +
-      '<div class="v1840-action-strip">' +
-      actionButton(entityDebt ? "Pay Tax " + compactMoney(entityDebt) : "Pay Tax", "payBusinessEntityTaxV1830('" + esc(b.id) + "','all')", "red", !entityDebt || !distMax || typeof window.payBusinessEntityTaxV1830 !== "function") +
-      actionButton(compliance ? "Pay Compliance " + compactMoney(compliance) : "Pay Compliance", "payBusinessComplianceV1830('" + esc(b.id) + "')", "", !compliance || !distMax || typeof window.payBusinessComplianceV1830 !== "function") +
-      '</div></div>' +
-      '</div><div><div class="section-label">Nameplate</div><div class="v1840-rename-row"><input id="v1840-rename-' + esc(id) + '" placeholder="Rename company"><button class="money-btn" onclick="event.preventDefault();event.stopPropagation();renameBusinessV1840(\'' + esc(b.id) + '\',\'v1840-rename-' + esc(id) + '\')">Rename</button></div><p class="v1840-note">Business value is not checking. Distributions and salaries become personal cash; retained earnings stay inside the company.</p></div></div>' +
-      '</section>';
+    return '<div class="v1840-option-rail">' + ops + '</div>';
+  }
+
+  function bizAssetsBodyV1862(b) {
+    ensureBusiness(b);
+    return '<div class="v1840-asset-rows">' + assetRows(b) + '</div>';
+  }
+
+  var BIZ_MODAL_META_V1862 = {
+    capital: { icon: "💰", title: "Founder capital" },
+    cash: { icon: "💵", title: "Company cash" },
+    taxes: { icon: "🧾", title: "Company taxes" },
+    structure: { icon: "🏗️", title: "Entity structure" },
+    team: { icon: "👥", title: "Operations team" },
+    assets: { icon: "🛠️", title: "Assets" },
+    network: { icon: "🌐", title: "Network + market share" },
+    family: { icon: "👨‍👩‍👧", title: "Family & succession" },
+    "new": { icon: "🚀", title: "New business" }
+  };
+  // Kinds that aren't tied to one focused company (open from a global button).
+  var GLOBAL_MODAL_KINDS_V1862 = { family: 1, "new": 1 };
+
+  function buildBizModalV1862(bizId, kind) {
+    var meta = BIZ_MODAL_META_V1862[kind] || { icon: "⚙️", title: "Manage" };
+    // Global popups don't need a focused company.
+    if (kind === "new") return { icon: meta.icon, title: meta.title, html: safeSection("newBusiness", bizNewBusinessBodyV1862), biz: null };
+    if (kind === "family") return { icon: meta.icon, title: meta.title, html: safeSection("familyEnterpriseDesk", familyEnterpriseDesk) + safeSection("historyDesk", historyDesk), biz: null };
+    var b = businessById(bizId);
+    if (!b) return { icon: meta.icon, title: meta.title, html: '<div class="v1840-empty">Company not found.</div>', biz: null };
+    ensureBusiness(b);
+    var html = "";
+    if (kind === "capital") html = bizCapitalBodyV1862(b);
+    else if (kind === "cash") html = bizCashBodyV1862(b);
+    else if (kind === "taxes") html = bizTaxesBodyV1862(b);
+    else if (kind === "structure") html = bizStructureBodyV1862(b);
+    else if (kind === "team") html = bizTeamBodyV1862(b);
+    else if (kind === "assets") html = bizAssetsBodyV1862(b);
+    else if (kind === "network") html = locationsPanelV1857(b);
+    else html = '<div class="v1840-empty">Nothing to manage here.</div>';
+    return { icon: meta.icon, title: meta.title, html: html, biz: b };
+  }
+  window.buildBizModalV1862 = buildBizModalV1862;
+
+  // ---- management popup overlay (Verdant style; reuses renderPopup's look) ----
+  var _bizModalV1862 = null; // { bizId, kind } or null
+  function bizModalInnerV1862() {
+    if (!_bizModalV1862) return "";
+    var built = buildBizModalV1862(_bizModalV1862.bizId, _bizModalV1862.kind);
+    return '<div class="biz-manage-card" role="dialog" aria-modal="true">' +
+      '<button class="biz-manage-x" aria-label="Close" onclick="event.preventDefault();event.stopPropagation();closeBizModalV1862()">×</button>' +
+      '<div class="biz-manage-head"><span>' + esc((built.biz && built.biz.name) || "Business office") + '</span><h3>' + esc(built.icon) + ' ' + esc(built.title) + '</h3></div>' +
+      '<div class="biz-manage-body">' + built.html + '</div>' +
+      '</div>';
+  }
+  window.openBizModalV1862 = function (bizId, kind) {
+    if (typeof document === "undefined" || !document.createElement) return;
+    _bizModalV1862 = { bizId: bizId, kind: kind };
+    var overlay = document.getElementById("biz-manage-overlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "biz-manage-overlay";
+      overlay.addEventListener("click", function (e) { if (e.target === overlay) window.closeBizModalV1862(); });
+      (document.body || document.documentElement).appendChild(overlay);
+      if (!window.__bizModalKeyV1862) {
+        window.__bizModalKeyV1862 = function (e) {
+          if ((e.key === "Escape" || e.keyCode === 27) && document.getElementById("biz-manage-overlay")) { e.preventDefault(); window.closeBizModalV1862(); }
+        };
+        document.addEventListener("keydown", window.__bizModalKeyV1862, true);
+      }
+    }
+    overlay.innerHTML = bizModalInnerV1862();
+  };
+  window.closeBizModalV1862 = function () {
+    _bizModalV1862 = null;
+    var overlay = typeof document !== "undefined" && document.getElementById ? document.getElementById("biz-manage-overlay") : null;
+    if (overlay) overlay.remove();
+  };
+  // Called at the end of the hub render: management actions re-render the hub, so rebuild the
+  // open popup's body in place with fresh values instead of leaving stale numbers.
+  function refreshBizModalV1862() {
+    if (!_bizModalV1862 || typeof document === "undefined" || !document.getElementById) return;
+    var overlay = document.getElementById("biz-manage-overlay");
+    if (!overlay) { _bizModalV1862 = null; return; }
+    // Per-company popups close if their company is gone; global popups (new/family) always refresh.
+    if (!GLOBAL_MODAL_KINDS_V1862[_bizModalV1862.kind] && !businessById(_bizModalV1862.bizId)) { window.closeBizModalV1862(); return; }
+    overlay.innerHTML = bizModalInnerV1862();
   }
 
   function familyEnterpriseDesk() {
@@ -1915,7 +2273,6 @@
       actionButton("Heir Education", "holdFamilyCouncilV1840('education')", "blue", !legalTrustActive()) +
       '</div></div><div><div class="section-label">🏛️ Governance rail</div><div class="v1840-option-rail">' + governanceCards + '</div></div></div>' +
       focusedTrust +
-      historyDesk() +
       '</section>';
   }
 
@@ -2043,7 +2400,7 @@
         var risk = n(v.failureRisk, .12);
         var riskTag = risk >= .30 ? '<i class="bad">High risk</i>' : risk >= .18 ? '<i class="gold">Medium risk</i>' : '<i class="good">Low risk</i>';
         var searchHay = esc(String((v.name || "") + " " + (v.desc || "") + " " + (v.category || "")).toLowerCase());
-        return '<button class="v1840-launch-card ' + (ready ? "ready" : "") + '" data-launch-card="1" data-group="' + esc(cat) + '" data-search="' + searchHay + '" onclick="event.preventDefault();event.stopPropagation();startVenture(\'' + esc(v.id) + '\')" ' + (!ready || typeof window.startVenture !== "function" ? "disabled" : "") + '><span>' + categoryIcon(v.category) + ' ' + esc(v.category || "Business") + '</span><b>' + esc(v.name || v.id) + '</b><em>' + esc(v.desc || "Business path.") + '</em><div class="v1840-company-stats">' + riskTag + '</div><strong>' + (ready ? "Start " + compactMoney(v.startup) : missing.join(" / ")) + '</strong></button>';
+        return '<button class="v1840-launch-card ' + (ready ? "ready" : "") + '" data-launch-card="1" data-group="' + esc(cat) + '" data-search="' + searchHay + '" onclick="event.preventDefault();event.stopPropagation();startVentureV1862(\'' + esc(v.id) + '\')" ' + (!ready || typeof window.startVenture !== "function" ? "disabled" : "") + '><span>' + categoryIcon(v.category) + ' ' + esc(v.category || "Business") + '</span><b>' + esc(v.name || v.id) + '</b><em>' + esc(v.desc || "Business path.") + '</em><div class="v1840-company-stats">' + riskTag + '</div><strong>' + (ready ? "Start " + compactMoney(v.startup) : missing.join(" / ")) + '</strong></button>';
       }).join("");
       return '<div class="v1840-launch-group" data-launch-group="' + esc(cat) + '"><div class="v1840-launch-group-label">' + categoryIcon(cat) + ' ' + esc(cat) + '</div><div class="v1840-rail">' + cards + '</div></div>';
     }).join("");
@@ -2055,7 +2412,7 @@
 
   function acquisitionRail() {
     var s = ensureBusinessState();
-    var catalog = acquisitionCatalog().slice(0, 18);
+    var catalog = acquisitionMarketV1862();
     if (!catalog.length) return "";
     var cards = catalog.map(function (v) {
       var price = n(v.buy || n(v.startup) * 2 || 50000);
@@ -2063,7 +2420,7 @@
       if (n(s.age) < n(v.minAge, 18)) missing.push("Age " + n(v.minAge, 18) + "+");
       if (n(s.money) < price) missing.push(compactMoney(price) + " cash");
       var ready = !missing.length;
-      return '<button class="v1840-launch-card acquisition ' + (ready ? "ready" : "") + '" onclick="event.preventDefault();event.stopPropagation();buyCompany(\'' + esc(v.id) + '\')" ' + (!ready || typeof window.buyCompany !== "function" ? "disabled" : "") + '><span>' + categoryIcon(v.category) + ' ' + esc(v.category || "Acquisition") + '</span><b>' + esc(v.name || v.id) + '</b><em>' + esc(v.desc || "Buy an existing company.") + '</em><strong>' + (ready ? "Buy around " + compactMoney(price) : missing.join(" / ")) + '</strong></button>';
+      return '<button class="v1840-launch-card acquisition ' + (ready ? "ready" : "") + '" onclick="event.preventDefault();event.stopPropagation();buyCompanyV1862(\'' + esc(v.id) + '\')" ' + (!ready || typeof window.buyCompany !== "function" ? "disabled" : "") + '><span>' + categoryIcon(v.category) + ' ' + esc(v.category || "Acquisition") + '</span><b>' + esc(v.name || v.id) + '</b><em>' + esc(v.desc || "Buy an existing company.") + '</em><strong>' + (ready ? "Buy around " + compactMoney(price) : missing.join(" / ")) + '</strong></button>';
     }).join("");
     return '<section class="panel v1840-launch-board"><div class="v1840-panel-head"><div><div class="section-label">🤝 Acquisition market</div><h3>Buy existing companies</h3></div><span>Purchases create one focused company card.</span></div><div class="v1840-rail">' + cards + '</div></section>';
   }
@@ -2145,18 +2502,50 @@
       return "";
     }
   }
+  // The "what happened" tab: enterprise ledger + the focused company's market events & asset log.
+  function ledgerTab() {
+    var b = focusBusiness();
+    var out = safeSection("historyDesk", historyDesk);
+    if (b) {
+      ensureBusiness(b);
+      out += '<section class="panel"><div class="section-label">📰 ' + esc(b.name) + ' — recent market events</div>' + eventHistoryFeed(b) +
+        '<div class="section-label" style="margin-top:12px">📜 Asset history</div>' + assetHistoryFeed(b) + '</section>';
+    }
+    if (!out) return '<div class="v1840-empty">No history yet. Run your companies a few years and events will show up here.</div>';
+    return out;
+  }
+
+  function businessOfficeV1862() {
+    var f = ensureBusinessState().finance;
+    if (!f.businessOfficeV1840 || typeof f.businessOfficeV1840 !== "object") f.businessOfficeV1840 = {};
+    return f.businessOfficeV1840;
+  }
+  // Back-compat: old top-tab calls map onto the focused-company sub-tabs / popups.
+  window.setBusinessTabV1862 = function (tab) {
+    var t = String(tab || "").toLowerCase();
+    if (t === "capital" || t === "network" || t === "overview") return window.setCompanyTabV1862(t);
+    if (t === "new" || t === "grow") return window.openBizModalV1862("", "new");
+    if (t === "family") return window.openBizModalV1862("", "family");
+    saveRender("business");
+  };
+
+  // Company-centric, no top tabs: portfolio snapshot + your companies (click to focus) +
+  // the focused company with its own mini-tabs + a "New Business" button at the bottom.
+  // Family and New Business are popups; everything detailed lives in the company's popups.
   function renderBusinessHub() {
     try { ensureBusinessState(); } catch (e) {}
-    return '<div class="v1840-business-shell">' +
+    var html = '<div class="v1840-business-shell">' +
       safeSection("hero", hero) +
       safeSection("kpis", kpis) +
-      safeSection("entrepreneurshipShortcut", entrepreneurshipShortcut) +
       safeSection("businessRail", businessRail) +
       safeSection("focusDesk", focusDesk) +
-      safeSection("launchRail", launchRail) +
-      safeSection("acquisitionRail", acquisitionRail) +
-      safeSection("familyEnterpriseDesk", familyEnterpriseDesk) +
+      newBusinessButtonV1862() +
+      safeSection("founderMode", founderMode) +
+      safeSection("entrepreneurshipShortcut", entrepreneurshipShortcut) +
       '</div>';
+    // Keep an open management popup in sync with the freshly-rendered state.
+    try { refreshBizModalV1862(); } catch (e) {}
+    return html;
   }
 
   var previousRenderHubContent = window.renderHubContent || (typeof renderHubContent === "function" ? renderHubContent : null);
@@ -2179,7 +2568,15 @@
     var style = document.createElement("style");
     style.textContent = [
       ".hub-overlay.hub-business .hub-head,.hub-overlay.hub-entrepreneurship .hub-head{position:sticky!important;top:0!important;z-index:8!important;background:linear-gradient(180deg,rgba(18,14,10,1),rgba(18,14,10,.92))!important;box-shadow:0 1px 0 rgba(255,255,255,.05)}",
-      ".v1840-business-shell{display:grid;gap:14px;padding:4px 0 96px;color:#f6ead8;min-width:0}.v1840-business-shell *{box-sizing:border-box}.v1840-business-shell .panel{min-width:0;overflow:hidden;border:1px solid rgba(216,173,109,.22);border-radius:12px;background:linear-gradient(135deg,rgba(34,30,23,.96),rgba(22,19,15,.96));padding:14px}.v1840-business-shell .section-label{font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.16em;color:#d8b16e;font-size:10px;margin-bottom:9px}",
+      ".v1840-business-shell{display:grid;gap:16px;padding:4px 0 96px;color:#f6ead8;min-width:0}.v1840-business-shell *{box-sizing:border-box}.v1840-business-shell .panel{min-width:0;overflow:hidden;border:1px solid rgba(216,173,109,.22);border-radius:12px;background:linear-gradient(135deg,rgba(34,30,23,.96),rgba(22,19,15,.96));padding:14px}.v1840-business-shell .section-label{font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.16em;color:#d8b16e;font-size:10px;margin-bottom:9px}",
+      ".v1840-zone{position:relative;display:grid;gap:12px;padding:14px 14px 16px 18px;border:1px solid rgba(255,255,255,.07);border-radius:16px;background:linear-gradient(135deg,rgba(28,24,18,.45),rgba(17,15,11,.45))}.v1840-zone::before{content:'';position:absolute;left:0;top:12px;bottom:12px;width:4px;border-radius:999px;background:var(--zacc,#d8b16e);box-shadow:0 0 14px var(--zacc,#d8b16e)}.v1840-zone[data-accent=gold]{--zacc:#f0ca7b}.v1840-zone[data-accent=blue]{--zacc:#7ea0ac}.v1840-zone[data-accent=green]{--zacc:#8faf6c}.v1840-zone[data-accent=violet]{--zacc:#b49bd8}.v1840-zone-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}.v1840-zone-label{font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.2em;color:var(--zacc,#d8b16e);font-size:12px;font-weight:600}.v1840-zone-head em{font-family:'JetBrains Mono',monospace;font-style:normal;color:#9a8c75;font-size:10px}.v1840-zone>.panel,.v1840-zone>section{margin:0!important}.v1840-zone .v1840-focus-desk,.v1840-zone .v1840-family-enterprise{margin-top:0}",
+      ".v1840-focus-desk{display:grid;gap:11px}.v1840-focus-desk>.v1840-panel-head{margin-bottom:2px}.v1840-primary-actions{margin:0}.v1840-disc{border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(255,255,255,.03);overflow:hidden}.v1840-disc>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:11px 13px}.v1840-disc>summary::-webkit-details-marker{display:none}.v1840-disc>summary::after{content:'\\25B8';margin-left:auto;color:#9a8c75;font-size:12px;transition:transform .15s}.v1840-disc[open]>summary::after{transform:rotate(90deg)}.v1840-disc>summary span{font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.14em;color:#d8b16e;font-size:11px}.v1840-disc>summary b{font-size:17px;color:#f0ca7b}.v1840-disc>summary b.good{color:#b9dc8a}.v1840-disc>summary b.bad{color:#e9927d}.v1840-disc>summary i{font-style:normal;color:#9a8c75;font-family:'JetBrains Mono',monospace;font-size:10px}.v1840-disc[open]>summary{border-bottom:1px solid rgba(255,255,255,.07)}.v1840-risk-disc .v1856-risk-panel{margin:0;border:none;background:transparent;padding:11px 13px}.v1840-manage-body{padding:12px 13px;display:grid;gap:13px}.v1840-cash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}.v1840-manage-body .v1840-rename-row{margin-top:0}",
+      ".v1840-tabs{margin:2px 0 2px}.v1840-tabpanel{position:relative;display:grid;gap:14px;padding:14px 2px 2px}.v1840-tabpanel::before{content:'';position:absolute;left:0;right:0;top:0;height:2px;border-radius:999px;background:var(--zacc,#d8b16e);opacity:.7;box-shadow:0 0 12px var(--zacc,#d8b16e)}.v1840-tabpanel[data-accent=gold]{--zacc:#f0ca7b}.v1840-tabpanel[data-accent=blue]{--zacc:#7ea0ac}.v1840-tabpanel[data-accent=green]{--zacc:#8faf6c}.v1840-tabpanel[data-accent=violet]{--zacc:#b49bd8}",
+      ".v1840-manage-label{margin-top:4px!important}.v1840-manage-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}.v1840-manage-btn{border:1px solid rgba(216,173,109,.30);border-radius:11px;background:linear-gradient(135deg,rgba(216,173,109,.10),rgba(255,255,255,.03));color:#f6ead8;font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.03em;padding:13px 10px;cursor:pointer;transition:border-color .12s,background .12s,transform .08s}.v1840-manage-btn:hover{border-color:rgba(240,202,123,.6);background:linear-gradient(135deg,rgba(216,173,109,.18),rgba(255,255,255,.05))}.v1840-manage-btn:active{transform:translateY(1px)}",
+      ".v1840-newbiz-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:8px}.v1840-newbiz-grid .v1840-launch-card{flex:initial;min-height:0;scroll-snap-align:none}.biz-manage-body .v1840-launch-group{margin-top:6px}.biz-manage-body .v1840-launch-controls{position:sticky;top:0;z-index:2;background:linear-gradient(180deg,rgba(22,19,15,.98),rgba(22,19,15,.9));padding:4px 0 8px}",
+      ".v1840-trend-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:4px}.v1840-trend-card{border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(255,255,255,.04);padding:12px}.v1840-trend-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}.v1840-trend-head span{font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.12em;color:#aa9a82;font-size:9px}.v1840-trend-head b{color:#fff3df;font-size:16px}.v1840-spark{width:100%;height:46px;display:block}",
+      ".v1840-company-tabs{margin:10px 0 4px}.v1840-company-body{display:grid;gap:11px}.v1840-newbiz-row{display:flex;justify-content:center;margin:4px 0 2px}.v1840-newbiz-btn{width:100%;border:1px dashed rgba(143,175,108,.5);border-radius:12px;background:linear-gradient(135deg,rgba(143,175,108,.12),rgba(255,255,255,.03));color:#cfe3b4;font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:.06em;padding:14px;cursor:pointer;transition:border-color .12s,background .12s}.v1840-newbiz-btn:hover{border-color:rgba(143,175,108,.85);background:linear-gradient(135deg,rgba(143,175,108,.2),rgba(255,255,255,.05))}",
+      "#biz-manage-overlay{position:fixed;inset:0;background:rgba(0,0,0,.66);z-index:2147482000;display:flex;align-items:center;justify-content:center;padding:18px;animation:bizMgFade .16s ease}@keyframes bizMgFade{0%{opacity:0;transform:scale(.98)}100%{opacity:1;transform:scale(1)}}.biz-manage-card{position:relative;max-width:780px;width:100%;max-height:88vh;overflow:auto;background:linear-gradient(135deg,rgba(30,26,20,.99),rgba(18,16,12,.99));border:1px solid rgba(216,173,109,.4);border-radius:16px;box-shadow:0 28px 70px rgba(0,0,0,.6);color:#f6ead8}.biz-manage-x{position:absolute;top:10px;right:12px;z-index:3;width:32px;height:32px;border:none;border-radius:9px;background:rgba(0,0,0,.32);color:#f3efe4;font-size:19px;line-height:1;cursor:pointer}.biz-manage-x:hover{background:rgba(0,0,0,.5)}.biz-manage-head{padding:18px 20px 14px;border-bottom:1px solid rgba(216,173,109,.22);background:linear-gradient(135deg,rgba(216,173,109,.10),transparent)}.biz-manage-head span{display:block;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.16em;color:#d8b16e;font-size:9px;margin-bottom:5px}.biz-manage-head h3{margin:0;font-size:22px;padding-right:30px}.biz-manage-body{padding:16px 18px 20px;display:grid;gap:12px}.biz-manage-body .v1857-location-panel,.biz-manage-body .v1856-risk-panel{margin:0}",
       ".v1840-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:end;border:1px solid rgba(143,175,108,.46);border-radius:16px;background:radial-gradient(circle at 12% 10%,rgba(143,175,108,.22),transparent 30%),radial-gradient(circle at 82% 0,rgba(216,173,109,.18),transparent 28%),linear-gradient(135deg,rgba(24,42,29,.98),rgba(43,31,21,.98));padding:18px;box-shadow:0 22px 58px rgba(0,0,0,.28)}.v1840-hero h2{font-size:38px;margin:0 0 6px;letter-spacing:0}.v1840-hero p{margin:0;color:#d9c8aa;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.55}.v1840-hero strong{font-size:40px;color:#f0ca7b;text-align:right}.v1840-hero strong span{display:block;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.15em;font-size:9px;color:#bba988}",
       ".v1840-chip-row,.v1840-action-strip{display:flex;gap:7px;flex-wrap:wrap}.v1840-chip-row{margin-top:12px}.v1840-chip-row span{border:1px solid rgba(255,255,255,.13);border-radius:999px;background:rgba(255,255,255,.045);padding:6px 9px;color:#d8b16e;font-family:'JetBrains Mono',monospace;font-size:10px}.v1840-chip-row .good{color:#b9dc8a;border-color:rgba(185,220,138,.36)}.v1840-chip-row .bad{color:#e9927d;border-color:rgba(233,146,125,.40)}",
       ".v1840-kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:9px}.v1840-metric{border:1px solid rgba(255,255,255,.11);border-radius:12px;background:rgba(255,255,255,.045);padding:11px;min-width:0}.v1840-metric span{display:block;color:#aa9a82;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.11em;font-size:9px}.v1840-metric b{display:block;color:#fff3df;font-size:20px;margin-top:5px;overflow-wrap:anywhere}.v1840-metric em{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-style:normal;font-size:10px;line-height:1.4;margin-top:5px}.v1840-metric.good b,.v1840-history em.good{color:#b9dc8a}.v1840-metric.bad b,.v1840-history em.bad{color:#e9927d}.v1840-metric.gold b{color:#f0ca7b}",

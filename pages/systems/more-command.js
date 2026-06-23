@@ -157,6 +157,13 @@
       home: "home",
       housing: "home",
       property: "home",
+      realestate: "home",
+      "real-estate": "home",
+      vehicles: "vehicles",
+      vehicle: "vehicles",
+      cars: "vehicles",
+      car: "vehicles",
+      garage: "vehicles",
       stats: "stats",
       allstats: "stats",
       more: "more"
@@ -603,7 +610,8 @@
     ];
     var lifeSystems = [
       routeButton("Health", "open", "health", "Doctor, wellness, recovery, health activities.", "green", "body"),
-      routeButton("Home", "open", "home", "Housing, living situation, property basics.", "gold", "place"),
+      routeButton("Real Estate", "open", "home", "Living situation and your property portfolio.", "gold", "place"),
+      routeButton("Vehicles", "open", "vehicles", "Your garage: buy, finance, service, and sell cars.", "blue", "place"),
       routeButton("All Stats", "open", "stats", "Detailed stats, IQ, traits, long-form signals.", "blue", "stats"),
       routeButton("Recovery", "open", "life", "De-stress tools currently live inside Life.", "green", "stress"),
       routeButton("Insurance", "open", "money", "Health insurance stays with Money controls.", "blue", "cover"),
@@ -647,7 +655,8 @@
       routeButton("Legal", "open", "law", "Taxes, accountants, attorneys, lawsuits.", "violet", "law"),
       routeButton("Family Trust", "open", "trust", "Trusts, child trusts, family fund, succession.", "gold", "trust"),
       routeButton("Health", "open", "health", "Doctor, wellness, and recovery.", "green", "body"),
-      routeButton("Home", "open", "home", "Housing and property basics.", "gold", "place")
+      routeButton("Real Estate", "open", "home", "Living situation and your property portfolio.", "gold", "place"),
+      routeButton("Vehicles", "open", "vehicles", "Your garage of cars.", "blue", "place")
     ];
     return card("Quick access", "jump to your places", [
       '<div class="more-v1848-route-grid">',
