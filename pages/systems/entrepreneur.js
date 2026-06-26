@@ -29,6 +29,8 @@
   function wealth() { return num(S().money); }              // personal cash
   function fin() { var s = S(); if (!s.finance || typeof s.finance !== "object") s.finance = {}; return s.finance; }
   function moneyText(v) { try { if (typeof window.money === "function") return window.money(round(v)); } catch (e) {} return "$" + round(v).toLocaleString(); }
+  // Per-share price: always show cents so small moves (e.g. a $2.03 share) are visible, not rounded to whole dollars.
+  function priceTextV1862(v) { v = num(v); return (v < 0 ? "-$" : "$") + Math.abs(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
   function currencySymbol() { return "$"; }
 
   // ------------------------------------------------- catalogs (ported data) --
@@ -50,6 +52,26 @@
     deeptech: { name:'AI / Deep Tech',    emoji:'🤖', color:'var(--blue)',   desc:'IP-heavy technology. Licensing income once proven.', models:['licensing','saas'], skills:['vision','execution'], marginMin:0.80, marginMax:0.95, marketSizeM:1000, churnBase:0.04, investorAppeal:'vc' },
     greentech:{ name:'Sustainability',    emoji:'🌱', color:'var(--green)',  desc:'Green tech. ESG score unlocks government grants.', models:['licensing','d2c'], skills:['vision','networking'], marginMin:0.55, marginMax:0.70, marketSizeM:50, churnBase:0.08, investorAppeal:'angel' },
     social_e: { name:'Social Enterprise', emoji:'🤲', color:'var(--green)',  desc:'Mission-driven. High karma = better staff and grants.', models:['d2c','retainer'], skills:['networking','salescraft'], marginMin:0.30, marginMax:0.50, marketSizeM:10, churnBase:0.10, investorAppeal:'angel' },
+  };
+
+  // v18.69 — industry server/cloud upkeep as a fraction of revenue (compute-heavy fields pay most).
+  var INFRA_RATE_V1869 = {
+    deeptech: 0.045, gaming: 0.030, media: 0.025, saas: 0.022, fintech: 0.020,
+    mktplace: 0.018, edtech: 0.015, health: 0.015, proptech: 0.012, greentech: 0.012,
+    logistics: 0.010, ecom: 0.010, social_e: 0.008, retail: 0.008, food: 0.006,
+    manufact: 0.006, agency: 0.004
+  };
+  // v18.69 — what each industry "ships" and which lever it pulls when live.
+  var FEATURE_TYPE_V1869 = {
+    saas: { noun: "integration", kind: "digital" }, deeptech: { noun: "model upgrade", kind: "digital" },
+    fintech: { noun: "feature", kind: "digital" }, edtech: { noun: "course module", kind: "digital" },
+    proptech: { noun: "feature", kind: "digital" }, media: { noun: "original show", kind: "digital" },
+    mktplace: { noun: "marketplace feature", kind: "digital" }, health: { noun: "care feature", kind: "digital" },
+    ecom: { noun: "product line", kind: "product" }, retail: { noun: "collection", kind: "product" },
+    food: { noun: "menu launch", kind: "product" }, manufact: { noun: "product line", kind: "product" },
+    logistics: { noun: "route service", kind: "product" }, gaming: { noun: "game update", kind: "product" },
+    agency: { noun: "service offering", kind: "service" }, greentech: { noun: "green initiative", kind: "service" },
+    social_e: { noun: "community program", kind: "service" }
   };
 
   var BIZ_MODEL_INFO = {
@@ -109,6 +131,28 @@
     };
     var pool = names[type] || ['Competitor A','Competitor B','Competitor C'];
     return pool.slice(0, 2).map(function (nm) { return { name: nm, strength: rnd(40, 80), marketShare: rnd(10, 30) }; });
+  }
+  // v18.69 — names for fresh rivals that emerge over time / after you acquire someone.
+  var NEW_RIVAL_NAMES_V1869 = ['Nova', 'Vertex', 'Apex', 'Quantum', 'Pinnacle', 'Catalyst', 'Horizon', 'Summit', 'Forge', 'Beacon', 'Pulse', 'Zenith', 'Atlas', 'Cobalt', 'Onyx', 'Vanguard', 'Helix', 'Orbit'];
+  // Keep the competitive field alive: rivals drift, and new ones enter open market share (esp. after acquisitions).
+  function _bizCompetitorDynamicsV1869(biz) {
+    if (!Array.isArray(biz.competitors)) biz.competitors = [];
+    var comps = biz.competitors;
+    comps.forEach(function (c) {
+      c.marketShare = Math.max(2, Math.min(45, Math.round(num(c.marketShare) + rnd(-2, 3))));
+      c.strength = Math.max(20, Math.min(95, Math.round(num(c.strength) + rnd(-3, 3))));
+    });
+    var claimed = num(biz.marketShare) + comps.reduce(function (s, c) { return s + num(c.marketShare); }, 0);
+    var unclaimed = Math.max(0, 100 - claimed);
+    if (comps.length < 3 && unclaimed > 10 && Math.random() < 0.28) {
+      var used = {}; comps.forEach(function (c) { used[c.name] = 1; });
+      var suffixes = [' Labs', ' Inc', ' Co', ' Group', ' AI', ' Systems'];
+      var name = "", guard = 0;
+      do { name = NEW_RIVAL_NAMES_V1869[Math.floor(Math.random() * NEW_RIVAL_NAMES_V1869.length)] + suffixes[Math.floor(Math.random() * suffixes.length)]; } while (used[name] && guard++ < 8);
+      var share = Math.max(6, Math.min(Math.round(unclaimed * 0.55), rnd(8, 22)));
+      comps.push({ name: name, strength: rnd(45, 80), marketShare: share });
+      try { log("🏴 A new competitor, " + name + ", entered " + biz.name + "'s market with ~" + share + "% share."); } catch (e) {}
+    }
   }
 
   function _newBizObj(name, type, model, startCash) {
@@ -787,7 +831,7 @@
     var marketSize = Math.max(1, num(biz.marketSize));
     var custScale = hist.map(function (h) { return num(h.customers); });
     var revPerEmp = hist.map(function (h) { return num(h.revenue) / Math.max(1, num(h.headcount) + 1); });
-    var shareSeries = hist.map(function (h) { return (num(h.revenue) / marketSize) * 100; });
+    var shareSeries = hist.map(function (h) { return h.marketShare != null ? num(h.marketShare) : (num(h.revenue) / marketSize) * 100; });
     var multSeries = hist.map(function (h) { return num(h.revenue) > 0 ? num(h.valuation) / num(h.revenue) : 0; });
     var fmtNum = function (v) { return round(v).toLocaleString(); };
     var fmtPct = function (v) { return (num(v)).toFixed(num(v) < 10 ? 2 : 1) + "%"; };
@@ -801,7 +845,7 @@
 
     var parts = [growth, scale, budget, hiring, marketing];
     if (mode === "overview") parts = [growth, scale];
-    else if (mode === "product") parts = [budget];
+    else if (mode === "product") parts = [];
     else if (mode === "growth") parts = [scale, marketing];
     else if (mode === "team") parts = [hiring];
     else if (mode === "funding") parts = [budget];
@@ -817,7 +861,7 @@
     rerender();
   }
   window.bizSetActiveV1861 = setActiveBiz;
-  var DASHBOARD_PANELS_V1862 = ["overview", "product", "growth", "team", "funding", "public", "exit"];
+  var DASHBOARD_PANELS_V1862 = ["overview", "product", "growth", "team", "funding", "budget", "public", "exit"];
   function dashboardPanelV1862(biz) {
     var B = initBiz();
     var p = String(B.activePanelV1862 || "overview").toLowerCase();
@@ -881,6 +925,7 @@
       ["growth", "Growth"],
       ["team", "Team"],
       ["funding", "Funding"],
+      ["budget", "Budget"],
       ["public", "Public Market"],
       ["exit", "Exit"]
     ];
@@ -896,7 +941,7 @@
     return '<div class="biz1862-command"><div class="biz1861-active-head"><div><div class="section-label">' + escH(t.emoji || "") + ' Founder command</div><h3>' + escH(biz.name) + '</h3><p>' + escH(t.name || "Business") + ' / ' + escH(model.name || biz.model || "Model") + ' / ' + escH(stageLabel(biz.stage)) + '</p></div><strong>' + moneyText(biz.valuation || 0) + '<span>valuation</span></strong></div>' +
       '<div class="biz1861-metric-grid">' +
       metric("Revenue", moneyText(biz.annualRevenue || 0), "Last year revenue.", (biz.annualRevenue || 0) > 0 ? "green" : "gold") +
-      metric("Profit", moneyText(biz.annualProfit || 0), "After your salary. You also draw 40% of positive profit.", (biz.annualProfit || 0) >= 0 ? "green" : "bad") +
+      metric("Profit", moneyText(biz.annualProfit || 0), "After salary, costs & tax. You draw " + Math.round(clampN(num(biz.founderDistRateV1869, 0.4), 0, 0.9) * 100) + "% of profit (set in Funding).", (biz.annualProfit || 0) >= 0 ? "green" : "bad") +
       metric("Cash", moneyText(biz.cashInBusiness || 0), "Business cash and runway fuel.", runwayKind) +
       metric("Runway", (num(biz.runway, 999) >= 999 ? "Infinite" : Math.max(0, round(biz.runway)) + " mo"), "Below 6 months is dangerous.", runwayKind) +
       metric("Product", escH(stageLabel(biz.productStage)), "Dev " + round(biz.productDev || 0) + " / Quality " + round(biz.productQuality || 0), "blue") +
@@ -928,9 +973,13 @@
     var distAmt = Math.max(0, Math.round(cash * DISTRIBUTION_RATE_V1862));
     var distReady = age() > num(biz._lastDistributionAge, -9999);
     var canDist = biz.active && !biz.dead && cash > 0 && distReady;
+    var distRate = clampN(num(biz.founderDistRateV1869, 0.4), 0, 0.9);
     function rb(p) { return actionBtn(Math.round(p * 100) + "%", "bizSetSalaryRateV1862(" + p + ")", Math.abs(rate - p) < 0.001 ? "gold" : "", false); }
-    return '<div class="biz1862-ctl ctl-green"><b>Founder pay</b><span>Salary last drawn: ' + moneyText(lastPaid) + ' · target ~' + moneyText(estSalary) + '/yr (' + Math.round(rate * 100) + '% of revenue, min ' + moneyText(floor) + ')</span>' +
+    function db(p) { return actionBtn(Math.round(p * 100) + "%", "bizSetDistRateV1869(" + p + ")", Math.abs(distRate - p) < 0.001 ? "gold" : "", false); }
+    return '<div class="biz1862-ctl ctl-green"><b>Founder pay</b><span>Salary (your wage): ' + moneyText(lastPaid) + ' last drawn · target ~' + moneyText(estSalary) + '/yr (' + Math.round(rate * 100) + '% of revenue, min ' + moneyText(floor) + ')</span>' +
       '<div class="biz1861-actions">' + rb(0.03) + rb(0.05) + rb(0.08) + rb(0.10) + '</div>' +
+      '<span style="margin-top:8px">Profit distribution: ' + Math.round(distRate * 100) + '% of each year\'s profit is paid to you as the owner; the rest stays in the company.</span>' +
+      '<div class="biz1861-actions">' + db(0) + db(0.2) + db(0.4) + db(0.6) + db(0.8) + '</div>' +
       '<div class="biz1861-actions">' + actionBtn("Take distribution", "bizTakeDistributionV1862()", "green", !canDist) + '</div>' +
       '<span style="margin-top:6px">' + escH(distReady ? ("Pull " + moneyText(distAmt) + " (" + Math.round(DISTRIBUTION_RATE_V1862 * 100) + "% of company cash) now") : "Distribution available again next year") + '</span></div>';
   }
@@ -945,13 +994,225 @@
     var hist = Array.isArray(biz.revenueHistory) ? biz.revenueHistory : [];
     var last = hist.length ? hist[hist.length - 1] : null;
     var recent = last ? "Latest year: " + moneyText(last.revenue || 0) + " revenue, " + moneyText(last.profit || 0) + " profit, " + round(last.customers || 0) + " customers." : "Age up after launch to build a performance record.";
-    return '<div class="biz1862-panel"><div class="biz1862-callout"><span>Current read</span><b>' + escH(recent) + '</b></div>' + renderBizGraphsV1861(biz, "overview") + '</div>';
+    return '<div class="biz1862-panel"><div class="biz1862-callout"><span>Current read</span><b>' + escH(recent) + '</b></div>' + bizStageLadderV1869(biz) + renderBizGraphsV1861(biz, "overview") + '</div>';
+  }
+  // Quick "where is this company on the journey" tracker for the Overview tab.
+  function bizStageLadderV1869(biz) {
+    // Derive the ladder from the SAME company stage shown in the header, so they always agree.
+    var idx, prog;
+    if (biz.public) { idx = 4; prog = 100; }
+    else if (biz.stage === 'mature') { idx = 3; prog = 100; }
+    else if (biz.stage === 'scale') { idx = 3; prog = Math.min(99, Math.round((num(biz.annualRevenue) / 2000000) * 100)); }
+    else if (biz.stage === 'growth') { idx = 2; prog = Math.min(99, Math.round((num(biz.annualRevenue) / 500000) * 100)); }
+    else if (biz.stage === 'early') { idx = 1; prog = Math.min(99, Math.round((num(biz.annualRevenue) / 50000) * 100)); }
+    else if (biz.stage === 'pre-revenue') { idx = 1; prog = Math.min(60, Math.round(num(biz.productDev))); }
+    else { idx = 0; prog = Math.min(95, Math.round(num(biz.productDev))); }
+    var stages = [
+      { label: "Idea", icon: "💡" },
+      { label: "Early / Seed", icon: "🌱" },
+      { label: "Growth", icon: "📈" },
+      { label: "Late / Mature", icon: "🏛" },
+      { label: "Public", icon: "🔔" }
+    ];
+    var steps = stages.map(function (s, i) {
+      var done = i < idx, cur = i === idx;
+      var col = cur ? "#e9c77d" : done ? "#9ccf9c" : "rgba(255,255,255,.30)";
+      var bg = cur ? "rgba(216,173,109,.16)" : "transparent";
+      return '<div style="flex:1;min-width:0;text-align:center;padding:7px 2px;border-radius:9px;background:' + bg + '">' +
+        '<div style="font-size:16px;line-height:1.1;opacity:' + (done || cur ? 1 : 0.4) + '">' + s.icon + '</div>' +
+        '<div style="font-size:8px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:' + col + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escH(s.label) + '</div></div>';
+    }).join('<div style="align-self:center;flex:0 0 8px;height:2px;background:rgba(255,255,255,.16)"></div>');
+    return '<div class="biz1861-graph"><div class="section-label">🧭 Investment stage</div>' +
+      '<div style="display:flex;align-items:stretch;gap:2px">' + steps + '</div>' +
+      '<div style="height:7px;border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:9px"><div style="height:100%;width:' + prog + '%;background:linear-gradient(90deg,#d8ad6d,#9ccf9c)"></div></div>' +
+      '<div class="biz1861-sublabel" style="margin-top:6px">' + (biz.public ? "Public company — trading on the open market." : ("Company stage: " + escH(stageLabel(biz.stage)) + " · " + prog + "% toward the next milestone")) + '</div>' +
+      '<div class="biz1862-next" style="margin-top:8px"><span>Next milestone</span><b>' + escH(bizNextMilestoneV1862(biz)) + '</b></div></div>';
+  }
+  function _pushProdLogV1869(biz, text) {
+    if (!Array.isArray(biz._prodLogV1869)) biz._prodLogV1869 = [];
+    biz._prodLogV1869.push({ age: age(), text: text });
+    if (biz._prodLogV1869.length > 12) biz._prodLogV1869.shift();
+  }
+  function productRoadmapV1869(biz) {
+    var order = ["concept", "mvp", "beta", "live", "v2"];
+    var labels = { concept: "Concept", mvp: "MVP", beta: "Beta", live: "Live", v2: "v2 / Scale" };
+    var icons = { concept: "💭", mvp: "🧱", beta: "🧪", live: "🚀", v2: "🏆" };
+    // A scaled/mature company shows a "v2 / Scale" product immediately, even before the next yearly tick formally advances it.
+    var ps = biz.productStage;
+    if (ps === "live" && (biz.stage === "scale" || biz.stage === "mature")) ps = "v2";
+    var cur = (ps === "v2+" || ps === "v2") ? "v2" : (ps || "concept");
+    var idx = order.indexOf(cur); if (idx < 0) idx = 0;
+    var liveP = idx >= 3;
+    var steps = order.map(function (k, i) {
+      var done = i < idx, c = i === idx;
+      var col = c ? "#e9c77d" : done ? "#9ccf9c" : "rgba(255,255,255,.30)";
+      var bg = c ? "rgba(216,173,109,.16)" : "transparent";
+      return '<div style="flex:1;min-width:0;text-align:center;padding:7px 2px;border-radius:9px;background:' + bg + '">' +
+        '<div style="font-size:16px;line-height:1.1;opacity:' + (done || c ? 1 : 0.4) + '">' + icons[k] + '</div>' +
+        '<div style="font-size:8px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:' + col + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escH(labels[k]) + '</div></div>';
+    }).join('<div style="align-self:center;flex:0 0 8px;height:2px;background:rgba(255,255,255,.16)"></div>');
+    return '<div class="biz1861-graph"><div class="section-label">🗺️ Product roadmap</div>' +
+      '<div style="display:flex;align-items:stretch;gap:2px">' + steps + '</div>' +
+      '<div class="biz1861-sublabel" style="margin-top:6px">' + escH(biz.productName || "Your product") + ' — ' + (liveP ? ("shipped · " + escH(labels[cur]) + " · quality " + Math.round(num(biz.productQuality)) + "/100") : ("in " + escH(labels[cur]) + " · keep building to launch (dev " + Math.round(num(biz.productDev)) + ")")) + '</div></div>';
+  }
+  function bizCompetitorPriceV1869(biz, c) {
+    var share = Math.max(1, num(c.marketShare));
+    var marketVal = Math.max(num(biz.annualRevenue) * 4, num(biz.marketSize) * 0.3, 1000000);
+    return Math.max(250000, Math.round(marketVal * (share / 100) * (0.7 + num(c.strength) / 200)));
+  }
+  function productCompetitorsV1869(biz) {
+    var comps = (biz.competitors || []).slice(0, 3);
+    if (!comps.length) return "";
+    function bar(val, color) {
+      var w = Math.max(2, Math.min(100, num(val)));
+      return '<div style="height:6px;border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden;margin:3px 0"><div style="height:100%;width:' + w + '%;background:' + color + '"></div></div>';
+    }
+    var youQ = Math.round(num(biz.productQuality));
+    var youRow = '<div class="biz1862-minirow" style="display:block"><b>You — ' + escH(biz.productName || biz.name) + '</b>' + bar(youQ, "linear-gradient(90deg,#d8ad6d,#9ccf9c)") + '<span style="font-size:9px;opacity:.85">Quality ' + youQ + ' · market share ' + num(biz.marketShare).toFixed(1) + '%</span></div>';
+    var cash = num(biz.cashInBusiness);
+    var compRows = comps.map(function (c, i) {
+      var price = bizCompetitorPriceV1869(biz, c);
+      return '<div class="biz1862-minirow" style="display:block">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px"><b>' + escH(c.name) + '</b>' + actionBtn("Acquire " + compactMoneyV1861(price), "bizAcquireCompetitorV1869(" + i + ")", "gold", cash < price) + '</div>' +
+        bar(num(c.strength), "rgba(201,155,85,.6)") +
+        '<span style="font-size:9px;opacity:.7">Strength ' + Math.round(num(c.strength)) + ' · market share ' + Math.round(num(c.marketShare)) + '% · buy with company cash</span></div>';
+    }).join("");
+    return '<div class="biz1861-graph"><div class="section-label">⚔️ Competitive landscape</div>' + youRow + compRows + '</div>';
+  }
+  function productActivityLogV1869(biz) {
+    var arr = (biz._prodLogV1869 || []).slice(-4).reverse();
+    if (!arr.length) return '<div class="biz1861-graph"><div class="section-label">📋 Product activity</div><div class="biz1861-spark-empty">Ship features, fix tech debt, or polish — your moves log here.</div></div>';
+    var rows = arr.map(function (e) { return '<div class="biz1862-minirow"><b>Age ' + round(e.age) + '</b><span>' + escH(e.text) + '</span></div>'; }).join("");
+    return '<div class="biz1861-graph"><div class="section-label">📋 Product activity</div>' + rows + '</div>';
   }
   function renderProductPanelV1862(biz) {
-    return '<div class="biz1862-panel"><div class="biz1861-control-grid">' + renderDevFocusControlsV1862(biz) + '</div>' + renderBizGraphsV1861(biz, "product") + '</div>';
+    var liveP = biz.productStage === "live" || biz.productStage === "v2" || biz.productStage === "v2+";
+    var q = round(num(biz.productQuality));
+    var dev = round(num(biz.productDev));
+    var ms = num(biz.marketShare);
+    var td = round(num(biz.techDebt));
+    var npsV = round(num(biz.nps));
+    var churn = num(biz.churnRate);
+    var qKind = q >= 70 ? "good" : q >= 45 ? "gold" : "bad";
+    var tdKind = td <= 20 ? "good" : td <= 50 ? "gold" : "bad";
+    var ft = FEATURE_TYPE_V1869[biz.type] || { noun: "feature" };
+    var shipCost = Math.max(10000, Math.round(num(biz.annualRevenue) * 0.04)) || 25000;
+    var fixCost = Math.max(8000, Math.round(num(biz.annualRevenue) * 0.03)) || 20000;
+    var polishCost = Math.max(8000, Math.round(num(biz.annualRevenue) * 0.03)) || 20000;
+    var cash = num(biz.cashInBusiness);
+    var tiles = '<div class="biz1861-metric-grid">' +
+      metric("Product quality", q + "/100", liveP ? "Retention & word of mouth." : "Raise it before launch.", qKind) +
+      metric("Development", liveP ? "Shipped ✓" : (dev + " pts"), liveP ? "Live — grow it through features now." : "Build progress — keep going to launch.", "blue") +
+      metric("Market share", ms.toFixed(1) + "%", "Of your industry's market.", ms > 0 ? "green" : "gold") +
+      metric("Tech debt", td + "/100", td > 50 ? "Slowing you down — clean it up." : "Under control.", tdKind) +
+      metric("NPS", String(npsV), "Customer love → organic growth.", npsV >= 30 ? "good" : npsV >= 0 ? "gold" : "bad") +
+      metric("Churn", pct(churn), "Customers lost per year.", churn <= 0.1 ? "good" : churn <= 0.2 ? "gold" : "bad") +
+      '</div>';
+    var actions = '<div class="biz1861-control-grid">' +
+      renderDevFocusControlsV1862(biz) +
+      '<div class="biz1862-ctl ctl-violet"><b>Ship a ' + escH(ft.noun) + '</b><span>' + (liveP ? "A hit grows market share; a flop can lose it — odds scale with quality." : "Pushes development forward; a rushed build can add bugs.") + ' Costs ' + moneyText(shipCost) + '.</span><div class="biz1861-actions">' + actionBtn(liveP ? ("Ship " + ft.noun) : "Build feature", "bizShipFeatureV1869()", "violet", cash < shipCost) + '</div></div>' +
+      '<div class="biz1862-ctl ctl-blue"><b>Cleanup sprint</b><span>Pay down tech debt and lift quality. Costs ' + moneyText(fixCost) + '.</span><div class="biz1861-actions">' + actionBtn("Fix tech debt", "bizFixTechDebtV1869()", "blue", cash < fixCost || td <= 0) + '</div></div>' +
+      '<div class="biz1862-ctl ctl-green"><b>Polish & support</b><span>Raise NPS and cut churn. Costs ' + moneyText(polishCost) + '.</span><div class="biz1861-actions">' + actionBtn("Polish", "bizPolishV1869()", "green", cash < polishCost) + '</div></div>' +
+      '</div>';
+    var devAlloc = biz._devAlloc || { features: 40, bugfix: 20, ux: 20, custdev: 20 };
+    var devBar = '<div class="biz1861-graph"><div class="section-label">🔧 Where your build effort goes</div><div class="biz1861-sublabel">Set by your Dev focus above — this is what each year of building spends time and money on.</div>' + segBar([
+      { label: "Features", value: devAlloc.features, color: BIZ_CHART_COLORS.features },
+      { label: "Bug fixes", value: devAlloc.bugfix, color: BIZ_CHART_COLORS.bugfix },
+      { label: "UX / polish", value: devAlloc.ux, color: BIZ_CHART_COLORS.ux },
+      { label: "Customer dev", value: devAlloc.custdev, color: BIZ_CHART_COLORS.custdev }
+    ]) + '</div>';
+    return '<div class="biz1862-panel">' + productRoadmapV1869(biz) + tiles + actions + devBar + productCompetitorsV1869(biz) + productActivityLogV1869(biz) + '</div>';
   }
   function renderGrowthPanelV1862(biz) {
     return '<div class="biz1862-panel"><div class="biz1861-control-grid">' + renderMarketingControlsV1862(biz) + '</div>' + renderBizGraphsV1861(biz, "growth") + '</div>';
+  }
+  // Budget tab: a dedicated, dynamic breakdown of where the company's money goes + people economics.
+  function renderBudgetPanelV1862(biz) {
+    var C = BIZ_CHART_COLORS;
+    var emps = biz.employees || [];
+    var rev = Math.max(0, num(biz.annualRevenue));
+    var staffCosts = emps.reduce(function (s, e) { return s + num(e.salary); }, 0);
+    var coFounderCosts = (biz.coFounders || []).length * 60000;
+    var mktgCosts = num(biz._mktgBudget);
+    var infraRate = INFRA_RATE_V1869[biz.type] != null ? INFRA_RATE_V1869[biz.type] : 0.01;
+    var serverCost = Math.round(rev * infraRate);
+    var officeCost = Math.round(num(biz.headcount) * 12000);
+    var toolsCosts = Math.round(num(biz.headcount) * 2400 + rev * 0.005);
+    var founderPay = num(biz._founderSalaryPaid);
+    var corpTax = num(biz._corpTaxV1869);
+    var gm = clampN(num(biz.grossMargin, 0.6), 0.05, 0.98);
+    var cogs = Math.round(rev * (1 - gm));                 // cost of goods / delivering the product (the gross-margin cost)
+    var grossProfit = rev - cogs;
+    var operating = staffCosts + coFounderCosts + mktgCosts + toolsCosts + serverCost + officeCost;
+    var total = cogs + operating + founderPay + corpTax;   // EVERYTHING between revenue and net profit
+    var netProfit = num(biz.annualProfit);
+    var distRate = clampN(num(biz.founderDistRateV1869, 0.4), 0, 0.9);
+    var distribution = Math.max(0, Math.round(netProfit * distRate)); // what YOU pull out as the owner
+    var retained = netProfit - distribution;
+    var head = num(biz.headcount);
+    var avgSalary = emps.length ? Math.round(staffCosts / emps.length) : 0;
+    var revPerHead = head > 0 ? Math.round(rev / head) : 0;
+    var costPerHead = head > 0 ? Math.round(total / head) : 0;
+    var payrollPct = rev > 0 ? Math.round((staffCosts + coFounderCosts) / rev * 100) : 0;
+    var burnKind = netProfit >= 0 ? "good" : "bad";
+    var typeName = (BIZ_TYPES[biz.type] || {}).name || "your industry";
+    var donut = total > 0 ? donutSVG([
+      { label: "Cost of goods", value: cogs, color: C.bugfix },
+      { label: "Payroll", value: staffCosts, color: C.staff },
+      { label: "Founder salary", value: founderPay, color: C.profit },
+      { label: "Servers / cloud", value: serverCost, color: C.val },
+      { label: "Office / real estate", value: officeCost, color: C.cofounder },
+      { label: "Marketing", value: mktgCosts, color: C.mktg },
+      { label: "Software & tools", value: toolsCosts, color: C.tools },
+      { label: "Corporate tax", value: corpTax, color: C.custdev }
+    ], "COSTS/YR") : '<div class="biz1861-spark-empty">No costs yet — hire, set marketing, or draw founder pay to see the breakdown.</div>';
+    function wrow(label, val, note, kind) {
+      var isTotal = kind === "total", isSub = kind === "sub";
+      var valColor = isSub ? "#e8a08f" : (isTotal ? "#ffe7b3" : "#dbe9d4");
+      var bg = isTotal ? "rgba(216,173,109,.12)" : "rgba(255,255,255,.025)";
+      var bd = isTotal ? "1px solid rgba(216,173,109,.40)" : "1px solid rgba(255,255,255,.06)";
+      return '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 13px;border-radius:10px;background:' + bg + ';border:' + bd + ';margin-bottom:6px">' +
+        '<div style="min-width:0"><div style="font-size:14px;font-weight:' + (isTotal ? 800 : 600) + ';color:' + (isTotal ? "#fff7e9" : "#ece1cd") + '">' + escH(label) + '</div>' + (note ? '<div style="font-size:11px;color:rgba(255,255,255,.55);margin-top:2px">' + escH(note) + '</div>' : '') + '</div>' +
+        '<div style="font-size:' + (isTotal ? 18 : 15) + 'px;font-weight:800;color:' + valColor + ';white-space:nowrap">' + (isSub ? "−" : "") + moneyText(val) + '</div></div>';
+    }
+    var waterfall = '<div class="biz1861-graph"><div class="section-label">📊 Revenue → your pocket</div>' +
+      '<div class="biz1861-sublabel" style="margin-bottom:8px">Read top to bottom: start with what you billed, subtract each cost (red), and the highlighted rows are the running totals.</div>' +
+      wrow("Revenue", rev, "everything the company billed this year", "rev") +
+      wrow("Cost of goods", cogs, Math.round((1 - gm) * 100) + "% of revenue spent making & delivering it", "sub") +
+      wrow("Gross profit", grossProfit, "what's left after delivery — a " + Math.round(gm * 100) + "% margin", "total") +
+      wrow("Operating costs", operating, "payroll, servers, office, marketing, tools", "sub") +
+      wrow("Your salary", founderPay, "your wage, paid out of the company", "sub") +
+      wrow("Corporate tax", corpTax, "21% tax on the profit", "sub") +
+      wrow("Net profit", netProfit, "the company's actual profit this year", "total") +
+      wrow("Your profit distribution", distribution, Math.round(distRate * 100) + "% of profit paid to YOU — change it in Funding", "sub") +
+      wrow("Kept in the company", retained, "reinvested to grow the business", "total") +
+      '</div>';
+    return '<div class="biz1862-panel">' +
+      '<div class="biz1862-callout"><span>The full picture</span><b>' + moneyText(rev) + ' revenue − ' + moneyText(total) + ' total costs = ' + moneyText(netProfit) + ' net profit. You take ' + moneyText(distribution) + '; ' + moneyText(retained) + ' stays in the company.</b></div>' +
+      '<div class="biz1861-metric-grid">' +
+      metric("Total costs", moneyText(total) + "/yr", "Goods + operating + salary + tax.", burnKind) +
+      metric("Cost of goods", moneyText(cogs) + "/yr", Math.round((1 - gm) * 100) + "% of revenue to deliver.", "gold") +
+      metric("Payroll", moneyText(staffCosts + coFounderCosts) + "/yr", emps.length + " staff + " + (biz.coFounders || []).length + " co-founders.", "gold") +
+      metric("Servers / cloud", moneyText(serverCost) + "/yr", "Compute & hosting for " + escH(typeName) + ".", "blue") +
+      metric("Office / real estate", moneyText(officeCost) + "/yr", "~$12K per head in space.", "blue") +
+      metric("Marketing", moneyText(mktgCosts) + "/yr", "Set this in the Growth tab.", "blue") +
+      metric("Software & tools", moneyText(toolsCosts) + "/yr", "Per-head seats + 0.5% of revenue.", "blue") +
+      metric("Founder salary", moneyText(founderPay) + "/yr", "Your wage from the company.", "green") +
+      metric("Corporate tax", moneyText(corpTax) + "/yr", "21% of taxable profit.", "gold") +
+      metric("Profit distribution", moneyText(distribution) + "/yr", Math.round(distRate * 100) + "% of profit you pull out.", "green") +
+      '</div>' +
+      '<div class="biz1861-graph"><div class="section-label">🥧 Where the money goes</div>' + donut + '</div>' +
+      waterfall +
+      '<div class="biz1862-callout" style="margin-top:4px"><span>Adjust spend</span><b>Marketing is your main discretionary budget; profit distribution is set in Funding. The rest scale with revenue & headcount.</b></div>' +
+      '<div class="biz1861-control-grid">' + renderMarketingControlsV1862(biz) + '</div>' +
+      '<div class="biz1861-graph"><div class="section-label">👥 People economics</div><div class="biz1862-split"><div>' +
+      '<div class="biz1862-minirow"><b>Headcount</b><span>' + head + '</span></div>' +
+      '<div class="biz1862-minirow"><b>Avg salary</b><span>' + moneyText(avgSalary) + '/yr</span></div>' +
+      '<div class="biz1862-minirow"><b>Payroll % of revenue</b><span>' + payrollPct + '%</span></div></div><div>' +
+      '<div class="biz1862-minirow"><b>Revenue / employee</b><span>' + moneyText(revPerHead) + '</span></div>' +
+      '<div class="biz1862-minirow"><b>Cost / employee</b><span>' + moneyText(costPerHead) + '</span></div>' +
+      '<div class="biz1862-minirow"><b>Cash runway</b><span>' + (num(biz.runway, 999) >= 999 ? "Infinite" : Math.max(0, round(biz.runway)) + " mo") + '</span></div>' +
+      '</div></div></div></div>';
   }
   function perfKindV1862(p) { return p >= 70 ? "good" : p >= 45 ? "gold" : "bad"; }
   function initialsV1862(name) {
@@ -1067,6 +1328,7 @@
       var risk = num(e.leaveRisk) >= 0.18;
       var leavePct = Math.round(num(e.leaveRisk) * 100);
       var trained = (e.trainV1868 && e.trainV1868.year === age()) ? num(e.trainV1868.count) : 0;
+      var retained = (e.retainV1868 && e.retainV1868.year === age()) ? num(e.retainV1868.count) : 0;
       return '<div class="biz1862-emp">' +
         '<div class="biz1862-emp-top"><span class="biz1862-emp-avatar">' + escH(initialsV1862(e.name)) + '</span>' +
         '<div class="biz1862-emp-id"><b>' + escH(e.name) + '</b><span>' + escH(role.emoji || "") + ' ' + escH(role.title || e.roleId) + '</span></div>' +
@@ -1075,8 +1337,8 @@
         '<div class="biz1862-emp-foot"><span>Perf ' + perf + ' · ' + (tenure ? tenure + "y" : "new") + ' · <span class="' + (risk ? "warn" : "good") + '">' + leavePct + '% leave risk</span></span><em>' + moneyText(e.salary) + '/yr</em></div>' +
         '<div class="biz1862-role-foot" style="flex-wrap:wrap;gap:4px;margin-top:6px">' +
           actionBtn("Train " + trained + "/3", "bizTrainEmployeeV1868('" + escH(e.id) + "')", "blue", trained >= 3) +
-          actionBtn("Give raise", "bizRetainEmployeeV1868('" + escH(e.id) + "','raise')", "gold", false) +
-          actionBtn("Recognize", "bizRetainEmployeeV1868('" + escH(e.id) + "','perk')", "green", false) +
+          actionBtn("Give raise", "bizRetainEmployeeV1868('" + escH(e.id) + "','raise')", "gold", retained >= 2) +
+          actionBtn("Recognize", "bizRetainEmployeeV1868('" + escH(e.id) + "','perk')", "green", retained >= 2) +
         '</div>' +
         '</div>';
     }).join("");
@@ -1098,6 +1360,7 @@
     if (panel === "growth") return renderGrowthPanelV1862(biz);
     if (panel === "team") return renderTeamPanelV1862(biz);
     if (panel === "funding") return renderFundingPanelV1862(biz);
+    if (panel === "budget") return renderBudgetPanelV1862(biz);
     if (panel === "public") return '<div class="biz1862-panel">' + renderPublicDeskV1861(biz) + '</div>';
     if (panel === "exit") return '<div class="biz1862-panel">' + renderExitDeskV1861(biz) + '</div>';
     return renderOverviewPanelV1862(biz);
@@ -1131,7 +1394,7 @@
     var sellId = "biz1861-sellown-" + escH(biz.uid);
     return '<div class="biz1861-public"><div class="section-label">📡 Public company — ' + escH(biz.shareTicker) + (biz.controlLost ? ' <span class="biz1861-ctrl-lost">control lost</span>' : ' <span class="biz1861-ctrl-ok">you are CEO</span>') + '</div>' +
       '<div class="biz1861-metric-grid">' +
-      metric("Share price", moneyText(price), (sinceIpo >= 0 ? "▲ +" : "▼ ") + Math.round(sinceIpo) + "% since IPO at " + moneyText(ipo), sinceIpo >= 0 ? "good" : "bad") +
+      metric("Share price", priceTextV1862(price), (sinceIpo >= 0 ? "▲ +" : "▼ ") + Math.round(sinceIpo) + "% since IPO at " + priceTextV1862(ipo), sinceIpo >= 0 ? "good" : "bad") +
       metric("Your stake", moneyText(stakeVal), Math.round(ownPct) + "% · " + compactSharesV1862(shares) + " of " + compactSharesV1862(totalShares) + " sh · counts in net worth", ownPct >= 25 ? "green" : ownPct >= 10 ? "gold" : "bad") +
       metric("Public float", Math.round(publicFloatPct) + "%", compactSharesV1862(publicShares) + " sh trade as " + escH(biz.shareTicker) + " in your Stocks portfolio", "blue") +
       metric("Market signal", marketLabel, moveLabel + " / beta " + (market * 100).toFixed(1) + "%", marketKind) +
@@ -1489,8 +1752,12 @@
     var staffCosts = (biz.employees || []).reduce(function (s, e) { return s + num(e.salary); }, 0);
     var coFounderCosts = (biz.coFounders || []).length * 60000;
     var mktgCosts = num(biz._mktgBudget);
-    var toolsCosts = num(biz.headcount) * 2400;
-    var operatingCosts = staffCosts + coFounderCosts + mktgCosts + toolsCosts;
+    // v18.69 — richer, industry-specific operating costs that actually bite into profit.
+    var infraRate = INFRA_RATE_V1869[biz.type] != null ? INFRA_RATE_V1869[biz.type] : 0.01;
+    var serverCost = Math.round(gross * infraRate);                        // cloud / server upkeep, by industry
+    var officeCost = Math.round(num(biz.headcount) * 12000);               // office / real estate per head
+    var toolsCosts = Math.round(num(biz.headcount) * 2400 + gross * 0.005); // software/tools: per-head + 0.5% of revenue
+    var operatingCosts = staffCosts + coFounderCosts + mktgCosts + toolsCosts + serverCost + officeCost;
     // Founder salary: pay yourself a living wage from the company so founding can be
     // your livelihood before it turns a net profit. It is a real cost (lowers profit)
     // and is capped at what the company can actually fund this year, so it never drives
@@ -1500,13 +1767,26 @@
     var salaryTarget = Math.max(salFloor, Math.round(gross * salRate));
     var fundableForSalary = Math.max(0, num(biz.cashInBusiness) + grossProfit - operatingCosts);
     var founderSalary = Math.max(0, Math.min(salaryTarget, Math.round(fundableForSalary)));
-    var totalCosts = operatingCosts + founderSalary;
+    // v18.69 — corporate tax is a real line: 21% on profit after costs + your salary.
+    var preTaxProfit = grossProfit - operatingCosts - founderSalary;
+    var corpTax = Math.max(0, Math.round(preTaxProfit * 0.21));
+    var totalCosts = operatingCosts + founderSalary + corpTax;
     biz.annualRevenue = gross;
     biz.annualCosts = totalCosts;
-    biz.annualProfit = grossProfit - totalCosts; // profit AFTER your salary
+    biz.annualProfit = preTaxProfit - corpTax; // after costs, your salary, AND tax
     biz.lifetimeRevenue = num(biz.lifetimeRevenue) + gross;
     biz._founderSalaryPaid = founderSalary;
-    var founderPayout = Math.max(0, Math.round(biz.annualProfit * 0.4));
+    biz._serverCostV1869 = serverCost;
+    biz._officeCostV1869 = officeCost;
+    biz._toolsCostV1869 = toolsCosts;
+    biz._corpTaxV1869 = corpTax;
+    // v18.69 — market share grows toward your revenue's organic share, but acquisitions / earned gains
+    // PERSIST: the yearly recompute only pulls share UP toward the organic floor, never erodes what you
+    // bought or won. Rivals then re-enter the open share over time (dynamic field).
+    var organicShare = Math.min(100, (gross / Math.max(1, num(biz.marketSize))) * 100);
+    if (organicShare > num(biz.marketShare)) biz.marketShare = clampN(num(biz.marketShare) + (organicShare - num(biz.marketShare)) * 0.4, 0, 100);
+    _bizCompetitorDynamicsV1869(biz);
+    var founderPayout = Math.max(0, Math.round(biz.annualProfit * clampN(num(biz.founderDistRateV1869, 0.4), 0, 0.9)));
     var retainedProfit = biz.annualProfit - founderPayout;
     biz.cashInBusiness = num(biz.cashInBusiness) + retainedProfit;
     biz.burnRate = totalCosts / 12;
@@ -1522,7 +1802,7 @@
     biz.brand = clamp01(num(biz.brand) + (biz.nps > 30 ? 2 : biz.nps < 0 ? -1 : 0.5) + (biz.annualProfit > 0 ? 1 : 0));
     B.founderReputation = clamp01(num(B.founderReputation, 30) + (biz.annualProfit > 50000 ? 2 : biz.annualProfit > 0 ? 1 : -1) + num(B.yearsAsFounder) * 0.1);
     if (!Array.isArray(biz.revenueHistory)) biz.revenueHistory = [];
-    biz.revenueHistory.push({ age: age(), revenue: gross, profit: biz.annualProfit, valuation: biz.valuation, customers: num(biz.customers), mktg: num(biz._mktgBudget), costs: totalCosts, headcount: num(biz.headcount) });
+    biz.revenueHistory.push({ age: age(), revenue: gross, profit: biz.annualProfit, valuation: biz.valuation, customers: num(biz.customers), mktg: num(biz._mktgBudget), costs: totalCosts, headcount: num(biz.headcount), marketShare: biz.marketShare });
     if (biz.revenueHistory.length > 30) biz.revenueHistory.shift();
     B.lifetimeRevenue = num(B.lifetimeRevenue) + gross;
     biz._yearWithdrawn = 0;
@@ -1569,6 +1849,12 @@
   }
 
   function _checkBizStageUp(biz) {
+    // Keep the product roadmap cohesive with the company stage: once you scale/mature, your product
+    // graduates from "Live" to a scaled "v2" (so a big mature company isn't stuck showing "Live").
+    if (biz.productStage === 'live' && (biz.stage === 'scale' || biz.stage === 'mature')) {
+      biz.productStage = 'v2';
+      log("🏆 " + biz.name + "'s product matured into a scaled v2.");
+    }
     var th = { 'pre-revenue': { minRevenue: 1, minCustomers: 1 }, early: { minRevenue: 50000, minCustomers: 10 }, growth: { minRevenue: 500000, minCustomers: 100 }, scale: { minRevenue: 2000000, minCustomers: 500 }, mature: { minRevenue: 10000000, minCustomers: 2000 } };
     var next = { 'pre-revenue': 'early', early: 'growth', growth: 'scale', scale: 'mature' };
     var req = th[biz.stage];
@@ -1701,14 +1987,15 @@
     if (num(biz.cashInBusiness) < cost) { toast("Not enough cash to fund training."); return; }
     biz.cashInBusiness = num(biz.cashInBusiness) - cost;
     e.trainV1868.count++;
-    e.performance = clamp01(num(e.performance) + 5 + Math.random() * 4);
-    e.leaveRisk = Math.max(0.02, num(e.leaveRisk) - 0.01);
-    log("📈 Trained " + e.name + " (" + e.trainV1868.count + "/3 this year) for " + moneyText(cost) + " — performance up.");
+    e.performance = clamp01(num(e.performance) + 2);
+    log("📈 Trained " + e.name + " (" + e.trainV1868.count + "/3 this year) for " + moneyText(cost) + " — skill +2%.");
     rerender();
   };
   window.bizRetainEmployeeV1868 = function (empId, mode) {
     var biz = getActiveBiz(); if (!biz) return;
     var e = (biz.employees || []).find(function (x) { return x.id === empId; }); if (!e) return;
+    if (!e.retainV1868 || e.retainV1868.year !== age()) e.retainV1868 = { year: age(), count: 0 };
+    if (e.retainV1868.count >= 2) { toast(e.name + " has already had 2 raises/recognitions this year — they'll renew next year."); return; }
     if (mode === "raise") {
       var bump = Math.max(3000, Math.round(num(e.salary) * 0.15));
       if (num(biz.cashInBusiness) < bump) { toast("Not enough cash for a raise."); return; }
@@ -1726,6 +2013,94 @@
       biz.culture = clamp01(num(biz.culture) + 2);
       log("🎉 Recognized " + e.name + " — they feel valued. Flight risk drops, culture up.");
     }
+    e.retainV1868.count++;
+    rerender();
+  };
+  // Ship a feature: when live it swings market share (good vs buggy); in development it moves dev/quality.
+  window.bizShipFeatureV1869 = function () {
+    var biz = getActiveBiz(); if (!biz) return;
+    var ft = FEATURE_TYPE_V1869[biz.type] || { noun: "feature", kind: "digital" };
+    var cap = ft.noun.charAt(0).toUpperCase() + ft.noun.slice(1);
+    var shipCost = Math.max(10000, Math.round(num(biz.annualRevenue) * 0.04)) || 25000;
+    if (num(biz.cashInBusiness) < shipCost) { toast("Not enough company cash to ship a " + ft.noun + "."); return; }
+    biz.cashInBusiness = num(biz.cashInBusiness) - shipCost;
+    var liveP = biz.productStage === "live" || biz.productStage === "v2";
+    if (!liveP) {
+      biz.productDev = clamp01(num(biz.productDev) + 8 + Math.random() * 6);
+      var qd = (Math.random() < 0.7) ? (2 + Math.random() * 4) : -(2 + Math.random() * 3);
+      biz.productQuality = clamp01(num(biz.productQuality) + qd);
+      log("🧪 Built a new " + ft.noun + " — dev " + Math.round(num(biz.productDev)) + "/100, quality " + (qd >= 0 ? "+" : "") + Math.round(qd) + ".");
+      toast(qd >= 0 ? ("New " + ft.noun + " in the build — dev progress up.") : ("Shipped a " + ft.noun + ", but it added some bugs."));
+      _pushProdLogV1869(biz, "🛠️ Built a " + ft.noun + " (in development).");
+      rerender(); return;
+    }
+    var q = num(biz.productQuality);
+    var landed = Math.random() < (0.35 + q / 200);
+    if (landed) {
+      var gain = (ft.kind === "product" ? 0.5 : ft.kind === "service" ? 0.3 : 0.6) + Math.random() * (ft.kind === "product" ? 2.0 : 1.4);
+      biz.marketShare = Math.min(100, num(biz.marketShare) + gain);
+      biz.nps = clamp01(num(biz.nps) + 2);
+      if (ft.kind === "product") { biz.customers = Math.round(num(biz.customers) * (1.03 + Math.random() * 0.05)); biz.productQuality = clamp01(q + 1); }
+      else if (ft.kind === "service") { biz.brand = clamp01(num(biz.brand) + 3); }
+      else { biz.productQuality = clamp01(q + 1 + Math.random() * 2); biz.churnRate = Math.max(0, num(biz.churnRate) - 0.005); }
+      log("🚀 New " + ft.noun + " landed at " + biz.name + "! Market share +" + gain.toFixed(1) + " pts.");
+      toast(cap + " landed — market share +" + gain.toFixed(1) + " pts!");
+      _pushProdLogV1869(biz, "🚀 " + cap + " landed — market share +" + gain.toFixed(1) + " pts.");
+    } else {
+      var loss = 0.3 + Math.random() * 1.2;
+      biz.marketShare = Math.max(0, num(biz.marketShare) - loss);
+      biz.productQuality = clamp01(q - (1 + Math.random() * 3));
+      biz.churnRate = Math.min(1, num(biz.churnRate) + 0.01);
+      if (ft.kind === "product") biz.customers = Math.round(num(biz.customers) * 0.98);
+      log("🐛 The new " + ft.noun + " flopped — a rough launch cost " + loss.toFixed(1) + " pts of market share.");
+      toast(cap + " flopped — market share -" + loss.toFixed(1) + " pts.");
+      _pushProdLogV1869(biz, "🐛 " + cap + " flopped — market share -" + loss.toFixed(1) + " pts.");
+    }
+    rerender();
+  };
+  window.bizFixTechDebtV1869 = function () {
+    var biz = getActiveBiz(); if (!biz) return;
+    if (num(biz.techDebt) <= 0) { toast("Tech debt is already clean."); return; }
+    var cost = Math.max(8000, Math.round(num(biz.annualRevenue) * 0.03)) || 20000;
+    if (num(biz.cashInBusiness) < cost) { toast("Not enough cash for a cleanup sprint."); return; }
+    biz.cashInBusiness = num(biz.cashInBusiness) - cost;
+    var reduce = 12 + Math.random() * 10;
+    biz.techDebt = Math.max(0, num(biz.techDebt) - reduce);
+    biz.productQuality = clamp01(num(biz.productQuality) + 3 + Math.random() * 3);
+    _pushProdLogV1869(biz, "🧹 Cleanup sprint — tech debt -" + Math.round(reduce) + ", quality up.");
+    log("🧹 Cleanup sprint at " + biz.name + " — tech debt down, quality up.");
+    toast("Tech debt reduced, quality up.");
+    rerender();
+  };
+  window.bizPolishV1869 = function () {
+    var biz = getActiveBiz(); if (!biz) return;
+    var cost = Math.max(8000, Math.round(num(biz.annualRevenue) * 0.03)) || 20000;
+    if (num(biz.cashInBusiness) < cost) { toast("Not enough cash to invest in polish."); return; }
+    biz.cashInBusiness = num(biz.cashInBusiness) - cost;
+    biz.nps = Math.min(100, num(biz.nps) + 4 + Math.random() * 4);
+    biz.churnRate = Math.max(0, num(biz.churnRate) - 0.01);
+    biz.productQuality = clamp01(num(biz.productQuality) + 1 + Math.random() * 2);
+    _pushProdLogV1869(biz, "✨ Polish & support — NPS up, churn down.");
+    log("✨ " + biz.name + " invested in polish & support — NPS up, churn down.");
+    toast("NPS up, churn down.");
+    rerender();
+  };
+  window.bizAcquireCompetitorV1869 = function (idx) {
+    var biz = getActiveBiz(); if (!biz) return;
+    var comps = biz.competitors || [];
+    var c = comps[idx]; if (!c) return;
+    var price = bizCompetitorPriceV1869(biz, c);
+    if (num(biz.cashInBusiness) < price) { toast("Need " + compactMoneyV1861(price) + " in company cash to acquire " + c.name + "."); return; }
+    biz.cashInBusiness = num(biz.cashInBusiness) - price;
+    var shareGain = num(c.marketShare) * 0.6;
+    biz.marketShare = Math.min(100, num(biz.marketShare) + shareGain);
+    biz.customers = Math.round(num(biz.customers) * (1 + num(c.marketShare) / 150));
+    biz.brand = clamp01(num(biz.brand) + 4);
+    biz.competitivePos = Math.min(100, num(biz.competitivePos, 50) + 8);
+    biz.competitors = comps.filter(function (x, i) { return i !== idx; });
+    _pushProdLogV1869(biz, "🤝 Acquired rival " + c.name + " — market share +" + shareGain.toFixed(1) + " pts.");
+    log("🤝 " + biz.name + " acquired competitor " + c.name + " for " + compactMoneyV1861(price) + ". Market share and customers grew.");
+    toast("Acquired " + c.name + "!");
     rerender();
   };
   window.bizFireV1861 = function (empId) {
@@ -1791,7 +2166,7 @@
     if (retained > 0) m.holdings.push({ id: ticker, shares: retained, avgCost: ipoPrice, invested: Math.round(retained * ipoPrice), _entrepreneurV1861: true });
     addMoney(net);
     var B = fin().bizV1860; if (B) B.founderReputation = clampN(num(B.founderReputation, 30) + 18, 0, 100);
-    log("🔔 IPO! " + biz.name + " (" + ticker + ") went public at " + moneyText(ipoPrice) + "/share — floated " + Math.round(floatPct) + "%. You received " + moneyText(net) + (tax > 0 ? " (after " + moneyText(tax) + " tax)" : "") + " and kept " + Math.round(bizOwnershipPctV1861(biz)) + "% as " + ticker + " stock.", { money: net });
+    log("🔔 IPO! " + biz.name + " (" + ticker + ") went public at " + priceTextV1862(ipoPrice) + "/share — floated " + Math.round(floatPct) + "%. You received " + moneyText(net) + (tax > 0 ? " (after " + moneyText(tax) + " tax)" : "") + " and kept " + Math.round(bizOwnershipPctV1861(biz)) + "% as " + ticker + " stock.", { money: net });
     try { if (typeof window.awardMilestone === "function") window.awardMilestone("founder_ipo", "IPO", "You took a company public.", 90); } catch (e) {}
     saveGame(); rerender();
   };
@@ -1823,7 +2198,7 @@
     var ownNow = num(bizOwnershipPctV1861(biz));
     if (ownNow >= 10) biz.controlLost = false;
     biz.floatPct = Math.max(0, Math.round(100 - ownNow)); // public float shrinks as you buy back
-    log("📈 Bought " + moneyText(spent) + " of your own stock (" + biz.shareTicker + " @ " + moneyText(price) + "). You now own " + Math.round(ownNow) + "%.", { money: -spent });
+    log("📈 Bought " + moneyText(spent) + " of your own stock (" + biz.shareTicker + " @ " + priceTextV1862(price) + "). You now own " + Math.round(ownNow) + "%.", { money: -spent });
     if (ownNow >= 99.5) _bizTakePrivateV1862(biz); // repurchased the whole float → delist
     saveGame(); rerender();
   };
@@ -1888,7 +2263,7 @@
     h.shares = num(h.shares) - shares;
     addMoney(proceeds);
     if (h.shares < 0.000001) { var m = ensureStocksV18Store(); m.holdings = m.holdings.filter(function (x) { return x !== h; }); }
-    log("📉 Sold " + moneyText(proceeds) + " of " + biz.shareTicker + " (@ " + moneyText(price) + "). You now own " + Math.round(bizOwnershipPctV1861(biz)) + "%.", { money: proceeds });
+    log("📉 Sold " + moneyText(proceeds) + " of " + biz.shareTicker + " (@ " + priceTextV1862(price) + "). You now own " + Math.round(bizOwnershipPctV1861(biz)) + "%.", { money: proceeds });
     var own = bizOwnershipPctV1861(biz);
     if (own <= 0) _bizFullyExitPublic(biz);
     else if (own < 10 && !biz.controlLost) { biz.controlLost = true; log("⚠️ Your stake in " + biz.name + " fell below 10% — you've lost CEO control of the board."); }
@@ -1923,6 +2298,12 @@
     var biz = getActiveBiz(); if (!biz) return;
     biz.founderSalaryRate = clampN(num(rate, FOUNDER_SALARY_RATE_DEFAULT), FOUNDER_SALARY_RATE_MIN, FOUNDER_SALARY_RATE_MAX);
     log("🧾 " + biz.name + ": founder salary set to " + Math.round(biz.founderSalaryRate * 100) + "% of revenue (min " + moneyText(num(biz.founderSalaryFloor, FOUNDER_SALARY_FLOOR_DEFAULT)) + ").");
+    saveGame(); rerender();
+  };
+  window.bizSetDistRateV1869 = function (rate) {
+    var biz = getActiveBiz(); if (!biz) return;
+    biz.founderDistRateV1869 = clampN(num(rate), 0, 0.9);
+    log("💵 " + biz.name + ": profit distribution set to " + Math.round(biz.founderDistRateV1869 * 100) + "% of profit (rest reinvested in the company).");
     saveGame(); rerender();
   };
 

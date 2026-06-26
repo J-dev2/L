@@ -15,7 +15,7 @@ If only Markdown/docs/skills changed:
 Run syntax check on touched files:
 
 ```powershell
-& "C:\Users\jgodj\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" --check pages\systems\YOUR_FILE.js
+node --check pages\systems\YOUR_FILE.js
 ```
 
 Also check any touched runtime or patch file.
@@ -25,7 +25,7 @@ Also check any touched runtime or patch file.
 After source changes, rebuild:
 
 ```powershell
-& "C:\Users\jgodj\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" build\build-ledger18.js
+node build\build-ledger18.js
 ```
 
 Do not hand-edit `dist/`.

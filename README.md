@@ -27,7 +27,7 @@ Important startup rule: `index.html` must not load `pages/runtime/00-core-app-ru
 Build one-file output (run from this folder):
 
 ```powershell
-& "C:\Users\jgodj\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" build\build-ledger18.js
+node build\build-ledger18.js
 ```
 
 Outputs:

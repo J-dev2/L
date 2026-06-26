@@ -14,7 +14,7 @@ Local copy:
 
 Global copy:
 
-- `C:\Users\jgodj\.codex\skills\ledger-ai-handoff\SKILL.md`
+- `~/.codex/skills/ledger-ai-handoff/SKILL.md`
 
 ### `ledger-feature-ux`
 

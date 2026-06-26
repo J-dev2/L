@@ -30,7 +30,7 @@ game state. So "add a page" = add/extend a `.js` render function, not a new HTML
    show up on refresh. Best for quick tweaks.
 2. **Rebuild the bundle** (updates `dist/`), run from this folder:
    ```powershell
-   & "C:\Users\jgodj\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" build\build-ledger18.js
+   node build\build-ledger18.js
    ```
 
 ---

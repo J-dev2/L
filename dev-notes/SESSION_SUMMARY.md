@@ -5,6 +5,85 @@
 
 ---
 
+## Checkpoint 46 - 2026-06-26 (Claude) — entrepreneurship economics overhaul
+
+User-approved build (`pages/systems/entrepreneur.js`). All confirmed via AskUserQuestion.
+- **Removed** duplicate "Budget allocation" graphs from the Product tab (`renderBizGraphsV1861` mode "product"
+  → `parts = []`); it lives in the Budget tab now.
+- **Market share = ONE number.** Was 3 conflicting sources (the `biz.marketShare` field, a separate
+  `revenue/marketSize` calc in the Scale chart, competitors' 10–30%). Now canonical = `revenue ÷ marketSize`,
+  eased into `biz.marketShare` each year (`+ (target-cur)*0.4`), stored in `revenueHistory[].marketShare`, and
+  the Scale chart reads that stored value. Product tile + chart now always agree. Ship-feature nudges the same
+  field.
+- **Per-industry expenses + corporate tax** in the year engine (~line 1611): `INFRA_RATE_V1869[type]` server/
+  cloud (% of revenue, AI/deeptech 4.5% … agency 0.4%), office/real estate `$12K×headcount`, tools now
+  `$2.4K×head + 0.5%×revenue`, and **21% corporate tax** on positive pre-tax profit. Stored on
+  `biz._serverCostV1869/_officeCostV1869/_toolsCostV1869/_corpTaxV1869`. Founder-salary cap still prevents
+  negative cash; tax only hits positive profit. Budget tab shows all 8 lines + donut.
+- **Category-specific Ship a feature**: `FEATURE_TYPE_V1869[type]` gives a noun + kind (digital/product/
+  service). digital → quality+share+churn↓; product → customers+share (flop loses customers); service →
+  brand/nps. Logs/toasts use the industry noun (AI "model upgrade", e-com "product line", agency "service
+  offering", …).
+
+Re-read post-edit: cost engine + budget panel coherent, balanced strings. `entrepreneur.js` cache-stamp
+`bizdeck2`→`bizdeck3`. **NOT runtime-tested** (sandbox down). Pending: user reload + **age up one year** so the
+new costs/tax/market-share compute, then screenshot Budget + Product to confirm. Dist NOT rebuilt.
+
+---
+
+## Checkpoint 45 - 2026-06-26 (Claude)
+
+Entrepreneurship hub deepened (all in `pages/systems/entrepreneur.js`):
+- **New "Budget" tab** (`renderBudgetPanelV1862`, registered in `DASHBOARD_PANELS_V1862` + tab list + dispatch).
+  Breaks out the existing yearly cost model (staff payroll, co-founders ×$60K, marketing, software/tools
+  ×$2.4K/head, founder pay, est. income tax ~30% of draw) as tiles + a `donutSVG` + "people economics"
+  (avg salary, revenue/employee, cost/employee, payroll % of revenue, runway). Reuses real cost formulas from
+  the year tick (~line 1490) so it never double-counts.
+- **Overview stage tracker** (`bizStageLadderV1869`): 5-step ladder Idea→Early/Seed→Growth→Late/Pre-IPO→Public,
+  current step highlighted, progress bar to next milestone (gated on productDev / revenue≥$10M / 5yrs / public),
+  plus the existing `bizNextMilestoneV1862` text. Inline-styled (no new CSS).
+- **Product tab** (`renderProductPanelV1862` rebuilt): shows Product quality / Development / Market share tiles,
+  and a new **Ship a feature** control → `window.bizShipFeatureV1869`: in development it moves productDev +
+  quality (rushed = bug risk); when live it rolls market-share gain vs a buggy-launch loss, odds scaled by
+  quality (`0.35 + quality/200`). Costs ~4% of revenue (min $10K).
+
+All reuse existing helpers (donutSVG, BIZ_CHART_COLORS, metric, actionBtn). Re-read post-edit: syntax balanced,
+following functions intact. `entrepreneur.js` cache-stamp bumped `cents`→`bizdeck` in `play.html`.
+**NOT verified** (sandbox down → no `node --check`; pending user reload + screenshot — big untested JS block, so
+confirm the hub still renders). Dist NOT rebuilt.
+
+---
+
+## Checkpoint 44 - 2026-06-26 (Claude)
+
+Verified live via Chrome screenshot (user runs `play.html` from source, file://). The earlier nav fixes were
+aimed at the wrong overlay variant — user pasted the real DOM (`.v11-hub-tab-strip`, no v18335/v18336), proving
+the standard hubs use `.hub-overlay.v11-tabbed-hub`. ROOT CAUSE of the floating nav was NOT alignment: it was
+the hub **sheet's adaptive height + a ~132px bottom padding**. Final nav fixes (all in `styles/ledger-ui.css`):
+- `.hub-overlay.v16-hub` / `.v11-tabbed-hub` / `.v9-scroll-stable-hub` sheets → `height:100dvh; max-height:100dvh;
+  padding-bottom:0` and overlay `padding:0`. Hub now fills the screen, nav strip flush at the very bottom.
+  (Confirmed on screen.)
+- Nav buttons were left-bunched → `.v11-hub-tab-scroll { justify-content: safe center }` centers them.
+- Team roster action buttons → tidy grid (`.biz1862-emp .biz1862-role-foot`): Train full-width on top, Give
+  raise + Recognize paired below.
+
+Gameplay tweaks (`pages/systems/entrepreneur.js`):
+- Training: skill gain now flat **+2** per session (was +5–9); still 3×/yr; dropped its tiny leave-risk drip so
+  training = skill only.
+- Retention: **Give raise + Recognize share a 2/yr cap** (`e.retainV1868={year,count}`); both buttons disable in
+  the card when used twice.
+
+Stocks show **cents** (`pages/runtime/00-core-app-runtime.js` + `entrepreneur.js`): prices already stored to 2dp
+(market tick `Math.round(next*100)/100`; company tick line ~1396) but DISPLAY rounded to whole dollars. Added
+`priceText18()` / `priceTextV1862()` (always 2 decimals) and swapped them into the brokerage stock card price
+and the Public Market "Share price" + buy/sell/IPO logs. Movement already cent-granular.
+
+Cache: CSS stamped `?v=20260626-navdock5`; the two changed JS files stamped `?v=20260626-cents` in `play.html`
+(file:// caches aggressively, so a plain reload now still pulls fresh). **Not yet visually confirmed:** Team
+button grid, retention disable, cents display (pending user reload + screenshot). Dist NOT rebuilt.
+
+---
+
 ## Checkpoint 43 - 2026-06-26 (Claude)
 
 ### Team: train + retention (culture) — `entrepreneur.js`
@@ -854,7 +933,7 @@ player's actual mental model: pick a company → manage it right there.
 ## Checkpoint 17 - 2026-06-21
 
 ### Business hub rebuilt: tab system + Verdant-style management popups
-Per approved plan `C:\Users\jgodj\.claude\plans\i-feel-like-you-re-sorted-hippo.md`. The hub was a
+Per approved plan `~/.claude/plans/i-feel-like-you-re-sorted-hippo.md`. The hub was a
 long scroll of patched-on panels; rebuilt around tabs + popups (all in `pages/systems/business-entities.js`).
 - **5 tabs** (mirrors the Entrepreneurship dashboard, reuses its global `.biz1862-tab` CSS):
   **Overview** (KPIs + founder mode + company rail + entrepreneurship link), **Company** (focused
@@ -1266,7 +1345,7 @@ Picked up a partially-edited `pages/systems/entrepreneur.js` and completed it:
 
 ### Current task
 Startup mini-game **re-audit + retune** + **scroll buttons (Part E)**, per approved
-plan `C:\Users\jgodj\.claude\plans\agile-stargazing-sifakis.md`.
+plan `~/.claude/plans/agile-stargazing-sifakis.md`.
 
 ### Where things stand (where I left off)
 The big "Startup Mini-Game Depth Upgrade" (Parts A–D, F) **already shipped** —

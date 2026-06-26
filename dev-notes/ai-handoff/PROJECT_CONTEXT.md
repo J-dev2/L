@@ -39,7 +39,7 @@ Do not hand-edit generated output:
 Build from repo root:
 
 ```powershell
-& "C:\Users\jgodj\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" build\build-ledger18.js
+node build\build-ledger18.js
 ```
 
 ## Boot Model
