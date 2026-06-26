@@ -77,6 +77,8 @@
       alive: true,
       age: 0
     };
+    // Match a normally-born child: stamp the inherited IQ so continuing as this heir works the same.
+    try { if (typeof window.childInheritedIQV1862 === "function") child.iqV1862 = window.childInheritedIQV1862(); } catch (e) {}
 
     var idx = 0;
     Object.keys(s.relationships).forEach(function (k) {

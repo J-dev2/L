@@ -1065,12 +1065,19 @@
       var pk = perfKindV1862(perf);
       var tenure = num(e.yearsAtCompany);
       var risk = num(e.leaveRisk) >= 0.18;
+      var leavePct = Math.round(num(e.leaveRisk) * 100);
+      var trained = (e.trainV1868 && e.trainV1868.year === age()) ? num(e.trainV1868.count) : 0;
       return '<div class="biz1862-emp">' +
         '<div class="biz1862-emp-top"><span class="biz1862-emp-avatar">' + escH(initialsV1862(e.name)) + '</span>' +
         '<div class="biz1862-emp-id"><b>' + escH(e.name) + '</b><span>' + escH(role.emoji || "") + ' ' + escH(role.title || e.roleId) + '</span></div>' +
         actionBtn("Fire", "bizFireV1861('" + escH(e.id) + "')", "red", false) + '</div>' +
         '<div class="biz1862-perf"><div class="biz1862-perf-bar ' + pk + '" style="width:' + Math.max(4, Math.min(100, perf)) + '%"></div></div>' +
-        '<div class="biz1862-emp-foot"><span>Perf ' + perf + ' · ' + (tenure ? tenure + "y tenure" : "new hire") + (risk ? ' · <i class="warn">flight risk</i>' : '') + '</span><em>' + moneyText(e.salary) + '/yr</em></div>' +
+        '<div class="biz1862-emp-foot"><span>Perf ' + perf + ' · ' + (tenure ? tenure + "y" : "new") + ' · <span class="' + (risk ? "warn" : "good") + '">' + leavePct + '% leave risk</span></span><em>' + moneyText(e.salary) + '/yr</em></div>' +
+        '<div class="biz1862-role-foot" style="flex-wrap:wrap;gap:4px;margin-top:6px">' +
+          actionBtn("Train " + trained + "/3", "bizTrainEmployeeV1868('" + escH(e.id) + "')", "blue", trained >= 3) +
+          actionBtn("Give raise", "bizRetainEmployeeV1868('" + escH(e.id) + "','raise')", "gold", false) +
+          actionBtn("Recognize", "bizRetainEmployeeV1868('" + escH(e.id) + "','perk')", "green", false) +
+        '</div>' +
         '</div>';
     }).join("");
     return '<div class="biz1862-subsection"><div class="section-label">Roster</div><div class="biz1862-roster">' + cofs + staff + '</div></div>';
@@ -1643,6 +1650,82 @@
     biz.employees.push({ id: roleId + '_' + Date.now(), roleId: roleId, name: pickOne(['Jamie','Alex','Sam','Jordan','Taylor','Morgan','Casey','Riley','Avery','Drew']) + ' ' + pickOne(['Smith','Jones','Lee','Park','Chen','Brown','Davis','Wilson']), salary: salary, cultureFit: cultureFit, performance: clamp01(50 + rnd(-15, 30)), hiredAge: age(), yearsAtCompany: 0, leaveRisk: cultureFit < 50 ? 0.25 : 0.08, isProblem: cultureFit < 30 });
     biz.headcount = num(biz.headcount) + 1; biz.annualCosts = num(biz.annualCosts) + salary;
     log("👤 Hired " + role.title + " at " + biz.name + " for " + moneyText(salary) + "/yr.");
+    rerender();
+  };
+  // Interview + hire flow (v18.68): open a role's candidate pool, screen them, then hire one.
+  window.bizOpenHiringV1868 = function (roleId) {
+    var biz = getActiveBiz(); if (!biz || !BIZ_ROLES[roleId]) return;
+    biz._hiringRoleV1868 = roleId;
+    ensureCandidatesV1868(biz, roleId);
+    rerender();
+  };
+  window.bizCloseHiringV1868 = function () { var biz = getActiveBiz(); if (!biz) return; biz._hiringRoleV1868 = null; rerender(); };
+  window.bizInterviewCandidateV1868 = function (roleId, candId, type) {
+    var biz = getActiveBiz(); if (!biz) return;
+    var pool = biz._candidatesV1868 && biz._candidatesV1868[roleId]; if (!pool) return;
+    var c = (pool.list || []).find(function (x) { return x.id === candId; }); if (!c) return;
+    var fee = type === "refs" ? 2500 : 1000;
+    if (c.revealed[type === "refs" ? "refs" : "skill"]) return;
+    if (num(biz.cashInBusiness) < fee) { toast("Not enough cash in the business for that check."); return; }
+    biz.cashInBusiness = num(biz.cashInBusiness) - fee;
+    if (type === "refs") c.revealed.refs = true; else c.revealed.skill = true;
+    log("🔎 " + (type === "refs" ? "Reference check" : "Interview") + " on " + c.name + " (" + moneyText(fee) + ").");
+    rerender();
+  };
+  window.bizHireCandidateV1868 = function (roleId, candId) {
+    var biz = getActiveBiz(); if (!biz) return; var role = BIZ_ROLES[roleId]; if (!role) return;
+    var pool = biz._candidatesV1868 && biz._candidatesV1868[roleId]; if (!pool) return;
+    var c = (pool.list || []).find(function (x) { return x.id === candId; }); if (!c) return;
+    if (num(biz.cashInBusiness) < c.salaryAsk * 0.5) { toast("Not enough cash in the business to hire."); return; }
+    biz.employees.push({ id: roleId + '_' + Date.now(), roleId: roleId, name: c.name, salary: c.salaryAsk, cultureFit: c.cultureFit, performance: c.performance, hiredAge: age(), yearsAtCompany: 0, leaveRisk: c.leaveRisk, isProblem: c.cultureFit < 30, traitV1868: c.traitId });
+    biz.headcount = num(biz.headcount) + 1; biz.annualCosts = num(biz.annualCosts) + c.salaryAsk;
+    if (biz._candidatesV1868) biz._candidatesV1868[roleId] = null; // pool consumed
+    biz._hiringRoleV1868 = null;
+    log("👤 Hired " + c.name + " as " + role.title + " at " + biz.name + " for " + moneyText(c.salaryAsk) + "/yr.");
+    rerender();
+  };
+  window.bizRejectCandidateV1868 = function (roleId, candId) {
+    var biz = getActiveBiz(); if (!biz) return;
+    var pool = biz._candidatesV1868 && biz._candidatesV1868[roleId]; if (!pool) return;
+    pool.list = (pool.list || []).filter(function (x) { return x.id !== candId; });
+    if (!pool.list.length) { biz._candidatesV1868[roleId] = null; biz._hiringRoleV1868 = null; }
+    rerender();
+  };
+  // Train an employee up to 3x/year (raises performance); retention actions drop flight risk toward ~1%.
+  window.bizTrainEmployeeV1868 = function (empId) {
+    var biz = getActiveBiz(); if (!biz) return;
+    var e = (biz.employees || []).find(function (x) { return x.id === empId; }); if (!e) return;
+    if (!e.trainV1868 || e.trainV1868.year !== age()) e.trainV1868 = { year: age(), count: 0 };
+    if (e.trainV1868.count >= 3) { toast(e.name + " has already trained 3 times this year."); return; }
+    var cost = Math.max(2000, Math.round(num(e.salary) * 0.08));
+    if (num(biz.cashInBusiness) < cost) { toast("Not enough cash to fund training."); return; }
+    biz.cashInBusiness = num(biz.cashInBusiness) - cost;
+    e.trainV1868.count++;
+    e.performance = clamp01(num(e.performance) + 5 + Math.random() * 4);
+    e.leaveRisk = Math.max(0.02, num(e.leaveRisk) - 0.01);
+    log("📈 Trained " + e.name + " (" + e.trainV1868.count + "/3 this year) for " + moneyText(cost) + " — performance up.");
+    rerender();
+  };
+  window.bizRetainEmployeeV1868 = function (empId, mode) {
+    var biz = getActiveBiz(); if (!biz) return;
+    var e = (biz.employees || []).find(function (x) { return x.id === empId; }); if (!e) return;
+    if (mode === "raise") {
+      var bump = Math.max(3000, Math.round(num(e.salary) * 0.15));
+      if (num(biz.cashInBusiness) < bump) { toast("Not enough cash for a raise."); return; }
+      e.salary = num(e.salary) + bump;
+      biz.annualCosts = num(biz.annualCosts) + bump;
+      e.leaveRisk = Math.max(0.01, num(e.leaveRisk) - 0.10);
+      e.cultureFit = clamp01(num(e.cultureFit) + 5);
+      log("💸 Gave " + e.name + " a " + moneyText(bump) + " raise — they're less likely to leave.");
+    } else {
+      var cost = Math.max(3000, Math.round(num(e.salary) * 0.05));
+      if (num(biz.cashInBusiness) < cost) { toast("Not enough cash for that."); return; }
+      biz.cashInBusiness = num(biz.cashInBusiness) - cost;
+      e.leaveRisk = Math.max(0.01, num(e.leaveRisk) - 0.07);
+      e.cultureFit = clamp01(num(e.cultureFit) + 8);
+      biz.culture = clamp01(num(biz.culture) + 2);
+      log("🎉 Recognized " + e.name + " — they feel valued. Flight risk drops, culture up.");
+    }
     rerender();
   };
   window.bizFireV1861 = function (empId) {

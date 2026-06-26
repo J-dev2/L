@@ -2825,17 +2825,18 @@ body.ledger-hub-open {
 }
 
 .hub-overlay.v9-scroll-stable-hub {
-  padding: 7px !important;
+  padding: 0 !important;
   overflow: hidden !important;
-  align-items: center !important;
+  align-items: flex-end !important;
   justify-content: center !important;
 }
 .hub-overlay.v9-scroll-stable-hub .hub-sheet {
   width: var(--ledger-hub-width) !important;
   max-width: calc(100vw - 10px) !important;
-  height: var(--ledger-hub-height) !important;
-  max-height: calc(100dvh - 6px) !important;
-  min-height: min(560px, calc(100dvh - 8px)) !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  min-height: 100dvh !important;
+  padding-bottom: 0 !important;
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;
@@ -3362,13 +3363,16 @@ body.ledger-hub-open {
 /* Hub now has a real scroll body + bottom tab wheel. */
 .hub-overlay.v11-tabbed-hub {
   overflow: hidden !important;
-  align-items: center !important;
+  align-items: flex-end !important;
   justify-content: center !important;
 }
 .hub-overlay.v11-tabbed-hub .hub-sheet {
   display: flex !important;
   flex-direction: column !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
   min-height: 0 !important;
+  padding-bottom: 0 !important;
   overflow: hidden !important;
 }
 .hub-overlay.v11-tabbed-hub .hub-head {
@@ -3405,6 +3409,7 @@ body.ledger-hub-open {
 }
 .v11-hub-tab-scroll {
   display: flex !important;
+  justify-content: safe center !important;
   gap: 7px !important;
   overflow-x: auto !important;
   overflow-y: hidden !important;
@@ -3446,6 +3451,22 @@ body.ledger-hub-open {
   box-shadow: 0 0 0 1px rgba(255,226,176,.22) inset, 0 8px 20px rgba(0,0,0,.26) !important;
 }
 .v11-tab-btn:disabled { opacity: .34 !important; cursor: not-allowed !important; }
+/* Team roster action buttons — tidy grid: Train across the top, Give raise + Recognize paired below */
+.biz1862-emp .biz1862-role-foot {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 5px !important;
+  margin-top: 8px !important;
+}
+.biz1862-emp .biz1862-role-foot > .money-btn {
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  white-space: nowrap !important;
+}
+.biz1862-emp .biz1862-role-foot > .money-btn:first-child {
+  grid-column: 1 / -1 !important;
+}
 .v11-tab-ico { font-size: 17px !important; line-height: 1 !important; }
 .v11-tab-lbl {
   font-family: "JetBrains Mono", monospace !important;
@@ -4151,16 +4172,17 @@ body[data-ledger-height="normal"] { --ledger-hub-height: calc(100dvh - 18px); }
 body[data-ledger-height="tall"] { --ledger-hub-height: calc(100dvh - 6px); }
 
 .hub-overlay.v16-hub {
-  padding: 7px !important;
-  align-items: center !important;
+  padding: 0 !important;
+  align-items: flex-end !important;
   justify-content: center !important;
   overflow: hidden !important;
 }
 .hub-overlay.v16-hub .hub-sheet {
   width: var(--ledger-hub-width) !important;
   max-width: calc(100vw - 8px) !important;
-  height: var(--ledger-hub-height) !important;
-  max-height: calc(100dvh - 6px) !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  padding-bottom: 0 !important;
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;

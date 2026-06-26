@@ -5,6 +5,79 @@
 
 ---
 
+## Checkpoint 43 - 2026-06-26 (Claude)
+
+### Team: train + retention (culture) — `entrepreneur.js`
+Per user: every roster employee now has action buttons (not just high-risk ones):
+- **Train N/3** — up to 3×/game-year, costs ~8% of salary, raises performance ~5–9, nudges leave-risk down.
+  Counter auto-resets each year (`e.trainV1868 = {year, count}` keyed on `age()`).
+- **Give raise** — +15% salary, leave-risk −0.10, culture-fit +5.
+- **Recognize** — perk/appreciation, costs ~5% salary, leave-risk −0.07, culture-fit +8, company culture +2.
+  Shown for ALL employees now (user wants it as a company-wide "people feel appreciated" lever).
+- Roster card shows live **leave-risk %** (warn colour ≥18%, good colour below). Stacking raise/recognize
+  drives risk toward the ~1% floor (`Math.max(0.01, …)`), so nobody you invest in quits.
+- New globals: `bizTrainEmployeeV1868`, `bizRetainEmployeeV1868(id, 'raise'|'perk')`. Helpers verified in scope
+  (`age` L25, `actionBtn` L562 — bakes in preventDefault/stopPropagation, `clamp01` L1245).
+
+### Nav bar floats mid-screen → docked to bottom — `styles/ledger-ui.css`
+Root cause: `.hub-overlay.v16-hub` centered the sheet (`align-items:center`, L4155) while the sheet height is
+adaptive (`--ledger-hub-height`). When the sheet is shorter than the viewport (or the height var is unset and
+it collapses to content), the whole sheet — including its bottom-pinned nav strip — floats mid-screen, and
+shifts as you navigate. The v16 nav is already `flex:0 0 auto` at the sheet bottom (L4228); the sheet is a flex
+column — the bug was purely the vertical centering.
+Fix: `.hub-overlay.v16-hub { align-items: flex-end; padding: 7px 7px 0 }` — docks the sheet (and its nav) to
+the bottom on **every** screen size, desktop included. This restores the ORIGINAL base behaviour (base
+`.hub-overlay` L783 was already `align-items:flex-end` bottom-sheet style; the v16 redesign broke it). Keeps
+width/height controls working; stops the position jumping. Reverted the earlier mobile-only `position:fixed`
+nav rule from `15-patch-v18-33-6.js` (no longer needed).
+
+**User runs SOURCE (`play.html` / root `index.html`), NOT `dist/`.** Confirmed: the dist builds lack the CP42
+interview/hire UI ("INTERVIEW FOR A ROLE" absent) yet the user sees it → they load the source modules. The nav
+fix didn't appear for them because the browser cached `ledger-ui.css`. Mitigations applied:
+- Version-stamped the stylesheet links in `play.html` + root `index.html` (`?v=20260626-navdock`) so a normal
+  reload pulls fresh CSS (no manual hard-refresh needed).
+- Also applied the same `align-items:flex-end` nav-dock fix into all 4 stale `dist/*.html` builds (index,
+  built, play_built, landing_built) at L4163 so any build copy is consistent — though those builds are old
+  (pre-CP42) and aren't what the user actually plays.
+- Specificity verified: `.hub-overlay.v16-hub` (0,2,0,!important) beats `themes/ledger-dark.css`'s
+  `.hub-overlay{align-items:stretch!important}` (0,1,0), so the dock wins regardless of file order.
+- **CORRECTION (next round, via user-pasted DOM):** the More/standard hubs render with
+  `.hub-overlay.v11-tabbed-hub` + a plain `v11-hub-tab-strip` nav (no v18335/v18336 modifier; `setTabV16`
+  handlers) — NOT `v16-hub`. So the v16-only fix missed them. Docked the two remaining centered overlay
+  variants too: `.hub-overlay.v11-tabbed-hub` (L3363) and `.hub-overlay.v9-scroll-stable-hub` (L2827) → both
+  `align-items: flex-end`. Map: v16-hub = business/law/money/entrepreneurship; v11-tabbed-hub =
+  More/life/people/career/finance; v8-adaptive already `stretch` (ok); v5/v7-fixed-hub are dead (superseded).
+  Bumped CSS cache-stamp `navdock`→`navdock2`. (dist builds left as-is — user runs source; rebuild will sync.)
+
+Changed: `pages/systems/entrepreneur.js`, `styles/ledger-ui.css`, `pages/patches/15-patch-v18-33-6.js`,
+`play.html`, `index.html`, and the 4 `dist/*.html` (nav rule only).
+**Tests NOT run (sandbox: no disk).** DO NEXT (Codex/tested): `node --check` the two JS files, rebuild dist
+(regenerates the builds with ALL current source incl. train/retention), eyeball the hub nav docked at the
+bottom on desktop + phone.
+
+---
+
+## Checkpoint 42 - 2026-06-22 (Claude)
+
+### Entrepreneurship: interview + hire (role-based team) — `entrepreneur.js`
+Per user (#17): replaced the one-click "Hire" on the Team panel with a dynamic interview flow.
+- The recruit rail's role cards now show **Interview** (not Hire). Clicking opens that role's **candidate
+  pool** (2–3 candidates, stable within a game year, stored on `biz._candidatesV1868`).
+- Each candidate has a **trait** (`HIRE_TRAITS_V1868`: 10x Performer 🚀 / Culture Champion 🤝 / Rising Star ⭐ /
+  Mercenary 💸 / Steady Hand 🧱 / Diamond in the Rough 💎) that sets performance / culture / flight-risk /
+  salary-ask ranges. Skill + references are **hidden until you pay to check**: Interview $1K reveals the
+  performance score, Refs $2.5K reveals culture + flight risk. Then **Hire** or **Pass**.
+- Hired candidates become real employees carrying the candidate's performance/cultureFit/leaveRisk (feeds the
+  existing yearly attrition/culture mechanics), so WHO you pick matters, not just the role.
+- New globals: `bizOpenHiringV1868` / `bizCloseHiringV1868` / `bizInterviewCandidateV1868` /
+  `bizHireCandidateV1868` / `bizRejectCandidateV1868`. Old `bizHireV1861` kept for back-compat.
+
+Changed file: `pages/systems/entrepreneur.js` only. Save-safe (candidate/hiring state lazy on `biz`; existing
+saves unaffected). **Tests NOT run here (sandbox down).** DO NEXT (Codex/tested): rebuild + entrepreneurship
+probes; confirm the interview-reveal + hire wiring.
+
+---
+
 ## Checkpoint 41 - 2026-06-22 (Claude)
 
 ### Trust "money looks lost" — SAFE visibility fix (titled wealth now shown)
