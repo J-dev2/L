@@ -74,6 +74,7 @@
     // take it public
     biz.public = true; biz.shareTicker = "DASH"; biz.shares = 1000000; biz.floatPct = 20;
     biz._ipoPrice = 30; biz.valuation = 40000000;
+    biz.active = true; biz.dead = false; biz.productStage = "live"; biz.cashInBusiness = Math.max(num(biz.cashInBusiness), 5000000);
     if (typeof window.ensureStocksV18Store === "function") {
       // prime a couple price updates so lastPriceMoveV1862 / lastMarketFactorV1862 populate
     }

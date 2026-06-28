@@ -5,6 +5,345 @@
 
 ---
 
+## Checkpoint 53 - 2026-06-28 (Codex) - Family Office follow-up fix: real founder ids, no duplicate panels, selective carry
+
+Fixed the tested-side issues exposed by the Trust hub DOM:
+
+- `pages/systems/family-office.js`
+  - Founder picker now keys companies by `uid` / `sourceKeyV1861` / fallback id instead of `b.id`, so buttons no longer call `titleEntrepreneurshipCompanyV1872('undefined', ...)`.
+  - Cleans stale `undefined` / `null` entries from `holdings.entrepreneurship.companiesV1872`.
+  - Family Office launcher/operator/founder panels now carry `data-fo72-panel` markers and inject inside the Trust content shell, preventing duplicate loose panels after the overlay.
+  - Founder value display uses `bizV1860StakeValueV1861` when available, matching Entrepreneurship/net-worth logic.
+- `pages/systems/tax-legal.js`
+  - `trustHeldEntrepreneurshipValueV1868()` now reads per-company selections by the same real founder-company keys.
+  - Succession carries only the selected trust-titled founder companies when a per-company map exists; all-or-nothing titling still carries the whole portfolio for old saves.
+  - The old all-or-nothing Entrepreneurship portfolio card clears the per-company map when used, so the two controls stay consistent.
+- `play.html`
+  - Bumped `tax-legal.js` and `family-office.js` cache stamps.
+- Added `cdp/family-office.js` and documented it in `cdp/README.md`.
+
+Verification:
+
+- `node --check pages/systems/family-office.js`
+- `node --check pages/systems/tax-legal.js`
+- `node --check cdp/family-office.js`
+- `node build\build-ledger18.js`
+- `cdp/family-office.js`: 20/20
+- `cdp/trust-holdings.js`: 12/12
+- `cdp/trust.js`: 18/18
+- `cdp/trust-business-protection.js`: 19/19
+- `cdp/death.js`: 20/20
+- `cdp/networth-genetics.js`: 9/9
+
+Decision note: the parked outside-capital venture-firm idea remains parked in `dev-notes/OUTSTANDING_TODO.md`; this pass only fixed the Family Office/operator/per-company trust workflow.
+
+---
+
+## Checkpoint 52 - 2026-06-27 (Claude) — Family Office: holdings popup + operator + per-company titling (UNTESTED)
+
+Built three user-requested features on TOP of Codex's Trust Envelop, as a NEW module
+**`pages/systems/family-office.js` (v18.72)** (so it doesn't clobber Codex's `tax-legal.js`/`entrepreneur.js`),
+plus ONE surgical edit to `tax-legal.js`. Wired into `play.html` after `life-rebuild.js`.
+
+1. **Holdings popup** (`openFamilyOfficeV1872`) — a "🏛️ Family Office" overlay launched from a "What you hold"
+   button injected at the top of the Trust hub. Shows Protected (under trust) vs Net worth, then a row breakdown
+   (corpus, child trusts, titled property, titled entrepreneurship, titled businesses, operator). DISPLAY ONLY —
+   reads Codex's window accessors (`legalProtectedAssetsV1839`, `trustHeldPropertyValueV1868`,
+   `trustHeldEntrepreneurshipValueV1868`, `businessTrustValueV1840`, `reEquityV1863`). Cannot change net worth.
+2. **Operator** (`hireOperatorV1872`/`fireOperatorV1872`) — 3 tiers (Associate/Director/Chief). State on
+   `familyTrustV1839.operatorV1872` (carries to heirs via the trust clone). Each year (wraps
+   `resolveLifeAndFinanceYear`, guarded once/yr) the operator earns `returnRate × titled value`, keeps
+   `annualFeeRate` as its fee, and compounds the rest into `trust.corpus`. Writes ONLY to `trust.corpus` + cash on
+   hire — never touches the asset engines, so no net-worth double-count. An operator desk is injected into the Trust
+   hub. **Rates (2.5/4/6% return, 11–15% fee) are a first pass — TUNE on the tested side.**
+3. **Per-company entrepreneurship titling** (`titleEntrepreneurshipCompanyV1872`) — replaces the all-or-nothing
+   toggle with a per-company picker desk in the Trust hub. Stores a map `holdings.entrepreneurship.companiesV1872`
+   `{id:true}`. **One edit to `tax-legal.js` `trustHeldEntrepreneurshipValueV1868`**: if the map has any titled
+   entries, sum only those companies' `entrepreneurshipStakeValueV1868`; else fall back to the all-or-nothing
+   master flag (backward-compatible for old saves). Titling the first company seeds the map from the whole
+   portfolio if it was previously titled, so protection isn't dropped on transition.
+
+### Files
+- NEW `pages/systems/family-office.js`.
+- `pages/systems/tax-legal.js` — `trustHeldEntrepreneurshipValueV1868` now per-company-aware (backward-compatible).
+- `play.html` — added `family-office.js?v=…-familyoffice2`; bumped `tax-legal.js?v=…-percompany1`.
+
+### Tests run / NOT run
+- **NONE** — sandbox out of disk space (no `node --check`, no `dist` rebuild, no CDP). Manual read-review only:
+  IIFE balanced, accessors guarded, operator writes only to corpus, map carries on the trust clone.
+- **Verify on the tested side (Codex):**
+  - `node --check pages/systems/family-office.js` + `tax-legal.js`; rebuild `dist`.
+  - Net worth UNCHANGED when titling individual companies (per-company `trustHeldEntrepreneurshipValueV1868` vs
+    `legacyNetWorth`); protection rises by exactly the titled companies' value.
+  - Operator: hire → age up → `trust.corpus` rises by `returnRate×titled − fee`, once/year; survives succession.
+  - Old saves (no `companiesV1872`, no `operatorV1872`) behave exactly as before.
+  - Suggest probes: `cdp/family-office.js` (holdings popup renders; per-company titling net-worth-neutral; operator
+    income once/year + balance sanity).
+
+### Known follow-up
+- The Trust hub now shows BOTH Codex's all-or-nothing "Entrepreneurship portfolio" card AND the new per-company
+  picker. Functional (the per-company map takes precedence in the value calc), but consider consolidating to one UI.
+
+---
+
+## Checkpoint 51 - 2026-06-27 (Codex) - Trust Envelop + Entrepreneurship Legal + Business age gates
+
+Completed the requested "one then 3" work and the business age-gate change.
+
+- Trust Envelop:
+  - Added `familyTrustV1839.holdingsV1868` with `property` and `entrepreneurship` envelopes.
+  - Added Family Trust hub cards to title Property and Entrepreneurship portfolios into trust protection without changing net worth.
+  - `legalProtectedAssetsV1839()` now includes titled real estate equity and titled `bizV1860` founder-portfolio value.
+  - Succession now carries titled `finance.reV1863` / `reV1862` property state and titled `finance.bizV1860` Entrepreneurship state to the heir.
+  - Cash inheritance subtracts these live carried assets so they cannot also become phantom cash.
+- Entrepreneurship Legal:
+  - Added a Legal dashboard tab.
+  - Added company-paid tax attorney plans (`startup`, `structuring`, `family_office`) with upfront cost, annual fee, and reduced effective corporate tax rate.
+  - Yearly business math now records counsel fee, effective rate, baseline tax, and tax savings.
+  - Budget tab now shows legal counsel and the effective corporate tax rate instead of hard-coded 21%.
+- Business age gates:
+  - Business launch/acquisition requirements above 21 are capped at 21 across Business hub catalogs, sector catalog merge, and legacy runtime launch/buy handlers.
+  - Existing younger starter ventures remain younger; only higher age walls are capped.
+- Cache stamps bumped in `play.html`; `dist` rebuilt.
+- Added probes: `cdp/trust-holdings.js`, `cdp/entrepreneur-legal.js`, `cdp/business-age21.js`.
+- Tightened existing probes:
+  - `cdp/dashboard.js` now ensures the public-company setup is live before checking market signal fields.
+  - `cdp/features.js` checks Budget allocation from the Funding tab, where the dashboard intentionally renders it.
+
+Verification run:
+
+- `node --check` on touched source/probe JS: clean.
+- `node build\build-ledger18.js`: passed.
+- New probes:
+  - `cdp/trust-holdings.js`: 12/12
+  - `cdp/entrepreneur-legal.js`: 11/11
+  - `cdp/business-age21.js`: 8/8
+- Regression probes:
+  - `cdp/trust-business-protection.js`: 19/19
+  - `cdp/trust.js`: 18/18
+  - `cdp/death.js`: 20/20
+  - `cdp/networth-genetics.js`: 9/9
+  - `cdp/dashboard.js`: 32/32
+  - `cdp/features.js`: 17/17
+  - `cdp/founderpay.js`: 24/24
+
+Key Trust Envelop probe numbers: titled property `$5M`, titled founder portfolio `$10M`, protected assets rose by `$15M`, net worth stayed unchanged before/after titling, and heir cash inheritance was based on the remaining cash estate rather than duplicating titled holdings.
+
+---
+
+## Checkpoint 50 - 2026-06-27 (Codex) - task #20/#Life verification + no-phantom-business-cash fix
+
+Completed the requested follow-up verification for outstanding tasks #3 and #4.
+
+- Rebuilt `dist` after source changes (`node build/build-ledger18.js`).
+- Added `cdp/life.js`: verifies the v18.71 Life rebuild renders through `lifehub`, has no horizontal overflow at the smoke viewport, opens the Luxury popup, keeps Decompress cheap/repeatable, treats Luxury/Experiences as pure sinks, gates Experiences once/year, and applies Status perks once/year.
+- Added `cdp/trust-business-protection.js`: verifies a `$500B` Business-hub company titled 100% into the family trust:
+  - changes net worth only by the legal titling fee,
+  - raises `businessTrustValueV1840()` and `legalProtectedAssetsV1839()` by the titled business value,
+  - survives succession as a live inherited business with trust percent intact,
+  - records `lastBusinessCarry`, `lastTrustBusinessCarry`, and `sourceLedger.trustOwnedBusiness`,
+  - makes `repairLegacyCarryV1847()` report the carry is already as large as the best source, without duplicating business value or net worth.
+- During the exact trust probe, found and fixed a related phantom-cash path: `personalInheritanceCashV1846()` was still calculating cash inheritance from `legacyNetWorth()` while `applyLegacyCarryV1846()` also carried live businesses forward. This could give an heir the carried business plus a second cash payout based on that same business value. Fixed by subtracting `businessCarryValueV1846(sourceState)` from the cash-inheritance base, matching the existing trust-corpus subtraction rule.
+- Bumped `play.html` cache stamp to `tax-legal.js?v=20260627-trustprotect2`.
+
+Verification run:
+
+- `node --check pages/systems/tax-legal.js`
+- `node --check cdp/life.js`
+- `node --check cdp/trust-business-protection.js`
+- `cdp/trust-business-protection.js`: 19/19
+- `cdp/death.js`: 20/20
+- `cdp/trust.js`: 18/18
+- `cdp/networth-genetics.js`: 9/9
+- `cdp/life.js`: 19/19
+
+Key trust-probe numbers after the fix: titled value `$500B`, protected assets `$500B`, old net worth about `$500.0095B`, heir net worth about `$500.008037B`, cash inheritance about `$8.037M` from the remaining cash estate rather than a duplicate `$423B` business payout.
+
+---
+
+## Checkpoint 49 - 2026-06-27 (Claude) — TRUST "loses value across succession" root cause + fix (UNTESTED)
+
+Investigated task #20 (the repair-carry "never recovers" / ~$500B trust balance-loss bug). **Root cause found
+(high confidence):** a business titled into the family trust via the Business/Legal hub (`familyV1833.trustPercent`,
+valued by `trustBusinessCarryValueV1846` / `businessTrustValueV1840`) was **not included in the estate-tax shield
+on death**, so it was taxed + probated every succession.
+
+- The death settlement (`08-patch-v18-31.js` `estateSettlement`, ~L206) computes
+  `protectedValue = min(gross, assignedTrustValue(s) + legalProtectedValue)`. `assignedTrustValue` only covers the
+  **estate-plan** titling (`estateV1831.assets.businessPercent`), NOT the Business/Legal-hub titling. And
+  `legalProtectedValue` = `legalProtectedAssetsV1839()` = `protectedAssets()` = **corpus + childTrustTotal only**.
+  So a Business-hub-titled business fell into `unprotected` → estate tax (up to ~8.5% effective for Dynasty) +
+  probate, **every generation**. `repairLegacyCarry` only band-aided it by re-pulling from a pre-death backup →
+  "never recovers". (Note: `estateSettlement` even computes `businessTrustValue` on L204 but never adds it to
+  `protectedValue` — the same omission.)
+
+**Fix (surgical, non-destructive):**
+- `pages/systems/tax-legal.js` `protectedAssets()` now adds `trustBusinessCarryValueV1846(stateNow())`. Since the
+  death patch caps `protectedValue` at `gross`, this can ONLY reduce estate tax — it never adds phantom cash and
+  **does not change net worth** (the business is still counted once as an operating business in finance-ledger).
+- `pages/systems/finance-ledger.js` `shortcuts()` "Family trust" tile now includes `businessTrustValueV1840()` so
+  the Finance page matches the Legal page's existing "Under trust (total)". Display-only.
+- `play.html`: added cache stamps `tax-legal.js?v=…-trustprotect1`, `finance-ledger.js?v=…-trustprotect1`.
+
+**Why it's safe to ship untested:** both changes are display + death-tax-calc only. Reloading does NOT mutate the
+save (protectedAssets/shortcuts are read during render; the death-tax change only applies at the NEXT succession).
+Worst case is over-protection, but it's capped at the gross estate → tax can't go negative and no phantom cash.
+
+**Tests run / NOT run:** NONE — sandbox still out of disk space. No `node --check`, no `dist` rebuild, no
+`cdp/death.js`/`cdp/trust.js`/`cdp/networth-genetics.js` probes. **Verify on the tested side:** title a business
+100% to trust, confirm `legalProtectedAssetsV1839()` rises by its value, net worth is UNCHANGED, then die and
+confirm the heir keeps the business value (estate tax/probate no longer eats it) and it persists the next year.
+
+**Note:** past losses already taxed in prior successions are gone; this fixes it going forward. This also unblocks
+the **Trust Envelop** (#3 / `TRUST_ENVELOP_PLAN.md`) which required this persistence/protection fix first.
+
+**Valuation consistency (verified):** `trustBusinessCarryValueV1846()` (tax-legal, used by the protection fix) and
+`businessTrustValueV1840()` = `trustBusinessValue()` (business-entities, used by the Finance display) compute the
+**same** formula — Σ `businessValue(b) × familyV1833.trustPercent` — so protection and display agree.
+
+**Confidence:** high on the root cause + safety (traced the exact death-settlement paths: `assignedTrustValue`
+covers only the estate-plan `estate.assets.businessPercent`, NOT the Business-hub `familyV1833.trustPercent`; and
+`legalProtectedValue` omitted it). NOT a tested guarantee — verified by source reading only (sandbox down). Treat
+as "fix applied, needs tested-side confirmation," not "closed".
+
+---
+
+## Checkpoint 48 - 2026-06-26 (Claude) — LIFE PAGE REBUILD shipped + luxury/experiences money-sinks
+
+Built the approved CP47 rebuild as a NEW module: **`pages/systems/life-rebuild.js` (v18.71)**, wired into
+`play.html` right after `life-wellbeing.js` (cache-stamp now `liferebuild3`) so its `renderHubContent` wrap is the
+OUTERMOST one.
+
+**Style note (follow-up):** the first cut hardcoded its own colors/classes; rewrote it to use the **project design
+system** — theme tokens (`var(--bg/--card/--line/--ink/--dim/--accent/--accent-2/--good/--bad/--money)`) and the
+existing component classes (`.panel`, `.section-label`, `.row/.row-title/.row-sub`, `.icon-btn`, `.lf-card/.lf-grid/
+.lf-pill`, `.school-menu-grid/.school-menu-card`, `.bar/.fill`, `.money-btn`, `.life-memory`, `.hub-close`). The only
+injected CSS now is the centered dialog shell + hero, all using tokens. Popups also default-center (was a bottom sheet).
+
+**Follow-up 2 (user request, cache-stamp `liferebuild4`):** brought the **Choose Your Life Focus**, **Lifestyle
+Budget** (rich 6-tier with deltas/perks/warnings), and **Personal Goal** sections back as visible on-page panels
+(`focusPanel()`/`lifestylePanel()`/`goalPanel()`) — they read the game's OWN mutated `lifeFocusCatalog`/
+`lifestyleCatalog`/`lifeGoalCatalog`, so they match the old rich UI; the now-redundant Focus&Goals popup was
+removed. Added **gender** to the hero subline (`state.gender` → ♂/♀ label) so it reads at a glance. Fixed
+`effectPills` so a negative stress delta shows green (good), and pill labels are capitalized to match `deltaChips`.
+
+**Follow-up 3 (user request, cache-stamp `liferebuild5`):** wired a **yearly Status perk** so owned luxuries keep
+paying off. `statusYearlyPerk()` maps the Status ladder → a small stat perk (Rising +1 happiness … Iconic +3
+happiness/+2 popularity/+2 confidence). `applyStatusPerkYear()` applies it once per year (guarded by
+`luxuryV1871._perkYr === age()`) via `applyStats` (stat deltas only — **no money, no net-worth impact**) and logs a
+concise line for visibility. Hooked through `wrapYearlyPerk()` wrapping `resolveLifeAndFinanceYear` (the core
+yearly resolver ageUp calls). The Luxury popup header now shows the active perk as pills (`+X · per year`).
+
+**Follow-up 4 (layout polish, cache-stamp `liferebuild7`):** put **Recent Timeline + Personal Goal** into a
+two-column row (`.life71-two`, collapses to 1 col ≤700px) — the old form factor. Made **Focus** and **Lifestyle
+Budget** collapsible accordions (`sectionHead()` + module var `collapseV1871`, default collapsed, toggled by
+`lifeToggleV1871()`); the header shows the current pick (e.g. "⚖️ Balanced Life ▸") so collapsed stays useful,
+and the choice survives the game's full re-renders. Renamed "Recent Story" → "Recent Timeline".
+
+**Follow-up 5 (Memories panel + economy tune, cache-stamp `liferebuild8`):** added a collapsible **📝 Memories**
+panel (`memoriesPanel()`, default collapsed) showing `state.life.memories`. Economy tune for very-wealthy lives:
+added **tier-5 ultra luxuries** (private jet $45M, named foundation $150M, mega-yacht $300M, pro sports team
+$1.2B) and **high-end experiences** (charity gala $5M, week on the space station $30M), plus a new top Status tier
+**Legendary** (score ≥80 → +4 happiness/+3 popularity/+3 confidence per year). Still pure sinks — none of it
+touches net worth. `LUX` is now 16 items (tiers 1–5), `EXP` 10 items.
+
+**Follow-up 6 (premium luxury cards, cache-stamp `liferebuild9`):** the Luxury + Experiences popups now use a
+dedicated card style (`.life71-lux-card` grid) instead of plain `.lf-card`: serif name, big emoji, a tier/price
+**badge**, gold buy button, and **tier-accented borders/material** (t2 blue → t3 gold → t4 warm-tint → t5 ultra
+gold-glow gradient). Owned/booked cards dim and the button turns green "✓ Owned/Booked". All from theme tokens.
+
+**Follow-up 7 (card layout + sort + labels, cache-stamp `liferebuild12`):** per user feedback the Luxury/Experiences
+cards were switched from tall vertical cards to a **horizontal band** layout (`.life71-lux-card` is now flex-row:
+emoji · name/desc/pills · badge+buy on the right; single-column grid; wraps on ≤430px). Both lists now **sort by
+cost ascending** (`LUX.slice().sort((a,b)=>a.cost-b.cost)`, same for `EXP` — display-only, owned/booked state
+unaffected). Added clarifying labels: luxury cards show a **"Lifetime bonus"** tag above the stat pills (one-time
+boost) and the popup header explains "Each piece gives a one-time lifetime stat bonus and raises your Status";
+experience cards show **"Boost + a memory · once a year"**. `effectPills` was also fixed so a negative **stress**
+delta renders green (good) and pill labels are capitalized. Net: `play.html` Life cache-stamp is now `liferebuild12`.
+
+### What it does
+- Wraps `renderHubContent` and, for ids `lifehub`/`life`/`stack`/`life-stack`, RETURNS a brand-new clean page
+  (it does NOT call the previous wrap for those ids, so the old Chapter Desk + stacked Focus/Lifestyle/Goal/
+  Memories panels no longer render on the Life hub; every other hub is untouched — `prev.apply` passthrough).
+- **Compact status header**: Health / Stress / Mental / Energy / Happiness / Money tiles + hero (name, age,
+  stage, Status tier, net worth, cash).
+- **Cheap one-click de-stress** `lifeDecompressV1871()` — $25 fixed, −6 stress / +2 happiness / +1 energy,
+  repeatable (NOT a money sink). Small fixed cost per CP47.
+- **Popup-category grid** (body-level overlay `#life-pop-v1871`, slides up, Esc/backdrop close) that REUSES the
+  existing openers — no actions rewritten:
+  - Body & Mind / Fun & Hobbies / Side Money → built from the runtime `activities` array + `doActivity(id)`
+    (same 3-way split as `renderHealth`: `WELLNESS_IDS` = gym/library/meditate/volunteer/haircut/doctor/
+    therapySession/travel).
+  - Wellbeing → `renderWellbeingPanelV1870()` (the CP47 panel, now surfaced as a popup instead of always-on).
+  - Focus & Goals → `setLifeFocus` / `setLifestyle` / `chooseLifeGoal` / `pursueLifeGoal` over the runtime
+    catalogs.
+  - Training → `renderMartialList()` / `renderMartialDetail()` (reads global `martialFocus`).
+- **NEW money-sinks** (in their own areas, per CP47 "spend goes elsewhere"):
+  - **Luxury & Status** — 12 goods across 4 tiers (`buyLuxuryV1871`), one-time buys, apply stat deltas once +
+    raise a derived **Status** ladder (Understated→Rising→Comfortable→Affluent→Elite→Iconic; weight = tier²).
+  - **Experiences** — 8 big discretionary trips (`bookExperienceV1871`), one of each per year
+    (`actionsTaken.exp_<id>`), buy happiness + stress relief + a life memory.
+  - **DESIGN: pure sinks.** Luxury/experience spend is gone and is NEVER added to net worth (deliberately, to
+    avoid the double-count traps the finance refs warn about). State `state.luxuryV1871={owned:[],lifetimeSpend}`.
+- **Popup survives re-render**: overlay is appended to `<body>` (sibling of `#app`); a `render()` wrap re-fills
+  the open popup after any reused action (and auto-closes it if a pending event appears or the player dies).
+
+### Files changed
+- NEW `pages/systems/life-rebuild.js`.
+- `play.html` — added the `<script>` after `life-wellbeing.js`.
+
+### Tests run / not run
+- **NOT run**: `node --check`, `dist` rebuild, CDP probes — the Linux sandbox was **out of disk space** all
+  session (same blocker as CP43–47). Did a careful manual review instead (balanced braces, every external
+  global guarded with `typeof`/`window.`, no double-charge, net-worth untouched).
+- Verified by reasoning, not runtime: popup overlay is body-level so it persists across `#app` re-renders.
+
+### Risks / watch
+- Integration point is `renderHubContent` (proven — `life-command.js` hooks the same chokepoint live), but the
+  popup-survives-render behavior and the reused-action refresh are UNTESTED in-browser. First QA step: reload
+  `play.html`, open Life, click each category, buy a luxury, book an experience, decompress, then **age up** and
+  confirm the popup refreshes / experiences reset.
+- Relies on the runtime globals `activities`, `doActivity`, `renderWellbeingPanelV1870`, `renderMartialList/
+  Detail`, `setLifeFocus/Lifestyle`, `chooseLifeGoal`, `pursueLifeGoal`, `applyDeltas`, `addLifeMemory` — all
+  guarded; if any is missing the section degrades gracefully (empty note / route to Health hub).
+
+### Next step
+- When the sandbox is back: `node --check pages/systems/life-rebuild.js`, then `node build/build-ledger18.js`,
+  then the CDP smoke probes. Consider a small `cdp/life.js` (open each popup, buy lux, book exp, decompress,
+  age-up reset). Optional follow-ups: a yearly Status perk; fold the legacy `renderHealth` activity tab into the
+  popups; let owned luxuries grant a small passive happiness floor (needs a yearly hook).
+
+---
+
+## Checkpoint 47 - 2026-06-26 (Claude) — Life wellbeing + LIFE-PAGE REBUILD plan
+
+### Built: `pages/systems/life-wellbeing.js` (loaded in play.html after more-command.js)
+A wellbeing layer: state `state.wbV1870` (fitness/diet/sleep/habits/conditions), a yearly pass
+`applyWellbeingYearV1870()` (wraps `resolveAnnualActivityHabits` — runs each ageUp) that rebalances stress
+(baseline −2/yr decompression + habit/diet/sleep relief vs buildup, stress>70 drags health/mood, conditions
+progress), and `renderWellbeingPanelV1870()` (a dashboard: 5 stat bars + Work out/Meditate/Vacation +
+diet/sleep/habit/condition controls). **The always-on panel injection is DISABLED** (wrap #2 commented out) —
+it duplicated the EXISTING Body & Mind popups and ate screen space. Backend rebalance + the panel fn remain.
+
+### NEXT (approved by user): REBUILD the whole Life page, top to bottom
+User wants a clean, **popup-driven** Life page (saves real estate, more dynamic). Keep stress relief **cheap +
+one-click + repeatable** (small fixed cost, NOT a money sink); put the real **money-sinks in OTHER life areas**
+(luxury / status / experiences). For mid-tier+ players stress is trivially affordable, so the interesting
+decision must become "where do I spend?".
+- The ENTIRE current Life system is embedded in `pages/runtime/00-core-app-runtime.js`: activities grid +
+  popups (`renderActivity()` ~L3751, `doActivity(id)` ~L2684, "Body & Mind" ~L3579, Healthcare/Self-Care/
+  Exercise submenus), stats, timeline, goals, family, pets, save/load, journal, art & auctions.
+- The current top layout is the "Chapter Desk" from `pages/systems/life-command.js` (it wraps
+  `renderHubContent` and prepends `renderLifeHubCommandV1844()` for ids lifehub/life/stack/life-stack).
+- REBUILD APPROACH: a fresh module that wraps `renderHubContent` (load it AFTER life-command so it's
+  outermost) and RETURNS a brand-new clean layout for the lifehub — a compact status header (Health/Stress/
+  Mental/Energy/Happiness/Money), a tidy grid of popup-category buttons that CALL THE EXISTING action openers
+  (don't rewrite the actions — reuse `doActivity` + the existing popup openers), a cheap one-click de-stress,
+  and a small recent-timeline. Map the existing category openers in `renderActivity()` first so the new grid
+  can trigger them.
+
+---
+
 ## Checkpoint 46 - 2026-06-26 (Claude) — entrepreneurship economics overhaul
 
 User-approved build (`pages/systems/entrepreneur.js`). All confirmed via AskUserQuestion.

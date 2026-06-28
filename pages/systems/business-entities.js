@@ -18,6 +18,19 @@
     return Math.round(n(value));
   }
 
+  function businessMinAgeV1872(v) {
+    var raw = n(v && v.minAge, 21);
+    return raw > 21 ? 21 : Math.max(0, round(raw || 21));
+  }
+
+  function normalizeBusinessAgeGatesV1872(list) {
+    if (!Array.isArray(list)) return list || [];
+    list.forEach(function (v) {
+      if (v && n(v.minAge, 0) > 21) v.minAge = 21;
+    });
+    return list;
+  }
+
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, n(value)));
   }
@@ -606,14 +619,14 @@
   };
 
   function businessCatalog() {
-    try { if (typeof entrepreneurshipCatalog !== "undefined" && Array.isArray(entrepreneurshipCatalog)) return entrepreneurshipCatalog; } catch (e) {}
-    try { if (Array.isArray(window.entrepreneurshipCatalog)) return window.entrepreneurshipCatalog; } catch (e2) {}
+    try { if (typeof entrepreneurshipCatalog !== "undefined" && Array.isArray(entrepreneurshipCatalog)) return normalizeBusinessAgeGatesV1872(entrepreneurshipCatalog); } catch (e) {}
+    try { if (Array.isArray(window.entrepreneurshipCatalog)) return normalizeBusinessAgeGatesV1872(window.entrepreneurshipCatalog); } catch (e2) {}
     return [];
   }
 
   function acquisitionCatalog() {
-    try { if (typeof V6_EXTRA_COMPANIES !== "undefined" && Array.isArray(V6_EXTRA_COMPANIES)) return V6_EXTRA_COMPANIES; } catch (e) {}
-    try { if (Array.isArray(window.V6_EXTRA_COMPANIES)) return window.V6_EXTRA_COMPANIES; } catch (e2) {}
+    try { if (typeof V6_EXTRA_COMPANIES !== "undefined" && Array.isArray(V6_EXTRA_COMPANIES)) return normalizeBusinessAgeGatesV1872(V6_EXTRA_COMPANIES); } catch (e) {}
+    try { if (Array.isArray(window.V6_EXTRA_COMPANIES)) return normalizeBusinessAgeGatesV1872(window.V6_EXTRA_COMPANIES); } catch (e2) {}
     return [];
   }
 
@@ -744,7 +757,7 @@
     (acquisitionCatalog() || []).forEach(function (v) { if (v && v.id) pool.push(v); });
     (businessCatalog() || []).forEach(function (v) {
       if (!v || !v.id || String(v.id).indexOf("acq_") === 0) return;
-      pool.push({ id: v.id, name: v.name, category: v.category, minAge: v.minAge, startup: v.startup, buy: n(v.buy) || Math.round(n(v.startup) * 2.2), desc: v.desc, failureRisk: v.failureRisk });
+      pool.push({ id: v.id, name: v.name, category: v.category, minAge: businessMinAgeV1872(v), startup: v.startup, buy: n(v.buy) || Math.round(n(v.startup) * 2.2), desc: v.desc, failureRisk: v.failureRisk });
     });
     var seen = {}, uniq = [];
     pool.forEach(function (v) {
@@ -2012,11 +2025,14 @@
   }
   window.startVentureV1862 = function (id) {
     var before = businesses().map(function (b) { return String(b.id); });
+    businessCatalog();
     if (typeof window.startVenture === "function") window.startVenture(id);
     if (businesses().length > before.length) { focusNewestV1862(before, id); window.closeBizModalV1862(); saveRender("business"); }
   };
   window.buyCompanyV1862 = function (id) {
     var before = businesses().map(function (b) { return String(b.id); });
+    businessCatalog();
+    acquisitionCatalog();
     if (typeof window.buyCompany === "function") window.buyCompany(id);
     if (businesses().length > before.length) { focusNewestV1862(before, null); window.closeBizModalV1862(); saveRender("business"); }
   };
@@ -2030,7 +2046,8 @@
   function newVentureCardV1862(v, owned, s) {
     var exists = owned.some(function (b) { return String(b.id) === String(v.id); });
     var missing = [];
-    if (n(s.age) < n(v.minAge, 18)) missing.push("Age " + n(v.minAge, 18) + "+");
+    var minAge = businessMinAgeV1872(v);
+    if (n(s.age) < minAge) missing.push("Age " + minAge + "+");
     if (n(s.money) < n(v.startup)) missing.push(compactMoney(v.startup) + " cash");
     if (exists) missing.push("Owned");
     var ready = !missing.length;
@@ -2053,7 +2070,8 @@
       var acards = acq.map(function (v) {
         var price = n(v.buy || n(v.startup) * 2 || 50000);
         var missing = [];
-        if (n(s.age) < n(v.minAge, 18)) missing.push("Age " + n(v.minAge, 18) + "+");
+        var minAge = businessMinAgeV1872(v);
+        if (n(s.age) < minAge) missing.push("Age " + minAge + "+");
         if (n(s.money) < price) missing.push(compactMoney(price) + " cash");
         var ready = !missing.length;
         return '<button class="v1840-launch-card ' + (ready ? "ready" : "") + '" onclick="event.preventDefault();event.stopPropagation();buyCompanyV1862(\'' + esc(v.id) + '\')" ' + (!ready || typeof window.buyCompany !== "function" ? "disabled" : "") + '><span>' + categoryIcon(v.category) + ' ' + esc(v.category || "Acquisition") + '</span><b>' + esc(v.name || v.id) + '</b><em>' + esc(v.desc || "Buy an existing company.") + '</em><strong>' + (ready ? "Buy ~" + compactMoney(price) : missing.join(" / ")) + '</strong></button>';
@@ -2393,7 +2411,8 @@
       var cards = groups[cat].map(function (v) {
         var exists = owned.some(function (b) { return String(b.id) === String(v.id); });
         var missing = [];
-        if (n(s.age) < n(v.minAge, 18)) missing.push("Age " + n(v.minAge, 18) + "+");
+        var minAge = businessMinAgeV1872(v);
+        if (n(s.age) < minAge) missing.push("Age " + minAge + "+");
         if (n(s.money) < n(v.startup)) missing.push(compactMoney(v.startup) + " cash");
         if (exists) missing.push("Owned");
         var ready = !missing.length;
@@ -2417,7 +2436,8 @@
     var cards = catalog.map(function (v) {
       var price = n(v.buy || n(v.startup) * 2 || 50000);
       var missing = [];
-      if (n(s.age) < n(v.minAge, 18)) missing.push("Age " + n(v.minAge, 18) + "+");
+      var minAge = businessMinAgeV1872(v);
+      if (n(s.age) < minAge) missing.push("Age " + minAge + "+");
       if (n(s.money) < price) missing.push(compactMoney(price) + " cash");
       var ready = !missing.length;
       return '<button class="v1840-launch-card acquisition ' + (ready ? "ready" : "") + '" onclick="event.preventDefault();event.stopPropagation();buyCompanyV1862(\'' + esc(v.id) + '\')" ' + (!ready || typeof window.buyCompany !== "function" ? "disabled" : "") + '><span>' + categoryIcon(v.category) + ' ' + esc(v.category || "Acquisition") + '</span><b>' + esc(v.name || v.id) + '</b><em>' + esc(v.desc || "Buy an existing company.") + '</em><strong>' + (ready ? "Buy around " + compactMoney(price) : missing.join(" / ")) + '</strong></button>';
@@ -2474,7 +2494,8 @@
     var rows = launch.concat(acquisition).map(function (v) {
       var price = n(v.buy || v.startup || 0);
       var missing = [];
-      if (n(s.age) < n(v.minAge, 18)) missing.push("Age " + n(v.minAge, 18) + "+");
+      var minAge = businessMinAgeV1872(v);
+      if (n(s.age) < minAge) missing.push("Age " + minAge + "+");
       if (price && n(s.money) < price) missing.push(compactMoney(price) + " cash");
       if (!missing.length) missing.push("Ready");
       return '<div class="v1841-requirement"><span>' + esc(v.category || "Business") + '</span><b>' + esc(v.name || v.id) + '</b><em>' + esc(v.desc || "Business path.") + '</em><i class="' + (missing[0] === "Ready" ? "good" : "gold") + '">' + esc(missing.join(" / ")) + '</i></div>';
@@ -2551,6 +2572,7 @@
   var previousRenderHubContent = window.renderHubContent || (typeof renderHubContent === "function" ? renderHubContent : null);
   window.renderBusinessHubV1840 = renderBusinessHub;
   window.renderEntrepreneurshipHubV1841 = renderEntrepreneurshipHub;
+  try { businessCatalog(); acquisitionCatalog(); } catch (e) {}
   window.businessEnterpriseScoreV1840 = enterpriseScore;
   window.businessTrustValueV1840 = trustBusinessValue;
   window.businessAssetIncomeBonus = businessAssetIncomeBonus;

@@ -6,7 +6,8 @@ const distDir = path.join(projectDir, "dist");
 const reportPath = path.join(projectDir, "docs", "build-report.json");
 
 function readRel(rel) {
-  return fs.readFileSync(path.join(projectDir, rel.replace(/\//g, path.sep)), "utf8");
+  const fileRel = rel.split(/[?#]/)[0];
+  return fs.readFileSync(path.join(projectDir, fileRel.replace(/\//g, path.sep)), "utf8");
 }
 
 function inlineStyles(html) {

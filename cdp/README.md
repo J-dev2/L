@@ -39,6 +39,10 @@ only pulls scripts referenced in `play.html` / `index.html`).
 | `founderpay.js` | Founder salary + manual distribution + tax | 24 |
 | `stock.js`      | Share counts, buyback de-list, splits, dividends | 30 |
 | `trust.js`      | Family trust create/fund, net worth, succession carry, death haircut | 18 |
+| `trust-holdings.js` | Trust Envelop titles Property + Entrepreneurship holdings, carries them without duplicate cash | 12 |
+| `family-office.js` | Family Office popup/operator/per-company founder titling + selected-company succession | 20 |
+| `entrepreneur-legal.js` | Entrepreneurship Legal tab + tax attorney rate/fee math | 11 |
+| `business-age21.js` | Business opportunity age gates above 21 are capped at 21 in UI/actions | 8 |
 | `wayback.js`    | Checkpoint create/restore + death-screen "Undo Death" | 11 |
 | `devtools.js`   | Hidden dev-tools gate/unlock + panel tools (run with `&dev=1`) | 17 |
 | `business-locations.js` | Business #10 locations/franchises/rival share | 23 |

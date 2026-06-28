@@ -618,12 +618,16 @@
     var risk = Math.max(0, round(f.taxLegalRisk));
     var invested = parts.assets.filter(function (row) { return ["brokerageCash", "stocks", "firm", "manager"].indexOf(row.id) >= 0; }).reduce(function (sum, row) { return sum + row.value; }, 0);
     var childTrusts = Object.keys(f.trustFunds || {}).reduce(function (sum, key) { return sum + Math.max(0, n(f.trustFunds[key])); }, 0);
-    var trustTotal = n((f.familyTrustV1839 || {}).corpus) + childTrusts + n(((safeState().estateV1831 || {}).assets || {}).trustCash) + n((f.familyEnterpriseV1833 || {}).totalTrustDividends);
+    // Include businesses titled into the trust so this matches the Legal page's "Under trust (total)"
+    // (display only — the business stays counted once under Operating businesses in net worth).
+    var titledTrustBiz = 0;
+    try { titledTrustBiz = typeof window.businessTrustValueV1840 === "function" ? Math.max(0, n(window.businessTrustValueV1840())) : 0; } catch (eTB) {}
+    var trustTotal = n((f.familyTrustV1839 || {}).corpus) + childTrusts + n(((safeState().estateV1831 || {}).assets || {}).trustCash) + n((f.familyEnterpriseV1833 || {}).totalTrustDividends) + titledTrustBiz;
     return '<section class="panel v1836-shortcuts"><div class="section-label">🧭 Where controls live</div><div class="v1836-shortcut-grid">' +
       '<div><span>Banking controls</span><b>Money</b><em>Checking, savings, budget, credit, insurance.</em>' + openAction("Open Money", "money") + '</div>' +
       '<div><span>Investment controls</span><b>' + compactMoney(invested) + '</b><em>Investments, outside managers, personal firm, fund track.</em>' + openAction("Open Investments", "brokerage") + '</div>' +
       '<div><span>Legal / accountant</span><b>' + esc(accountant === "none" ? "No accountant" : accountant) + '</b><em>Tax debt ' + compactMoney(f.taxDebt || 0) + ', risk ' + risk + '/100.</em>' + openAction("Open Legal", "law") + '</div>' +
-      '<div><span>Family trust</span><b>' + compactMoney(trustTotal) + '</b><em>Trust corpus and child trusts stay in Legal.</em>' + openAction("Open Legal", "law") + '</div>' +
+      '<div><span>Family trust</span><b>' + compactMoney(trustTotal) + '</b><em>Corpus, child trusts, and businesses titled to the trust. Managed in Legal.</em>' + openAction("Open Legal", "law") + '</div>' +
       '</div></section>';
   }
 

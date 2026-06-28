@@ -263,7 +263,7 @@
     NEW_VENTURES.forEach(function (v) {
       if (catalog.some(function (x) { return x.id === v.id; })) return;
       var entry = {
-        id: v.id, name: v.name, category: v.sector, minAge: v.minAge,
+        id: v.id, name: v.name, category: v.sector, minAge: Math.min(Number(v.minAge) || 21, 21),
         startup: v.startup, buy: Math.round(v.startup * 2.2),
         yearlyMin: v.yearlyMin, yearlyMax: v.yearlyMax,
         scaleStat: v.scaleStat, failureRisk: v.failureRisk, desc: v.desc
@@ -274,6 +274,7 @@
     // Re-home every catalog entry into its clean sector.
     catalog.forEach(function (c) {
       if (c && c.id && SECTOR_OF[c.id]) c.category = SECTOR_OF[c.id];
+      if (c && Number(c.minAge || 0) > 21) c.minAge = 21;
     });
     return true;
   }

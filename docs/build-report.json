@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-06-22T23:51:53.203Z",
+  "builtAt": "2026-06-28T01:34:59.588Z",
   "source": "outputs/ledger18_modular_v18_35",
   "entries": [
     {
@@ -11,7 +11,7 @@
           "bytes": 11028
         }
       ],
-      "bytes": 203908
+      "bytes": 204590
     },
     {
       "entry": "play.html",
@@ -22,8 +22,8 @@
           "bytes": 1157
         },
         {
-          "src": "pages/runtime/00-core-app-runtime.js",
-          "bytes": 1271275
+          "src": "pages/runtime/00-core-app-runtime.js?v=20260627-businessage21",
+          "bytes": 1271688
         },
         {
           "src": "pages/patches/01-patch-v18-24.js",
@@ -110,12 +110,12 @@
           "bytes": 131427
         },
         {
-          "src": "pages/systems/business-entities.js",
-          "bytes": 183375
+          "src": "pages/systems/business-entities.js?v=20260627-age21",
+          "bytes": 184127
         },
         {
-          "src": "pages/systems/business-sectors.js",
-          "bytes": 49655
+          "src": "pages/systems/business-sectors.js?v=20260627-age21",
+          "bytes": 49741
         },
         {
           "src": "pages/systems/business-events.js",
@@ -130,20 +130,20 @@
           "bytes": 25350
         },
         {
-          "src": "pages/systems/tax-legal.js",
-          "bytes": 84931
+          "src": "pages/systems/tax-legal.js?v=20260627-percompany2",
+          "bytes": 102038
         },
         {
           "src": "pages/systems/money-banking.js",
           "bytes": 60829
         },
         {
-          "src": "pages/systems/finance-ledger.js",
-          "bytes": 51187
+          "src": "pages/systems/finance-ledger.js?v=20260627-trustprotect1",
+          "bytes": 51618
         },
         {
           "src": "pages/systems/property-estate.js",
-          "bytes": 119909
+          "bytes": 124656
         },
         {
           "src": "pages/systems/car-collection.js",
@@ -162,8 +162,8 @@
           "bytes": 23355
         },
         {
-          "src": "pages/systems/entrepreneur.js",
-          "bytes": 157765
+          "src": "pages/systems/entrepreneur.js?v=20260627-legal1",
+          "bytes": 208807
         },
         {
           "src": "pages/systems/save-recovery.js",
@@ -184,6 +184,18 @@
         {
           "src": "pages/systems/more-command.js",
           "bytes": 46136
+        },
+        {
+          "src": "pages/systems/life-wellbeing.js?v=20260626-wb3",
+          "bytes": 22764
+        },
+        {
+          "src": "pages/systems/life-rebuild.js?v=20260626-liferebuild12",
+          "bytes": 45857
+        },
+        {
+          "src": "pages/systems/family-office.js?v=20260627-familyoffice5",
+          "bytes": 29426
         },
         {
           "src": "pages/hubs/00-hub-registry.js",
@@ -231,16 +243,16 @@
         },
         {
           "src": "pages/systems/dev-tools.js",
-          "bytes": 12612
+          "bytes": 15386
         }
       ],
-      "bytes": 3305638
+      "bytes": 3482104
     },
     {
       "entry": "index.html",
       "output": "outputs/ledger18_modular_v18_35/dist/index.html",
       "aliasFor": "Ledger_18_dynamic_stocks_v18_35_landing_built.html",
-      "bytes": 203908
+      "bytes": 204590
     },
     {
       "entry": "play.html",

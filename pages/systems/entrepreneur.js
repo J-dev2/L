@@ -74,6 +74,35 @@
     social_e: { noun: "community program", kind: "service" }
   };
 
+  var BIZ_TAX_ATTORNEYS_V1872 = [
+    { id: "none", name: "No tax counsel", cost: 0, annualFee: 0, rateCut: 0, desc: "The company pays the default corporate tax rate." },
+    { id: "startup", name: "Startup tax counsel", cost: 25000, annualFee: 12000, rateCut: 0.025, desc: "Basic entity cleanup, credits, and filing discipline." },
+    { id: "structuring", name: "Tax structuring attorney", cost: 120000, annualFee: 60000, rateCut: 0.055, desc: "Revenue, IP, payroll, and state-tax planning for growing companies." },
+    { id: "family_office", name: "Family office tax attorney", cost: 500000, annualFee: 180000, rateCut: 0.08, desc: "Advanced corporate and founder tax planning for large operating companies." }
+  ];
+
+  function taxAttorneyByIdV1872(id) {
+    id = String(id || "none");
+    return BIZ_TAX_ATTORNEYS_V1872.find(function (p) { return p.id === id; }) || BIZ_TAX_ATTORNEYS_V1872[0];
+  }
+
+  function legalStateV1872(biz) {
+    if (!biz.legalV1872 || typeof biz.legalV1872 !== "object" || Array.isArray(biz.legalV1872)) biz.legalV1872 = {};
+    if (!biz.legalV1872.taxAttorney) biz.legalV1872.taxAttorney = "none";
+    biz.legalV1872.totalFees = Math.max(0, round(biz.legalV1872.totalFees));
+    biz.legalV1872.totalTaxSaved = Math.max(0, round(biz.legalV1872.totalTaxSaved));
+    return biz.legalV1872;
+  }
+
+  function bizTaxAttorneyPlanV1872(biz) {
+    return taxAttorneyByIdV1872(legalStateV1872(biz || {}).taxAttorney);
+  }
+
+  function bizEffectiveTaxRateV1872(biz) {
+    var plan = bizTaxAttorneyPlanV1872(biz || {});
+    return clampN(0.21 - num(plan.rateCut), 0.08, 0.21);
+  }
+
   var BIZ_MODEL_INFO = {
     saas:       { name:'SaaS / Subscription', emoji:'🔄', desc:'Monthly recurring revenue. Predictable. Churn kills you slowly.', kpis:['MRR','Churn%','NRR'] },
     d2c:        { name:'Direct-to-Consumer',  emoji:'🛒', desc:'Sell products or services directly. CAC/LTV ratio is survival.', kpis:['CAC','LTV','Conv%'] },
@@ -861,7 +890,7 @@
     rerender();
   }
   window.bizSetActiveV1861 = setActiveBiz;
-  var DASHBOARD_PANELS_V1862 = ["overview", "product", "growth", "team", "funding", "budget", "public", "exit"];
+  var DASHBOARD_PANELS_V1862 = ["overview", "product", "growth", "team", "funding", "budget", "legal", "public", "exit"];
   function dashboardPanelV1862(biz) {
     var B = initBiz();
     var p = String(B.activePanelV1862 || "overview").toLowerCase();
@@ -875,6 +904,28 @@
     var p = String(panel || "overview").toLowerCase();
     if (DASHBOARD_PANELS_V1862.indexOf(p) < 0) p = "overview";
     B.activePanelV1862 = p;
+    saveGame();
+    rerender();
+  };
+  window.bizHireTaxAttorneyV1872 = function (planId) {
+    var biz = getActiveBiz();
+    if (!biz) return toast("No active business.");
+    var plan = taxAttorneyByIdV1872(planId || "none");
+    var legal = legalStateV1872(biz);
+    if (plan.id === legal.taxAttorney) return toast(plan.id === "none" ? "No tax counsel is active." : plan.name + " is already retained.");
+    if (plan.id === "none") {
+      legal.taxAttorney = "none";
+      legal.updatedAge = age();
+      log("Released tax counsel for " + biz.name + ".");
+      saveGame();
+      return rerender();
+    }
+    if (num(biz.cashInBusiness) < plan.cost) return toast(plan.name + " needs " + moneyText(plan.cost) + " in company cash.");
+    biz.cashInBusiness = num(biz.cashInBusiness) - plan.cost;
+    legal.taxAttorney = plan.id;
+    legal.updatedAge = age();
+    legal.totalFees = round(num(legal.totalFees) + plan.cost);
+    log("Retained " + plan.name + " for " + biz.name + ". Effective corporate tax rate now " + (bizEffectiveTaxRateV1872(biz) * 100).toFixed(1).replace(/\.0$/, "") + "%.", {});
     saveGame();
     rerender();
   };
@@ -926,6 +977,7 @@
       ["team", "Team"],
       ["funding", "Funding"],
       ["budget", "Budget"],
+      ["legal", "Legal"],
       ["public", "Public Market"],
       ["exit", "Exit"]
     ];
@@ -1140,10 +1192,14 @@
     var toolsCosts = Math.round(num(biz.headcount) * 2400 + rev * 0.005);
     var founderPay = num(biz._founderSalaryPaid);
     var corpTax = num(biz._corpTaxV1869);
+    var legalPlan = bizTaxAttorneyPlanV1872(biz);
+    var legalFee = num(biz._taxAttorneyFeeV1872, legalPlan.annualFee);
+    var taxRate = num(biz._corpTaxRateV1872, bizEffectiveTaxRateV1872(biz));
+    var taxRateLabel = (taxRate * 100).toFixed(taxRate * 100 >= 10 ? 1 : 2).replace(/\.0$/, "") + "%";
     var gm = clampN(num(biz.grossMargin, 0.6), 0.05, 0.98);
     var cogs = Math.round(rev * (1 - gm));                 // cost of goods / delivering the product (the gross-margin cost)
     var grossProfit = rev - cogs;
-    var operating = staffCosts + coFounderCosts + mktgCosts + toolsCosts + serverCost + officeCost;
+    var operating = staffCosts + coFounderCosts + mktgCosts + toolsCosts + serverCost + officeCost + legalFee;
     var total = cogs + operating + founderPay + corpTax;   // EVERYTHING between revenue and net profit
     var netProfit = num(biz.annualProfit);
     var distRate = clampN(num(biz.founderDistRateV1869, 0.4), 0, 0.9);
@@ -1164,6 +1220,7 @@
       { label: "Office / real estate", value: officeCost, color: C.cofounder },
       { label: "Marketing", value: mktgCosts, color: C.mktg },
       { label: "Software & tools", value: toolsCosts, color: C.tools },
+      { label: "Legal counsel", value: legalFee, color: C.val },
       { label: "Corporate tax", value: corpTax, color: C.custdev }
     ], "COSTS/YR") : '<div class="biz1861-spark-empty">No costs yet — hire, set marketing, or draw founder pay to see the breakdown.</div>';
     function wrow(label, val, note, kind) {
@@ -1180,9 +1237,9 @@
       wrow("Revenue", rev, "everything the company billed this year", "rev") +
       wrow("Cost of goods", cogs, Math.round((1 - gm) * 100) + "% of revenue spent making & delivering it", "sub") +
       wrow("Gross profit", grossProfit, "what's left after delivery — a " + Math.round(gm * 100) + "% margin", "total") +
-      wrow("Operating costs", operating, "payroll, servers, office, marketing, tools", "sub") +
+      wrow("Operating costs", operating, "payroll, servers, office, marketing, tools, legal", "sub") +
       wrow("Your salary", founderPay, "your wage, paid out of the company", "sub") +
-      wrow("Corporate tax", corpTax, "21% tax on the profit", "sub") +
+      wrow("Corporate tax", corpTax, taxRateLabel + " tax on the profit", "sub") +
       wrow("Net profit", netProfit, "the company's actual profit this year", "total") +
       wrow("Your profit distribution", distribution, Math.round(distRate * 100) + "% of profit paid to YOU — change it in Funding", "sub") +
       wrow("Kept in the company", retained, "reinvested to grow the business", "total") +
@@ -1197,13 +1254,14 @@
       metric("Office / real estate", moneyText(officeCost) + "/yr", "~$12K per head in space.", "blue") +
       metric("Marketing", moneyText(mktgCosts) + "/yr", "Set this in the Growth tab.", "blue") +
       metric("Software & tools", moneyText(toolsCosts) + "/yr", "Per-head seats + 0.5% of revenue.", "blue") +
+      metric("Legal counsel", moneyText(legalFee) + "/yr", legalPlan.id === "none" ? "No annual tax counsel." : legalPlan.name + ".", legalPlan.id === "none" ? "gold" : "green") +
       metric("Founder salary", moneyText(founderPay) + "/yr", "Your wage from the company.", "green") +
-      metric("Corporate tax", moneyText(corpTax) + "/yr", "21% of taxable profit.", "gold") +
+      metric("Corporate tax", moneyText(corpTax) + "/yr", taxRateLabel + " of taxable profit.", "gold") +
       metric("Profit distribution", moneyText(distribution) + "/yr", Math.round(distRate * 100) + "% of profit you pull out.", "green") +
       '</div>' +
       '<div class="biz1861-graph"><div class="section-label">🥧 Where the money goes</div>' + donut + '</div>' +
       waterfall +
-      '<div class="biz1862-callout" style="margin-top:4px"><span>Adjust spend</span><b>Marketing is your main discretionary budget; profit distribution is set in Funding. The rest scale with revenue & headcount.</b></div>' +
+      '<div class="biz1862-callout" style="margin-top:4px"><span>Adjust spend</span><b>Marketing is your main discretionary budget; profit distribution is set in Funding. Legal counsel is set in Legal; the rest scale with revenue & headcount.</b></div>' +
       '<div class="biz1861-control-grid">' + renderMarketingControlsV1862(biz) + '</div>' +
       '<div class="biz1861-graph"><div class="section-label">👥 People economics</div><div class="biz1862-split"><div>' +
       '<div class="biz1862-minirow"><b>Headcount</b><span>' + head + '</span></div>' +
@@ -1355,12 +1413,43 @@
   function renderFundingPanelV1862(biz) {
     return '<div class="biz1862-panel"><div class="biz1861-control-grid">' + renderFounderPayControlsV1862(biz) + renderCapitalControlsV1862(biz) + renderFundingControlsV1862(biz) + '</div>' + renderFundingHistoryV1862(biz) + renderBizGraphsV1861(biz, "funding") + '</div>';
   }
+  function renderLegalPanelV1872(biz) {
+    var legal = legalStateV1872(biz);
+    var plan = bizTaxAttorneyPlanV1872(biz);
+    var rate = bizEffectiveTaxRateV1872(biz);
+    var rateLabel = (rate * 100).toFixed(rate * 100 >= 10 ? 1 : 2).replace(/\.0$/, "") + "%";
+    var preTax = num(biz._preTaxProfitV1872);
+    var baselineTax = Math.max(0, Math.round(preTax * 0.21));
+    var currentTax = Math.max(0, Math.round(preTax * rate));
+    var currentSavings = Math.max(0, baselineTax - currentTax);
+    var cards = BIZ_TAX_ATTORNEYS_V1872.slice(1).map(function (p) {
+      var selected = plan.id === p.id;
+      var pRate = clampN(0.21 - num(p.rateCut), 0.08, 0.21);
+      return '<div class="biz1862-ctl ctl-blue"><b>' + escH(p.name) + '</b><span>' + escH(p.desc) + ' Upfront ' + moneyText(p.cost) + ', annual ' + moneyText(p.annualFee) + ', rate ' + (pRate * 100).toFixed(1).replace(/\.0$/, "") + '%.</span><div class="biz1861-actions">' +
+        actionBtn(selected ? "Retained" : "Retain", "bizHireTaxAttorneyV1872('" + p.id + "')", selected ? "green" : "blue", selected || num(biz.cashInBusiness) < p.cost) +
+        '</div></div>';
+    }).join("");
+    var remove = plan.id === "none" ? "" : '<div class="biz1862-ctl ctl-gold"><b>Current counsel</b><span>' + escH(plan.name) + ' is active. Annual legal fee is included in Budget and the yearly engine.</span><div class="biz1861-actions">' + actionBtn("Release Counsel", "bizHireTaxAttorneyV1872('none')", "gold", false) + '</div></div>';
+    return '<div class="biz1862-panel">' +
+      '<div class="biz1862-callout"><span>Corporate tax planning</span><b>Tax counsel lowers the company tax rate but adds legal fees. It helps profitable companies most.</b></div>' +
+      '<div class="biz1861-metric-grid">' +
+      metric("Tax counsel", plan.id === "none" ? "None" : plan.name, plan.id === "none" ? "Default corporate tax treatment." : "Retained at age " + escH(legal.updatedAge == null ? age() : legal.updatedAge) + ".", plan.id === "none" ? "gold" : "green") +
+      metric("Effective rate", rateLabel, "Default is 21%.", plan.id === "none" ? "gold" : "green") +
+      metric("Annual fee", moneyText(plan.annualFee) + "/yr", "Paid by company cash through operating costs.", plan.annualFee ? "gold" : "green") +
+      metric("Last tax saved", moneyText(num(biz._taxAttorneySavingsV1872, currentSavings)), preTax > 0 ? "Based on last taxable profit." : "Needs positive taxable profit.", num(biz._taxAttorneySavingsV1872, currentSavings) ? "green" : "gold") +
+      metric("Lifetime saved", moneyText(legal.totalTaxSaved || 0), "Accumulated through yearly company tax runs.", legal.totalTaxSaved ? "green" : "gold") +
+      metric("Counsel fees", moneyText(legal.totalFees || 0), "Upfront and annual tax counsel spend.", legal.totalFees ? "gold" : "green") +
+      '</div><div class="biz1861-control-grid">' + cards + remove + '</div>' +
+      '<div class="biz1862-callout"><span>How it works</span><b>The yearly engine applies counsel fees before tax, then taxes positive profit at the effective rate. Loss years pay no corporate tax.</b></div>' +
+      '</div>';
+  }
   function renderActivePanelBodyV1862(biz, panel) {
     if (panel === "product") return renderProductPanelV1862(biz);
     if (panel === "growth") return renderGrowthPanelV1862(biz);
     if (panel === "team") return renderTeamPanelV1862(biz);
     if (panel === "funding") return renderFundingPanelV1862(biz);
     if (panel === "budget") return renderBudgetPanelV1862(biz);
+    if (panel === "legal") return renderLegalPanelV1872(biz);
     if (panel === "public") return '<div class="biz1862-panel">' + renderPublicDeskV1861(biz) + '</div>';
     if (panel === "exit") return '<div class="biz1862-panel">' + renderExitDeskV1861(biz) + '</div>';
     return renderOverviewPanelV1862(biz);
@@ -1757,7 +1846,10 @@
     var serverCost = Math.round(gross * infraRate);                        // cloud / server upkeep, by industry
     var officeCost = Math.round(num(biz.headcount) * 12000);               // office / real estate per head
     var toolsCosts = Math.round(num(biz.headcount) * 2400 + gross * 0.005); // software/tools: per-head + 0.5% of revenue
-    var operatingCosts = staffCosts + coFounderCosts + mktgCosts + toolsCosts + serverCost + officeCost;
+    var legal = legalStateV1872(biz);
+    var taxPlan = bizTaxAttorneyPlanV1872(biz);
+    var legalFee = taxPlan.id === "none" ? 0 : Math.max(0, round(taxPlan.annualFee));
+    var operatingCosts = staffCosts + coFounderCosts + mktgCosts + toolsCosts + serverCost + officeCost + legalFee;
     // Founder salary: pay yourself a living wage from the company so founding can be
     // your livelihood before it turns a net profit. It is a real cost (lowers profit)
     // and is capped at what the company can actually fund this year, so it never drives
@@ -1768,8 +1860,12 @@
     var fundableForSalary = Math.max(0, num(biz.cashInBusiness) + grossProfit - operatingCosts);
     var founderSalary = Math.max(0, Math.min(salaryTarget, Math.round(fundableForSalary)));
     // v18.69 — corporate tax is a real line: 21% on profit after costs + your salary.
+    // v18.72 — tax counsel lowers that rate, with annual legal fees as real operating cost.
     var preTaxProfit = grossProfit - operatingCosts - founderSalary;
-    var corpTax = Math.max(0, Math.round(preTaxProfit * 0.21));
+    var corpTaxRate = bizEffectiveTaxRateV1872(biz);
+    var baselineCorpTax = Math.max(0, Math.round(preTaxProfit * 0.21));
+    var corpTax = Math.max(0, Math.round(preTaxProfit * corpTaxRate));
+    var taxSavings = Math.max(0, baselineCorpTax - corpTax);
     var totalCosts = operatingCosts + founderSalary + corpTax;
     biz.annualRevenue = gross;
     biz.annualCosts = totalCosts;
@@ -1780,6 +1876,13 @@
     biz._officeCostV1869 = officeCost;
     biz._toolsCostV1869 = toolsCosts;
     biz._corpTaxV1869 = corpTax;
+    biz._preTaxProfitV1872 = preTaxProfit;
+    biz._corpTaxRateV1872 = corpTaxRate;
+    biz._baselineCorpTaxV1872 = baselineCorpTax;
+    biz._taxAttorneyFeeV1872 = legalFee;
+    biz._taxAttorneySavingsV1872 = taxSavings;
+    if (legalFee) legal.totalFees = round(num(legal.totalFees) + legalFee);
+    if (taxSavings) legal.totalTaxSaved = round(num(legal.totalTaxSaved) + taxSavings);
     // v18.69 — market share grows toward your revenue's organic share, but acquisitions / earned gains
     // PERSIST: the yearly recompute only pulls share UP toward the organic floor, never erodes what you
     // bought or won. Rivals then re-enter the open share over time (dynamic field).
@@ -1802,7 +1905,7 @@
     biz.brand = clamp01(num(biz.brand) + (biz.nps > 30 ? 2 : biz.nps < 0 ? -1 : 0.5) + (biz.annualProfit > 0 ? 1 : 0));
     B.founderReputation = clamp01(num(B.founderReputation, 30) + (biz.annualProfit > 50000 ? 2 : biz.annualProfit > 0 ? 1 : -1) + num(B.yearsAsFounder) * 0.1);
     if (!Array.isArray(biz.revenueHistory)) biz.revenueHistory = [];
-    biz.revenueHistory.push({ age: age(), revenue: gross, profit: biz.annualProfit, valuation: biz.valuation, customers: num(biz.customers), mktg: num(biz._mktgBudget), costs: totalCosts, headcount: num(biz.headcount), marketShare: biz.marketShare });
+    biz.revenueHistory.push({ age: age(), revenue: gross, profit: biz.annualProfit, valuation: biz.valuation, customers: num(biz.customers), mktg: num(biz._mktgBudget), costs: totalCosts, headcount: num(biz.headcount), marketShare: biz.marketShare, corpTax: corpTax, corpTaxRate: corpTaxRate, taxAttorneyFee: legalFee, taxAttorneySavings: taxSavings });
     if (biz.revenueHistory.length > 30) biz.revenueHistory.shift();
     B.lifetimeRevenue = num(B.lifetimeRevenue) + gross;
     biz._yearWithdrawn = 0;
@@ -2380,7 +2483,7 @@
         ".biz1862-roster{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;margin-top:8px}.biz1862-emp{display:flex;flex-direction:column;gap:8px;border:1px solid rgba(255,255,255,.10);border-radius:10px;background:rgba(255,255,255,.04);padding:11px;min-width:0}.biz1862-emp.founder{border-color:rgba(216,173,109,.35);background:rgba(216,173,109,.06)}.biz1862-emp-top{display:flex;align-items:center;gap:9px;min-width:0}.biz1862-emp-avatar{flex:none;width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:rgba(126,160,172,.16);border:1px solid rgba(126,160,172,.4);color:#cfe0e6;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700}.biz1862-emp-avatar.gold{background:rgba(216,173,109,.16);border-color:rgba(216,173,109,.45);color:#e9cf9c}.biz1862-emp-id{min-width:0;flex:1}.biz1862-emp-id b{display:block;color:#fff3df;font-family:'Fraunces',Georgia,serif;font-size:15px;line-height:1.15;overflow-wrap:anywhere}.biz1862-emp-id span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;margin-top:3px;overflow-wrap:anywhere}.biz1862-emp .money-btn{flex:none;padding:4px 9px;font-size:10px}",
         ".biz1862-perf{height:6px;border-radius:99px;background:rgba(0,0,0,.3);overflow:hidden}.biz1862-perf-bar{height:100%;border-radius:99px;background:#7ea0ac}.biz1862-perf-bar.good{background:#9fd07d}.biz1862-perf-bar.gold{background:#d8b16e}.biz1862-perf-bar.bad{background:#e9927d}.biz1862-emp-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}.biz1862-emp-foot span{color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;min-width:0;overflow-wrap:anywhere}.biz1862-emp-foot i.warn{color:#e9927d;font-style:normal}.biz1862-emp-foot em{color:#d8b16e;font-family:'JetBrains Mono',monospace;font-size:11px;font-style:normal;flex:none}",
         // dashboard 2.0 — color pass: semantic per-section accents + gradient pop
-        ".biz1861-active{--acc:216,173,109}.biz1862-accent-overview{--acc:216,173,109}.biz1862-accent-product{--acc:126,160,172}.biz1862-accent-growth{--acc:159,208,125}.biz1862-accent-team{--acc:195,155,211}.biz1862-accent-funding{--acc:216,173,109}.biz1862-accent-public{--acc:120,170,185}.biz1862-accent-exit{--acc:233,146,125}",
+        ".biz1861-active{--acc:216,173,109}.biz1862-accent-overview{--acc:216,173,109}.biz1862-accent-product{--acc:126,160,172}.biz1862-accent-growth{--acc:159,208,125}.biz1862-accent-team{--acc:195,155,211}.biz1862-accent-funding{--acc:216,173,109}.biz1862-accent-legal{--acc:120,170,185}.biz1862-accent-public{--acc:120,170,185}.biz1862-accent-exit{--acc:233,146,125}",
         // semantic gradient tint on metric cards so status strips read in color, not grey
         ".biz1861-metric.good,.biz1861-metric.green{background:linear-gradient(135deg,rgba(159,208,125,.16),rgba(255,255,255,.025));border-color:rgba(159,208,125,.32)}.biz1861-metric.bad,.biz1861-metric.red{background:linear-gradient(135deg,rgba(233,146,125,.16),rgba(255,255,255,.025));border-color:rgba(233,146,125,.32)}.biz1861-metric.gold{background:linear-gradient(135deg,rgba(216,173,109,.16),rgba(255,255,255,.025));border-color:rgba(216,173,109,.32)}.biz1861-metric.blue{background:linear-gradient(135deg,rgba(126,160,172,.16),rgba(255,255,255,.025));border-color:rgba(126,160,172,.32)}",
         // section accent: panel wash, valuation badge, tabs, next-milestone, section labels
@@ -2402,8 +2505,11 @@
   window.EntrepreneurV1861 = {
     BIZ_TYPES: BIZ_TYPES,
     BIZ_MODEL_INFO: BIZ_MODEL_INFO,
+    BIZ_TAX_ATTORNEYS_V1872: BIZ_TAX_ATTORNEYS_V1872,
     initBiz: initBiz,
     getActiveBiz: getActiveBiz,
+    taxAttorneyByIdV1872: taxAttorneyByIdV1872,
+    bizEffectiveTaxRateV1872: bizEffectiveTaxRateV1872,
     newBizObj: _newBizObj,
     genCompetitors: _genCompetitors,
     shim: { S: S, num: num, round: round, clampN: clampN, rnd: rnd, pick: pickOne, age: age, smarts: smarts, karma: karma, fame: fame, wealth: wealth, fin: fin, moneyText: moneyText, currencySymbol: currencySymbol }

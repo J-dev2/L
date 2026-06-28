@@ -284,7 +284,7 @@
       : '<div style="font-size:11px;color:rgba(255,255,255,.45)">No active conditions. Keep up your fitness, sleep, and stress and it stays that way.</div>';
     var condBox = '<div style="' + sec + '"><div style="' + lbl + '">🩺 Conditions ' + actBtn("Get a checkup · $350", "wbCheckupV1870()", "rgba(126,160,172,.16)", false).replace("font-size:12px", "font-size:10px").replace("padding:9px 13px", "padding:5px 9px") + '</div>' + conds + '</div>';
 
-    return '<section class="panel" style="margin-bottom:14px"><div style="' + sec + ';margin-bottom:12px">' +
+    return '<section class="panel wb1870-panel" style="margin-bottom:14px"><div style="' + sec + ';margin-bottom:12px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div style="' + lbl + ';margin:0">🧬 Wellbeing</div><span style="font-size:10px;color:rgba(255,255,255,.45)">your health, stress & mind in one place</span></div>' +
       bars +
       '<div style="font-size:11px;color:rgba(255,255,255,.55);margin:10px 0 6px">Recover now (repeatable):</div>' + actions +
@@ -303,18 +303,10 @@
     try { resolveAnnualActivityHabits = window.resolveAnnualActivityHabits; } catch (e) {}
   } catch (e) {}
 
-  // 2) Dashboard — wrap renderLifeHub, inject the wellbeing panel near the top of the Life hub.
-  try {
-    var _prevLifeHub = window.renderLifeHub || (typeof renderLifeHub === "function" ? renderLifeHub : null);
-    window.renderLifeHub = function () {
-      var out = ""; try { out = _prevLifeHub ? _prevLifeHub.apply(this, arguments) : ""; } catch (e) { out = ""; }
-      var panel = ""; try { panel = window.renderWellbeingPanelV1870() || ""; } catch (e) { panel = ""; }
-      if (!panel) return out;
-      // inject right after the first closing of the stats/pill header if present, else prepend.
-      var marker = '</div>';
-      return panel + out;
-    };
-    try { renderLifeHub = window.renderLifeHub; } catch (e) {}
-  } catch (e) {}
+  // 2) Dashboard injection is DISABLED pending the full Life-page rebuild (the always-on panel
+  //    duplicated the existing Body & Mind popups and ate screen real estate). The backend stress
+  //    rebalance (wrap #1) stays active, and renderWellbeingPanelV1870() remains available so the
+  //    rebuilt page can surface it as a popup. To re-enable the old behaviour, restore the
+  //    renderHubContent wrap that prepended renderWellbeingPanelV1870() for "lifehub".
 
 })();

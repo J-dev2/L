@@ -4855,7 +4855,8 @@ function startVenture(id) {
   ensureStateShape();
   const v = entrepreneurshipCatalog.find(x => x.id === id);
   if (!v) return;
-  if (state.age < v.minAge) return addToast(`${v.name} unlocks at age ${v.minAge}.`);
+  const minAge = Math.min(v.minAge || 18, 21);
+  if (state.age < minAge) return addToast(`${v.name} unlocks at age ${minAge}.`);
   if (state.finance.businesses.some(b => b.id === id)) return addToast("You already started that venture.");
   if (state.money < v.startup) return addToast(`Startup cost is ${money(v.startup)}.`);
   state.money -= v.startup;
@@ -6146,7 +6147,8 @@ getSuggestedActions = function(s) {
     ensureStateShape();
     const v = entrepreneurshipCatalog.find(x => x.id === id);
     if (!v) return;
-    if (state.age < v.minAge) return addToast(`${v.name} unlocks at age ${v.minAge}.`);
+    const minAge = Math.min(v.minAge || 18, 21);
+    if (state.age < minAge) return addToast(`${v.name} unlocks at age ${minAge}.`);
     if (state.finance.businesses.some(b => b.id === id)) return addToast("You already own that business.");
     if (state.money < v.startup) return addToast(`Startup cost is ${fmtMoney(v.startup)}.`);
     state.money -= v.startup;
@@ -7921,7 +7923,7 @@ getSuggestedActions = function(s) {
   function bizValueTotal(){ ensureStateShape(); return (state.finance.businesses||[]).reduce((s,b)=>s+Math.max(0,Math.round(b.value||0)),0); }
   function riskLabelV6(r){ r=Number(r)||0; if(r>=.30) return ["high","High risk"]; if(r>=.18) return ["med","Medium risk"]; return ["low","Lower risk"]; }
   function buyCompanyV6(baseId){
-    ensureStateShape(); const bp=bizBlueprint(baseId); if(!bp.id) return addToast("Company not found."); if(state.age < (bp.minAge||18)) return addToast(`${bp.name} unlocks at age ${bp.minAge}.`);
+    ensureStateShape(); const bp=bizBlueprint(baseId); if(!bp.id) return addToast("Company not found."); const minAge=Math.min(bp.minAge||18,21); if(state.age < minAge) return addToast(`${bp.name} unlocks at age ${minAge}.`);
     const price=Math.round((bp.buy || bp.startup*2 || 50000) * rand(85,125)/100); if((state.money||0) < price) return addToast(`Buying ${bp.name} needs ${fmtMoney(price)} cash.`);
     const uid=`acq_${bp.id}_${state.age}_${rand(1000,9999)}`; const cat=Object.assign({}, bp, {id:uid, baseId:bp.id, name:bp.name, startup:price, category:bp.category||"Acquisition"}); entrepreneurshipCatalog.push(cat);
     state.money -= price; state.finance.businesses.push({id:uid, baseId:bp.id, name:bp.name, category:bp.category||"Acquisition", value:Math.round(price*.82), years:0, reputation:rand(25,55), lastIncome:0, failureRisk:bp.failureRisk||.18, stage:"acquired", employees:rand(2,18), locations:1, manager:false, systems:0});

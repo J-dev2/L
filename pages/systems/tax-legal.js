@@ -143,6 +143,21 @@
     return Object.assign({}, byId(attorneyPlans(), id), typeof atty === "object" ? atty : {});
   }
 
+  function ensureTrustHoldingsV1868(trust) {
+    trust = trust || {};
+    if (!trust.holdingsV1868 || typeof trust.holdingsV1868 !== "object" || Array.isArray(trust.holdingsV1868)) {
+      trust.holdingsV1868 = {};
+    }
+    var h = trust.holdingsV1868;
+    if (!h.property || typeof h.property !== "object") h.property = {};
+    if (!h.entrepreneurship || typeof h.entrepreneurship !== "object") h.entrepreneurship = {};
+    h.property.titled = !!h.property.titled;
+    h.property.pct = Math.max(0, Math.min(1, n(h.property.pct == null ? 1 : h.property.pct)));
+    h.entrepreneurship.titled = !!h.entrepreneurship.titled;
+    h.entrepreneurship.pct = Math.max(0, Math.min(1, n(h.entrepreneurship.pct == null ? 1 : h.entrepreneurship.pct)));
+    return h;
+  }
+
   function ensureLegalState() {
     var s = stateNow();
     if (!s.stats || typeof s.stats !== "object") s.stats = {};
@@ -167,6 +182,7 @@
     var trust = f.familyTrustV1839;
     if (!trust.sourceLedger || typeof trust.sourceLedger !== "object") trust.sourceLedger = {};
     if (!trust.familyFund || typeof trust.familyFund !== "object") trust.familyFund = { active: false, capital: 0, risk: "balanced", lastReturn: 0, lastFee: 0, years: 0 };
+    ensureTrustHoldingsV1868(trust);
     if (!Array.isArray(trust.history)) trust.history = [];
     if (!Array.isArray(trust.beneficiaries)) trust.beneficiaries = [];
     if (f.taxDebt == null) f.taxDebt = Math.max(0, n(f.debts.taxDebt || s.taxDebt));
@@ -206,7 +222,21 @@
   function protectedAssets() {
     var f = financeNow();
     var trust = f.familyTrustV1839 || {};
-    return Math.max(0, round(n(trust.corpus) + childTrustTotal()));
+    // Businesses titled into the trust (familyV1833.trustPercent) are protected by it too. Without this
+    // they were left OUT of the estate-tax shield (legalProtectedValue in the death settlement at
+    // 08-patch-v18-31.js), so a business "100% in the trust for tax benefit" got taxed + probated on death
+    // EVERY succession — the root of the "loses value across succession / never recovers" bug. The death
+    // patch caps protected value at the gross estate, so this can only REDUCE tax; it never adds phantom
+    // cash and never changes net worth (the business is still counted once as an operating business).
+    var titledBusiness = 0;
+    try { titledBusiness = Math.max(0, round(trustBusinessCarryValueV1846(stateNow()))); } catch (e) {}
+    return Math.max(0, round(
+      n(trust.corpus) +
+      childTrustTotal() +
+      titledBusiness +
+      trustHeldPropertyValueV1868(stateNow()) +
+      trustHeldEntrepreneurshipValueV1868(stateNow())
+    ));
   }
 
   function legalRisk() {
@@ -367,6 +397,34 @@
     trust.history = trust.history.slice(0, 8);
     log((current.cost ? "Upgraded" : "Created") + " the family trust: " + plan.name + ".", { money: -upgradeCost });
     saveRender();
+  };
+
+  function setTrustHoldingV1868(kind, titled) {
+    var s = ensureLegalState();
+    var trust = s.finance.familyTrustV1839;
+    if (!trust.created) return toast("Create a family trust before titling holdings.");
+    var holdings = ensureTrustHoldingsV1868(trust);
+    var value = kind === "property" ? propertyEquityValueV1868(s) : entrepreneurshipPortfolioValueV1868(s);
+    if (titled !== false && value <= 0) return toast(kind === "property" ? "No property equity is available to title." : "No Entrepreneurship portfolio is available to title.");
+    var label = kind === "property" ? "property portfolio" : "Entrepreneurship portfolio";
+    holdings[kind].titled = titled !== false;
+    holdings[kind].pct = 1;
+    holdings[kind].updatedAge = round(s.age);
+    if (kind === "entrepreneurship") {
+      holdings[kind].companiesV1872 = holdings[kind].titled ? {} : {};
+    }
+    trust.history.unshift({ age: round(s.age), event: (holdings[kind].titled ? "Titled " : "Removed ") + label + (holdings[kind].titled ? " into trust protection" : " from trust titling"), amount: holdings[kind].titled ? value : 0 });
+    trust.history = trust.history.slice(0, 10);
+    log((holdings[kind].titled ? "Titled " : "Removed ") + label + (holdings[kind].titled ? " into family trust protection." : " from trust titling."), {});
+    saveRender("trust");
+  }
+
+  window.titlePropertyToTrustV1868 = function (titled) {
+    return setTrustHoldingV1868("property", titled !== false);
+  };
+
+  window.titleEntrepreneurshipToTrustV1868 = function (titled) {
+    return setTrustHoldingV1868("entrepreneurship", titled !== false);
   };
 
   window.fundFamilyTrustV1839 = function (source, mode, inputId) {
@@ -608,15 +666,19 @@
     var titledBizUnderTrust = round(trustBusinessCarryValueV1846(sNow));
     var childTrustsUnderTrust = round(childTrustCarryV1846(sNow, "", true));
     var estateTrustCash = round(n((((sNow || {}).estateV1831 || {}).assets || {}).trustCash));
-    var totalUnderTrust = round(n(trust.corpus) + titledBizUnderTrust + childTrustsUnderTrust + estateTrustCash);
+    var titledPropertyUnderTrust = round(trustHeldPropertyValueV1868(sNow));
+    var titledFounderUnderTrust = round(trustHeldEntrepreneurshipValueV1868(sNow));
+    var totalUnderTrust = round(n(trust.corpus) + titledBizUnderTrust + titledPropertyUnderTrust + titledFounderUnderTrust + childTrustsUnderTrust + estateTrustCash);
     return '<section class="panel v1839-family-fund"><div class="v1839-panel-head"><div><div class="section-label">📈 Step 2: Grow it</div><h3>Trust investment sleeve</h3><p>The family fund invests trust capital without removing it from the protected family structure.</p></div><strong class="' + ((fund.lastReturn || 0) >= 0 ? "good" : "bad") + '">' + signedMoney(fund.lastReturn || 0) + '<span>last return</span></strong></div><div class="v1839-metric-grid compact">' +
       metric("Allocated", compactMoney(fund.capital || 0), "Trust corpus assigned to active management.", fund.active ? "good" : "gold") +
       metric("Room", compactMoney(room), "Unallocated trust corpus.", room ? "gold" : "good") +
       metric("Mandate", spec.label, "Expected " + pct(spec.rate) + " before volatility.", "gold") +
       metric("Years", String(round(fund.years || 0)), "Family fund operating history.", "good") +
       metric("Trust corpus", compactMoney(n(trust.corpus)), "Funded, liquid trust capital right now (the cash sleeve).", "gold") +
-      metric("Under trust (total)", compactMoney(totalUnderTrust), "Everything the trust protects: funded corpus + businesses titled to the trust + child trusts. Your full family wealth under the trust, even when it isn't all liquid corpus.", "gold") +
+      metric("Under trust (total)", compactMoney(totalUnderTrust), "Everything the trust protects: corpus, titled businesses, titled portfolios, and child trusts.", "gold") +
       (titledBizUnderTrust > 0 ? metric("Titled businesses", compactMoney(titledBizUnderTrust), "Value of businesses you have titled to the trust - protected by it, but still run as businesses (not corpus cash). This is why the corpus alone can look small.", "good") : "") +
+      (titledPropertyUnderTrust > 0 ? metric("Titled property", compactMoney(titledPropertyUnderTrust), "Real estate equity titled into the trust envelope.", "good") : "") +
+      (titledFounderUnderTrust > 0 ? metric("Titled founder portfolio", compactMoney(titledFounderUnderTrust), "Entrepreneurship value titled into the trust envelope.", "good") : "") +
       metric("Total earned", compactMoney(n(trust.totalReturn)), "Lifetime returns the trust + fund have added to the corpus.", n(trust.totalReturn) >= 0 ? "good" : "bad") +
       '</div><div class="v1839-action-row">' +
       button(fund.active ? "Fund Active" : "Start Family Fund", "allocateFamilyFundV1839(250000)", "green", !trust.created || !round(trust.corpus) || (fund.active && room <= 0)) +
@@ -708,6 +770,132 @@
     return Math.max(0, round(n(trust.corpus) + n((estate.assets || {}).trustCash) + childTrustCarryV1846(sourceState, heirKey, true)));
   }
 
+  function trustHoldingsFromStateV1868(sourceState) {
+    var f = ((sourceState || {}).finance || {});
+    return ensureTrustHoldingsV1868(f.familyTrustV1839 || {});
+  }
+
+  function propertyEquityValueV1868(sourceState) {
+    var f = ((sourceState || {}).finance || {});
+    var re = f.reV1863 || f.reV1862 || {};
+    var list = Array.isArray(re.portfolio) ? re.portfolio : [];
+    var total = list.reduce(function (sum, p) {
+      p = p || {};
+      var value = Math.max(0, round(n(p.currentValue) || n(p.value) || n(p.buyPrice) || n(p.basePrice) || n(p.price)));
+      var debt = Math.max(0, round(n(p.mortgageLeft) || n(p.debt) || n(p.mortgage && p.mortgage.balance)));
+      return sum + Math.max(0, value - debt);
+    }, 0);
+    if (!total) total = Math.max(0, round(n(f.lastRealEstateEquityV1863) || n(f.lastRealEstateEquityV1862)));
+    return Math.max(0, round(total));
+  }
+
+  function entrepreneurshipStakeValueV1868(b, sourceState) {
+    b = b || {};
+    if (b.active === false || b.dead) return 0;
+    if (b.public && b.shareTicker) {
+      var stocks = (((sourceState || {}).finance || {}).stocksV18) || {};
+      var holdings = Array.isArray(stocks.holdings) ? stocks.holdings : [];
+      var h = holdings.find(function (row) { return row && row.id === b.shareTicker; });
+      var price = n((stocks.prices || {})[b.shareTicker]) || n(b._ipoPrice);
+      return Math.max(0, round((h ? n(h.shares) : 0) * price));
+    }
+    return Math.max(0, round(
+      (n(b.valuation) || n(b.value) || n(b.marketValue) || n(b.companyValue)) +
+      (n(b.cashInBusiness) || n(b.retainedEarnings) || n(b.companyCash) || n(b.cash))
+    ));
+  }
+
+  function entrepreneurshipPortfolioValueV1868(sourceState) {
+    var biz = ((((sourceState || {}).finance || {}).bizV1860 || {}).businesses) || [];
+    if (!Array.isArray(biz)) return 0;
+    return Math.max(0, round(biz.reduce(function (sum, b) {
+      return sum + entrepreneurshipStakeValueV1868(b, sourceState);
+    }, 0)));
+  }
+
+  function validEntrepreneurshipKeyV1872(k) {
+    k = String(k == null ? "" : k);
+    return !!(k && k !== "undefined" && k !== "null");
+  }
+
+  function entrepreneurshipCompanyKeysV1872(b) {
+    b = b || {};
+    var seen = {}, out = [];
+    [b.uid, b.sourceKeyV1861, b.id, b.legacyIdV1861, b.name].forEach(function (k) {
+      k = String(k == null ? "" : k);
+      if (validEntrepreneurshipKeyV1872(k) && !seen[k]) {
+        seen[k] = true;
+        out.push(k);
+      }
+    });
+    return out;
+  }
+
+  function cleanEntrepreneurshipCompanyMapV1872(map) {
+    if (!map || typeof map !== "object") return {};
+    Object.keys(map).forEach(function (k) {
+      if (!validEntrepreneurshipKeyV1872(k)) delete map[k];
+    });
+    return map;
+  }
+
+  function mapHasTitledEntrepreneurshipCompanyV1872(map) {
+    map = cleanEntrepreneurshipCompanyMapV1872(map);
+    return Object.keys(map).some(function (k) { return !!map[k]; });
+  }
+
+  function mapTitlesEntrepreneurshipCompanyV1872(map, b) {
+    map = cleanEntrepreneurshipCompanyMapV1872(map);
+    return entrepreneurshipCompanyKeysV1872(b).some(function (k) { return !!map[k]; });
+  }
+
+  function trustHeldEntrepreneurshipStateV1872(sourceState) {
+    var f = ((sourceState || {}).finance || {});
+    var source = f.bizV1860;
+    if (!source || typeof source !== "object") return null;
+    var holdings = trustHoldingsFromStateV1868(sourceState);
+    var ent = holdings.entrepreneurship || {};
+    var map = cleanEntrepreneurshipCompanyMapV1872(ent.companiesV1872);
+    var hasSelection = mapHasTitledEntrepreneurshipCompanyV1872(map);
+    if (!hasSelection && !ent.titled) return null;
+    var copy = cloneV1846(source) || {};
+    if (hasSelection) {
+      var sourceList = Array.isArray(source.businesses) ? source.businesses : [];
+      var selected = sourceList.filter(function (b) { return b && mapTitlesEntrepreneurshipCompanyV1872(map, b); });
+      copy.businesses = cloneV1846(selected) || [];
+      copy.active = copy.businesses.some(function (b) { return b && b.active !== false && !b.dead; });
+      if (!copy.businesses.some(function (b) { return b && b.uid && String(b.uid) === String(copy.activeBizId); })) {
+        copy.activeBizId = copy.businesses[0] ? (copy.businesses[0].uid || entrepreneurshipCompanyKeysV1872(copy.businesses[0])[0] || null) : null;
+      }
+    }
+    return copy;
+  }
+
+  function trustHeldPropertyValueV1868(sourceState) {
+    var holdings = trustHoldingsFromStateV1868(sourceState);
+    if (!holdings.property.titled) return 0;
+    return Math.max(0, round(propertyEquityValueV1868(sourceState) * Math.max(0, Math.min(1, n(holdings.property.pct, 1)))));
+  }
+
+  function trustHeldEntrepreneurshipValueV1868(sourceState) {
+    var holdings = trustHoldingsFromStateV1868(sourceState);
+    var ent = holdings.entrepreneurship || {};
+    // Per-company titling (V1872 family office): if a companies map exists with any titled entries,
+    // sum only those companies' stake. Backward-compatible: falls back to the all-or-nothing master
+    // flag for saves that titled the whole portfolio.
+    var map = cleanEntrepreneurshipCompanyMapV1872(ent.companiesV1872);
+    if (map && typeof map === "object") {
+      var biz = ((((sourceState || {}).finance || {}).bizV1860 || {}).businesses) || [];
+      if (Array.isArray(biz) && mapHasTitledEntrepreneurshipCompanyV1872(map)) {
+        return Math.max(0, round(biz.reduce(function (sum, b) {
+          return (b && mapTitlesEntrepreneurshipCompanyV1872(map, b)) ? sum + entrepreneurshipStakeValueV1868(b, sourceState) : sum;
+        }, 0)));
+      }
+    }
+    if (!ent.titled) return 0;
+    return Math.max(0, round(entrepreneurshipPortfolioValueV1868(sourceState) * Math.max(0, Math.min(1, n(ent.pct, 1)))));
+  }
+
   function investmentOfficeCarryValueV1849(sourceState) {
     var f = ((sourceState || {}).finance || {});
     var firm = f.personalFirm || f.personalFund || {};
@@ -736,6 +924,8 @@
       n((estate.assets || {}).trustCash) ||
       estate.hasWill || estate.trustType ||
       trustBusinessCarryValueV1846(s) > 0 ||
+      trustHeldPropertyValueV1868(s) > 0 ||
+      trustHeldEntrepreneurshipValueV1868(s) > 0 ||
       childTrustCarryV1846(s, "", true) > 0
     );
   }
@@ -750,9 +940,20 @@
       n(s.debt) + n(f.taxDebt) + n(f.creditCardDebt) +
       n(f.debts && f.debts.medical) + n(f.debts && f.debts.education) + n(f.debts && f.debts.secured);
     var legacyEstate = 0;
-    // legacyNetWorth now includes the family trust, but the trust carries to the heir
-    // separately (applyLegacyCarryV1846) — subtract it so it is not also paid out as cash.
-    try { if (typeof legacyNetWorth === "function") legacyEstate = Math.max(0, round(legacyNetWorth(s) - trustCarryValueV1846(s, heirKey))); } catch (e) {}
+    // legacyNetWorth includes family structures that carry forward as live assets.
+    // Subtract them before calculating cash inheritance so a trust/business does not
+    // become both a preserved asset and a second cash payout.
+    try {
+      if (typeof legacyNetWorth === "function") {
+        legacyEstate = Math.max(0, round(
+          legacyNetWorth(s) -
+          trustCarryValueV1846(s, heirKey) -
+          businessCarryValueV1846(s) -
+          trustHeldPropertyValueV1868(s) -
+          trustHeldEntrepreneurshipValueV1868(s)
+        ));
+      }
+    } catch (e) {}
     var base = Math.max(0, Math.max(legacyEstate, personalAssets - personalDebts));
     var heirTrust = Math.max(0, round((((f.trustFunds || {})[heirKey]) || 0)));
     // A strong family trust / estate plan sharply reduces the death haircut on the
@@ -789,11 +990,14 @@
     var carriedTrust = trustCarryValueV1846(old, heirKey);
     var carriedBusiness = businessCarryValueV1846(old);
     var carriedTrustBusiness = trustBusinessCarryValueV1846(old);
+    var carriedTrustProperty = trustHeldPropertyValueV1868(old);
+    var carriedTrustEntrepreneurship = trustHeldEntrepreneurshipValueV1868(old);
     var carriedInvestmentOffice = investmentOfficeCarryValueV1849(old);
     var protectedOffice = hasProtectedFamilyStructureV1849(old) ? carriedInvestmentOffice : 0;
     var hasBusinessStructure = oldBusinesses.length || carriedBusiness || carriedTrustBusiness;
+    var hasPortfolioStructure = carriedTrustProperty || carriedTrustEntrepreneurship;
 
-    if (oldTrust.created || n(oldTrust.corpus) || heirTrust || otherChildTrusts || n((oldEstate.assets || {}).trustCash) || hasBusinessStructure || protectedOffice) {
+    if (oldTrust.created || n(oldTrust.corpus) || heirTrust || otherChildTrusts || n((oldEstate.assets || {}).trustCash) || hasBusinessStructure || hasPortfolioStructure || protectedOffice) {
       var nextTrust = cloneV1846(oldTrust) || {};
       if (!nextTrust.created) {
         nextTrust.created = true;
@@ -805,14 +1009,19 @@
       if (!nextTrust.sourceLedger || typeof nextTrust.sourceLedger !== "object") nextTrust.sourceLedger = {};
       if (!Array.isArray(nextTrust.history)) nextTrust.history = [];
       if (!nextTrust.familyFund || typeof nextTrust.familyFund !== "object") nextTrust.familyFund = { active: false, capital: 0, risk: "balanced", lastReturn: 0, lastFee: 0, years: 0 };
+      ensureTrustHoldingsV1868(nextTrust);
       nextTrust.corpus = Math.max(0, round(n(nextTrust.corpus) + otherChildTrusts + protectedOffice));
       nextTrust.sourceLedger.inheritedTrust = Math.max(0, round(n(nextTrust.sourceLedger.inheritedTrust) + carriedTrust));
       if (heirTrust) nextTrust.sourceLedger.heirTrustDistributed = Math.max(0, round(n(nextTrust.sourceLedger.heirTrustDistributed) + heirTrust));
       if (otherChildTrusts) nextTrust.sourceLedger.remainingChildTrusts = Math.max(0, round(n(nextTrust.sourceLedger.remainingChildTrusts) + otherChildTrusts));
       if (carriedTrustBusiness) nextTrust.sourceLedger.trustOwnedBusiness = Math.max(0, round(n(nextTrust.sourceLedger.trustOwnedBusiness) + carriedTrustBusiness));
+      if (carriedTrustProperty) nextTrust.sourceLedger.trustHeldProperty = Math.max(0, round(n(nextTrust.sourceLedger.trustHeldProperty) + carriedTrustProperty));
+      if (carriedTrustEntrepreneurship) nextTrust.sourceLedger.trustHeldEntrepreneurship = Math.max(0, round(n(nextTrust.sourceLedger.trustHeldEntrepreneurship) + carriedTrustEntrepreneurship));
       if (protectedOffice) nextTrust.sourceLedger.investmentOffice = Math.max(0, round(n(nextTrust.sourceLedger.investmentOffice) + protectedOffice));
       nextTrust.history.unshift({ age: 0, event: "Carried into generation " + generation, amount: carriedTrust });
       if (carriedTrustBusiness) nextTrust.history.unshift({ age: 0, event: "Trust-owned business stake carried into generation " + generation, amount: carriedTrustBusiness });
+      if (carriedTrustProperty) nextTrust.history.unshift({ age: 0, event: "Trust-held property carried into generation " + generation, amount: carriedTrustProperty });
+      if (carriedTrustEntrepreneurship) nextTrust.history.unshift({ age: 0, event: "Trust-held founder portfolio carried into generation " + generation, amount: carriedTrustEntrepreneurship });
       if (protectedOffice) nextTrust.history.unshift({ age: 0, event: "Investment office capital carried into generation " + generation, amount: protectedOffice });
       nextTrust.history = nextTrust.history.slice(0, 10);
       s.finance.familyTrustV1839 = nextTrust;
@@ -858,15 +1067,28 @@
       if (!s.finance.businessTaxV1830 || typeof s.finance.businessTaxV1830 !== "object") s.finance.businessTaxV1830 = cloneV1846(oldF.businessTaxV1830 || { history: [], processedAges: {} });
     }
 
+    if (carriedTrustProperty) {
+      if (oldF.reV1863) s.finance.reV1863 = cloneV1846(oldF.reV1863);
+      if (oldF.reV1862) s.finance.reV1862 = cloneV1846(oldF.reV1862);
+      if (Array.isArray(old.rentals)) s.rentals = cloneV1846(old.rentals);
+    }
+
+    if (carriedTrustEntrepreneurship && oldF.bizV1860) {
+      var carriedFounderState = trustHeldEntrepreneurshipStateV1872(old);
+      if (carriedFounderState) s.finance.bizV1860 = carriedFounderState;
+    }
+
     if (!s.legacy || typeof s.legacy !== "object") s.legacy = {};
     s.legacy.lastTrustCarry = carriedTrust;
     s.legacy.lastBusinessCarry = carriedBusiness;
     s.legacy.lastTrustBusinessCarry = carriedTrustBusiness;
+    s.legacy.lastTrustPropertyCarry = carriedTrustProperty;
+    s.legacy.lastTrustEntrepreneurshipCarry = carriedTrustEntrepreneurship;
     s.legacy.lastInvestmentOfficeCarry = carriedInvestmentOffice;
     s.legacy.lastProtectedInvestmentOfficeCarry = protectedOffice;
     s.legacy.lastHeirTrustCash = heirTrust;
     s.legacy.successionBridgeV1846 = true;
-    return { trust: carriedTrust, business: carriedBusiness, trustBusiness: carriedTrustBusiness, investmentOffice: carriedInvestmentOffice, protectedInvestmentOffice: protectedOffice, heirTrust: heirTrust };
+    return { trust: carriedTrust, business: carriedBusiness, trustBusiness: carriedTrustBusiness, trustProperty: carriedTrustProperty, trustEntrepreneurship: carriedTrustEntrepreneurship, investmentOffice: carriedInvestmentOffice, protectedInvestmentOffice: protectedOffice, heirTrust: heirTrust };
   }
 
   function selectedHeirEntryV1846(old) {
@@ -982,7 +1204,7 @@
     } catch (eAge) {}
     var carried = applyLegacyCarryV1846(old, heirKey);
     if (!hasDirectHeir) log("With no direct heir, " + nextName + " — a relative of the " + familyName + " line — steps forward to continue it.", { money: 0 });
-    log("You carry the " + familyName + " line forward with " + compactMoney(cashInheritance) + " cash, " + compactMoney(carried.trust) + " protected trust cash, " + compactMoney(carried.business) + " family business value, and " + compactMoney(carried.protectedInvestmentOffice || 0) + " protected investment office capital.", { money: 0 });
+    log("You carry the " + familyName + " line forward with " + compactMoney(cashInheritance) + " cash, " + compactMoney(carried.trust) + " protected trust cash, " + compactMoney(carried.business) + " family business value, " + compactMoney(carried.trustProperty || 0) + " trust-held property, " + compactMoney(carried.trustEntrepreneurship || 0) + " trust-held founder portfolio, and " + compactMoney(carried.protectedInvestmentOffice || 0) + " protected investment office capital.", { money: 0 });
     try { if (typeof save === "function") save(); } catch (e3) {}
     try { if (typeof render === "function") render(); } catch (e4) {}
     try { if (typeof milestoneToast === "function") milestoneToast("Legacy Continued", nextName + " begins generation " + stateNow().legacy.generation + "."); } catch (e5) {}
@@ -991,13 +1213,13 @@
   function carriedPreviewNetV1847(s) {
     try { if (typeof legacyNetWorth === "function") return round(legacyNetWorth(s)); } catch (e) {}
     var f = (s || {}).finance || {};
-    return round(n((s || {}).money) + n((s || {}).savings) + businessCarryValueV1846(s) + trustCarryValueV1846(s, "") + investmentOfficeCarryValueV1849(s) + n(f.brokerage) - n((s || {}).debt));
+    return round(n((s || {}).money) + n((s || {}).savings) + businessCarryValueV1846(s) + trustCarryValueV1846(s, "") + trustHeldPropertyValueV1868(s) + trustHeldEntrepreneurshipValueV1868(s) + investmentOfficeCarryValueV1849(s) + n(f.brokerage) - n((s || {}).debt));
   }
 
   function sourceScoreV1847(candidate) {
     var source = candidate && (candidate.source || candidate.state || candidate);
     if (!source || typeof source !== "object") return -1;
-    return businessCarryValueV1846(source) + trustCarryValueV1846(source, "") + trustBusinessCarryValueV1846(source) + investmentOfficeCarryValueV1849(source);
+    return businessCarryValueV1846(source) + trustCarryValueV1846(source, "") + trustBusinessCarryValueV1846(source) + trustHeldPropertyValueV1868(source) + trustHeldEntrepreneurshipValueV1868(source) + investmentOfficeCarryValueV1849(source);
   }
 
   function readJsonV1847(key) {
@@ -1064,14 +1286,14 @@
 
   window.repairLegacyCarryV1847 = function () {
     var current = ensureLegalState();
-    var existing = businessCarryValueV1846(current) + trustCarryValueV1846(current, "") + trustBusinessCarryValueV1846(current);
+    var existing = businessCarryValueV1846(current) + trustCarryValueV1846(current, "") + trustBusinessCarryValueV1846(current) + trustHeldPropertyValueV1868(current) + trustHeldEntrepreneurshipValueV1868(current);
     var candidate = bestRepairSourceV1847();
     if (!candidate) return toast("No recoverable pre-succession trust source was found. Use a Wayback checkpoint or an older slot if one exists.");
     var source = candidate.source || candidate.state || candidate;
     if (sourceScoreV1847(candidate) <= existing) return toast("Current legacy carry is already as large as the best recoverable source.");
     var heirKey = candidate.heirKey || heirKeyForRepairV1847(source, current);
     var carried = applyLegacyCarryV1846(source, heirKey);
-    log("Recovered missing legacy carry: " + compactMoney(carried.trust) + " trust cash and " + compactMoney(carried.business) + " family business value.", {});
+    log("Recovered missing legacy carry: " + compactMoney(carried.trust) + " trust cash, " + compactMoney(carried.business) + " family business value, " + compactMoney(carried.trustProperty || 0) + " property, and " + compactMoney(carried.trustEntrepreneurship || 0) + " founder portfolio.", {});
     try { if (typeof save === "function") save(); } catch (e) {}
     try { if (typeof render === "function") render(); } catch (e2) {}
   };
@@ -1088,6 +1310,24 @@
       if (r && r.role === "Child" && r.alive !== false) out.push({ id: key, name: (r.name || key) + " (child)" });
     });
     return out;
+  }
+
+  function trustPortfolioTitlingDeskV1868() {
+    var s = ensureLegalState();
+    var trust = s.finance.familyTrustV1839 || {};
+    var holdings = ensureTrustHoldingsV1868(trust);
+    var propValue = propertyEquityValueV1868(s);
+    var founderValue = entrepreneurshipPortfolioValueV1868(s);
+    function card(kind, label, value, titled, titleAction, removeAction, note) {
+      return '<div class="v1839-child-card"><span>' + esc(label) + '</span><b class="' + (titled ? "good" : "gold") + '">' + (titled ? "Titled" : "Personal") + '</b><em>' + esc(note) + ' Value ' + compactMoney(value) + '.</em><div class="v1839-mini-actions">' +
+        button(titled ? "Protected" : "Title to Trust", titleAction, titled ? "green" : "gold", titled || !trust.created || value <= 0) +
+        button("Remove", removeAction, "blue", !titled || !trust.created) +
+        '</div></div>';
+    }
+    return '<section class="panel v1846-titling-desk"><div class="v1839-panel-head"><div><div class="section-label">Step 3: Family office holdings</div><h3>Title portfolios into the trust envelope</h3><p>These actions do not move cash or change net worth. They mark live property and founder holdings as protected family assets for risk and succession.</p></div><strong>' + compactMoney(trustHeldPropertyValueV1868(s) + trustHeldEntrepreneurshipValueV1868(s)) + '<span>held portfolios</span></strong></div><div class="v1839-rail">' +
+      card("property", "Property portfolio", propValue, holdings.property.titled, "titlePropertyToTrustV1868(true)", "titlePropertyToTrustV1868(false)", "Real estate equity stays in Property, but carries as trust-titled wealth.") +
+      card("entrepreneurship", "Entrepreneurship portfolio", founderValue, holdings.entrepreneurship.titled, "titleEntrepreneurshipToTrustV1868(true)", "titleEntrepreneurshipToTrustV1868(false)", "Founder companies stay in Entrepreneurship, but carry as trust-titled wealth.") +
+      '</div></section>';
   }
 
   function businessTitlingDesk() {
@@ -1137,6 +1377,8 @@
     var s = ensureLegalState();
     var carriedTrust = n((s.legacy || {}).lastTrustCarry);
     var carriedBusiness = n((s.legacy || {}).lastBusinessCarry);
+    var carriedProperty = n((s.legacy || {}).lastTrustPropertyCarry);
+    var carriedFounder = n((s.legacy || {}).lastTrustEntrepreneurshipCarry);
     var carriedOffice = n((s.legacy || {}).lastInvestmentOfficeCarry);
     var protectedOffice = n((s.legacy || {}).lastProtectedInvestmentOfficeCarry);
     var trust = s.finance.familyTrustV1839 || {};
@@ -1145,9 +1387,11 @@
       var r = s.relationships[key];
       return r && r.role === "Child" && r.alive !== false;
     });
-    return '<section class="panel v1846-succession-desk"><div class="v1839-panel-head"><div><div class="section-label">🌳 Step 5: Continue the legacy</div><h3>Heirs keep protected family assets</h3><p>Continuing as a child now preserves the legal trust, family fund, child-trust cash, and trust-owned businesses instead of collapsing the family structure into a small cash payout.</p></div><strong class="' + (carriedTrust || carriedBusiness ? "good" : "gold") + '">' + compactMoney(carriedTrust + carriedBusiness) + '<span>last carry</span></strong></div><div class="v1839-metric-grid compact">' +
+    return '<section class="panel v1846-succession-desk"><div class="v1839-panel-head"><div><div class="section-label">🌳 Step 5: Continue the legacy</div><h3>Heirs keep protected family assets</h3><p>Continuing as a child now preserves the legal trust, family fund, child-trust cash, trust-owned businesses, titled property, and titled founder holdings instead of collapsing the family structure into a small cash payout.</p></div><strong class="' + (carriedTrust || carriedBusiness || carriedProperty || carriedFounder ? "good" : "gold") + '">' + compactMoney(carriedTrust + carriedBusiness + carriedProperty + carriedFounder) + '<span>last carry</span></strong></div><div class="v1839-metric-grid compact">' +
       metric("Trust status", trust.created ? "Protected" : "Open", trust.created ? "Corpus " + compactMoney(trust.corpus || 0) : "Create or fund a trust before succession.", trust.created ? "good" : "gold") +
       metric("Family businesses", String(businesses), businesses ? "Business desk keeps inherited companies." : "No businesses carried yet.", businesses ? "good" : "gold") +
+      metric("Titled property", compactMoney(carriedProperty), carriedProperty ? "Property portfolio carried as trust-held wealth." : "Title property before succession to carry it intact.", carriedProperty ? "good" : "gold") +
+      metric("Founder portfolio", compactMoney(carriedFounder), carriedFounder ? "Entrepreneurship portfolio carried as trust-held wealth." : "Title Entrepreneurship before succession to carry it intact.", carriedFounder ? "good" : "gold") +
       metric("Investment office", compactMoney(carriedOffice), protectedOffice ? compactMoney(protectedOffice) + " moved into the family trust pool." : "Without a trust, office capital is personal estate value.", protectedOffice ? "green" : "gold") +
       metric("Last cash inheritance", compactMoney((s.legacy || {}).lastInheritance || 0), "Spendable cash from the personal estate.", "blue") +
       metric("Last heir trust cash", compactMoney((s.legacy || {}).lastHeirTrustCash || 0), "Child-specific trust cash became starting cash.", "green") +
@@ -1177,9 +1421,11 @@
   function trustCounters() {
     var trust = financeNow().familyTrustV1839 || {};
     var plan = trustPlan();
+    var held = trustHeldPropertyValueV1868(stateNow()) + trustHeldEntrepreneurshipValueV1868(stateNow());
     return '<section class="panel v1839-counters"><div class="section-label">📊 Trust counters</div><div class="v1839-metric-grid">' +
       metric("Family trust", compactMoney(trust.corpus || 0), (trust.created ? pct(plan.protection) + " protection profile." : "Create one before moving assets."), trust.created ? "good" : "gold") +
       metric("Protected assets", compactMoney(protectedAssets()), "Sheltered from lawsuits and risk.", protectedAssets() ? "good" : "gold") +
+      metric("Held portfolios", compactMoney(held), "Property and Entrepreneurship titled to trust.", held ? "good" : "gold") +
       metric("Child trusts", compactMoney(childTrustTotal()), "Heir-specific trust balances.", childTrustTotal() ? "good" : "gold") +
       metric("Family fund", compactMoney((trust.familyFund || {}).capital || 0), (trust.familyFund || {}).active ? riskSpec().label + " mandate." : "Inactive trust sleeve.", (trust.familyFund || {}).active ? "good" : "gold") +
       '</div></section>';
@@ -1188,7 +1434,7 @@
   function trustHero() {
     var trust = financeNow().familyTrustV1839 || {};
     var plan = trustPlan();
-    return '<section class="v1839-hero"><div><div class="section-label">🏛️ Family office</div><h2>Family Trust</h2><p>Create and fund the trust, title your businesses into it, run the family fund, set up child trusts, and name a successor to carry the legacy.</p><div class="v1839-chip-row"><span class="' + (trust.created ? "good" : "gold") + '">Trust ' + esc(trust.created ? plan.name : "not created") + '</span><span>Corpus ' + compactMoney(trust.corpus || 0) + '</span><span>Protected ' + compactMoney(protectedAssets()) + '</span></div></div><strong class="' + (trust.created ? "good" : "gold") + '">' + compactMoney(trust.corpus || 0) + '<span>trust corpus</span></strong></section>';
+    return '<section class="v1839-hero"><div><div class="section-label">🏛️ Family office</div><h2>Family Trust</h2><p>Create and fund the trust, title businesses, property, and founder portfolios into it, run the family fund, set up child trusts, and name a successor to carry the legacy.</p><div class="v1839-chip-row"><span class="' + (trust.created ? "good" : "gold") + '">Trust ' + esc(trust.created ? plan.name : "not created") + '</span><span>Corpus ' + compactMoney(trust.corpus || 0) + '</span><span>Protected ' + compactMoney(protectedAssets()) + '</span></div></div><strong class="' + (trust.created ? "good" : "gold") + '">' + compactMoney(trust.corpus || 0) + '<span>trust corpus</span></strong></section>';
   }
 
   function trustLinkCardV1853() {
@@ -1206,11 +1452,12 @@
       legalBackLinkV1853() +
       trustHero() +
       trustCounters() +
-      '<div class="v1846-journey-banner">🗺️ Family Office &amp; Succession - five steps, one place: set up the trust, fund it, title your businesses, pick a successor, then continue the legacy.</div>' +
+      '<div class="v1846-journey-banner">🗺️ Family Office &amp; Succession - one place: set up the trust, fund it, title portfolios and businesses, pick a successor, then continue the legacy.</div>' +
       trustPlanDesk() +
       trustFundingDesk() +
       familyFundDesk() +
       childTrustDesk() +
+      trustPortfolioTitlingDeskV1868() +
       businessTitlingDesk() +
       successorDesk() +
       successionDeskV1846() +
@@ -1244,6 +1491,8 @@
   window.renderLegalHubV1839 = renderLegalHub;
   window.renderTrustHubV1853 = renderTrustHub;
   window.legalProtectedAssetsV1839 = protectedAssets;
+  window.trustHeldPropertyValueV1868 = function (sourceState) { return trustHeldPropertyValueV1868(sourceState || stateNow()); };
+  window.trustHeldEntrepreneurshipValueV1868 = function (sourceState) { return trustHeldEntrepreneurshipValueV1868(sourceState || stateNow()); };
   window.continueAsHeirV1846 = continueAsHeirV1846;
   window.continueAsHeir = continueAsHeirV1846;
   try { continueAsHeir = continueAsHeirV1846; } catch (e0) {}

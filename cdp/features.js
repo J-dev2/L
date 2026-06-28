@@ -75,8 +75,8 @@
     function panelHtml(tab) { window.bizSetPanelV1862(tab); return window.renderEntrepreneurHubV1861(); }
     var overviewP = panelHtml("overview");
     ok("graphs_growth_trends", overviewP.indexOf("Growth trends") >= 0 && overviewP.indexOf("biz1861-spark") >= 0);
-    var productP = panelHtml("product");
-    ok("graphs_budget_allocation", productP.indexOf("Budget allocation") >= 0 && productP.indexOf("biz1861-segbar") >= 0);
+    var fundingGraphP = panelHtml("funding");
+    ok("graphs_budget_allocation", fundingGraphP.indexOf("Budget allocation") >= 0 && fundingGraphP.indexOf("biz1861-segbar") >= 0);
     var teamP = panelHtml("team");
     ok("graphs_hiring_impact", teamP.indexOf("Hiring impact") >= 0);
     var growthP = panelHtml("growth");
