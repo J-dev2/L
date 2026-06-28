@@ -33,11 +33,17 @@ Cache-stamps currently in `play.html` (bump again after any further edit): `entr
 Note: the 4 `dist/*.html` files got the nav-dock CSS patched in by hand but are otherwise STALE (missing all the
 entrepreneurship + wellbeing work). A clean rebuild fixes that.
 
-Mobile QA note from user (2026-06-28): On the GitHub-hosted/mobile build, the Finance page is the only checked hub
-that appears to use the wrong vertical height. Its content can extend down under the browser chrome/bottom area,
-making the page hard to play; Money and the other checked pages did not show the same issue. Hosted site may be one
-or two versions behind current source, so verify against latest `play.html`/rebuilt `dist` first. Likely affected
-file: `pages/systems/finance-ledger.js` (and possibly hub-sheet/mobile CSS if the issue reproduces).
+Mobile QA note from user (2026-06-28, corrected): On the GitHub-hosted/mobile build, the Money page is the hub that
+appears to use the wrong vertical height. Its content extends down under the browser chrome/bottom area, so the user
+cannot reliably see or touch controls at the bottom. Earlier report said Finance, but user re-checked and corrected
+it to Money. Hosted site may be one or two versions behind current source, so verify against latest `play.html`/
+rebuilt `dist` first. Likely affected file: `pages/systems/money-banking.js` (and possibly hub-sheet/mobile CSS if
+the issue reproduces).
+
+Emoji/platform QA note from user (2026-06-28): On an Apple phone, some emojis/icons do not show correctly. Future
+work should add a verification/fallback layer that detects Apple/iOS, Android, or desktop and swaps to symbols known
+to render on that platform. If emoji rendering still fails, fall back to plain text/sign characters so controls remain
+readable. Do not implement yet; capture for a later UI compatibility pass.
 
 ---
 

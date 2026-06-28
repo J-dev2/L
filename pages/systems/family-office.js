@@ -118,19 +118,58 @@
      family wealth grows across years and generations. State lives on the trust (carries to heirs).
      Writes ONLY to trust.corpus + cash on hire; never touches the asset engines, so no net-worth
      double-count. NOTE (tested side): the return/fee rates are a first pass — tune for balance. */
+  var OPERATOR_COMP_CAP = 1000000000;
   var OPERATORS = [
-    { id: "associate", name: "Associate operator",            cost: 50000,   annualFeeRate: 0.15, returnRate: 0.025, desc: "A capable hand to keep titled holdings running." },
-    { id: "director",  name: "Managing director",             cost: 600000,  annualFeeRate: 0.13, returnRate: 0.040, desc: "Actively runs and grows the family holdings." },
-    { id: "chief",     name: "Chief family-office operator",  cost: 3000000, annualFeeRate: 0.11, returnRate: 0.060, desc: "Top tier: best growth, lowest relative fee, runs across generations." }
+    { id: "associate", name: "Associate operator",            cost: 50000,   annualFeeRate: 0.15, returnRate: 0.025, salaryMin: 75000,   salaryDefault: 150000,  salaryMax: 750000,     desc: "A capable hand to keep titled holdings running." },
+    { id: "director",  name: "Managing director",             cost: 600000,  annualFeeRate: 0.13, returnRate: 0.040, salaryMin: 250000,  salaryDefault: 900000,  salaryMax: 8000000,    desc: "Actively runs and grows the family holdings." },
+    { id: "chief",     name: "Chief family-office operator",  cost: 3000000, annualFeeRate: 0.11, returnRate: 0.060, salaryMin: 1000000, salaryDefault: 5000000, salaryMax: 1000000000, desc: "Top tier: best growth, lowest relative fee, runs across generations." }
   ];
   function operatorDef(id) { for (var i = 0; i < OPERATORS.length; i++) if (OPERATORS[i].id === id) return OPERATORS[i]; return null; }
+  function clampOperatorSalary(def, raw) {
+    raw = round(raw);
+    if (!def) return 0;
+    return Math.max(def.salaryMin || 0, Math.min(OPERATOR_COMP_CAP, def.salaryMax || OPERATOR_COMP_CAP, raw || def.salaryDefault || 0));
+  }
+  function clampFeeRate(raw) {
+    raw = num(raw);
+    if (!isFinite(raw)) raw = 0;
+    return Math.max(0, Math.min(0.40, raw));
+  }
+  function ensureOperatorComp(op, def) {
+    if (!op || !def) return op;
+    op.salary = clampOperatorSalary(def, op.salary || def.salaryDefault);
+    op.feeRate = clampFeeRate(op.feeRate == null ? def.annualFeeRate : op.feeRate);
+    op.compCap = OPERATOR_COMP_CAP;
+    if (op.lastSalary == null) op.lastSalary = 0;
+    if (op.lastGross == null) op.lastGross = 0;
+    if (op.lastComp == null) op.lastComp = 0;
+    return op;
+  }
+  function operatorCompOptions(def) {
+    if (!def) return [];
+    return [
+      { id: "lower_salary", name: "Lower salary", salary: def.salaryMin, feeRate: def.annualFeeRate + 0.03, note: "Cheaper payroll, higher upside fee." },
+      { id: "balanced", name: "Balanced", salary: def.salaryDefault, feeRate: def.annualFeeRate, note: "Default salary and fee split." },
+      { id: "higher_salary", name: "Higher salary", salary: def.salaryMax, feeRate: Math.max(0.03, def.annualFeeRate - 0.04), note: "More guaranteed pay, lower fee percentage." }
+    ];
+  }
+  function calcOperatorComp(gross, op, def) {
+    ensureOperatorComp(op, def);
+    gross = Math.max(0, round(gross));
+    var remainingCap = OPERATOR_COMP_CAP;
+    var salary = Math.min(gross, remainingCap, clampOperatorSalary(def, op.salary));
+    remainingCap = Math.max(0, remainingCap - salary);
+    var fee = Math.min(Math.max(0, gross - salary), remainingCap, round(clampFeeRate(op.feeRate) * gross));
+    return { gross: gross, salary: round(salary), fee: round(fee), net: Math.max(0, round(gross - salary - fee)), comp: round(salary + fee) };
+  }
   function operatorState() {
     var s = S(); if (!s) return null;
     var f = s.finance || (s.finance = {});
     var trust = f.familyTrustV1839; if (!trust) return null;
     if (!trust.operatorV1872 || typeof trust.operatorV1872 !== "object") {
-      trust.operatorV1872 = { hired: false, tier: null, hiredAge: null, lastReturn: 0, lastFee: 0, totalGrown: 0, _yr: -1 };
+      trust.operatorV1872 = { hired: false, tier: null, hiredAge: null, salary: 0, feeRate: 0, compCap: OPERATOR_COMP_CAP, lastReturn: 0, lastGross: 0, lastSalary: 0, lastFee: 0, lastComp: 0, totalGrown: 0, _yr: -1 };
     }
+    if (trust.operatorV1872.hired) ensureOperatorComp(trust.operatorV1872, operatorDef(trust.operatorV1872.tier));
     return trust.operatorV1872;
   }
   function titledManagedValue() {
@@ -148,8 +187,35 @@
     if (num(s.money) < def.cost) { toast(def.name + " costs " + money(def.cost) + " to bring on."); return; }
     s.money = round(num(s.money) - def.cost);
     op.hired = true; op.tier = tierId; op.hiredAge = round(num(s.age));
+    op.salary = def.salaryDefault;
+    op.feeRate = def.annualFeeRate;
+    op.compCap = OPERATOR_COMP_CAP;
     log("🤝 Hired " + def.name + " to run the family office (" + money(def.cost) + ").", { money: -def.cost });
     toast("Hired " + def.name + ".");
+    saveGame(); rerender();
+  };
+  window.setOperatorCompPresetV1872 = function (presetId) {
+    var op = operatorState(); if (!op || !op.hired) return;
+    var def = operatorDef(op.tier); if (!def) return;
+    var opts = operatorCompOptions(def);
+    for (var i = 0; i < opts.length; i++) {
+      if (opts[i].id === presetId) {
+        op.salary = clampOperatorSalary(def, opts[i].salary);
+        op.feeRate = clampFeeRate(opts[i].feeRate);
+        op.compCap = OPERATOR_COMP_CAP;
+        log("Updated operator compensation to " + opts[i].name.toLowerCase() + " (" + money(op.salary) + " salary, " + Math.round(op.feeRate * 100) + "% fee).");
+        saveGame(); rerender();
+        return;
+      }
+    }
+  };
+  window.setOperatorCompV1872 = function (salary, feeRate) {
+    var op = operatorState(); if (!op || !op.hired) return;
+    var def = operatorDef(op.tier); if (!def) return;
+    op.salary = clampOperatorSalary(def, salary);
+    op.feeRate = clampFeeRate(feeRate);
+    op.compCap = OPERATOR_COMP_CAP;
+    log("Negotiated operator compensation (" + money(op.salary) + " salary, " + Math.round(op.feeRate * 100) + "% fee).");
     saveGame(); rerender();
   };
   window.fireOperatorV1872 = function () {
@@ -168,16 +234,16 @@
     op._yr = round(num(s.age));
     var def = operatorDef(op.tier); if (!def || !def.returnRate) return;
     var titled = titledManagedValue();
-    if (titled <= 0) { op.lastReturn = 0; op.lastFee = 0; return; }
+    if (titled <= 0) { op.lastReturn = 0; op.lastGross = 0; op.lastSalary = 0; op.lastFee = 0; op.lastComp = 0; return; }
     var gross = round(def.returnRate * titled);
-    var fee = round(def.annualFeeRate * gross);
-    var net = Math.max(0, gross - fee);
+    var comp = calcOperatorComp(gross, op, def);
+    var net = comp.net;
     trust.corpus = Math.max(0, round(num(trust.corpus) + net));
-    op.lastReturn = net; op.lastFee = fee; op.totalGrown = round(num(op.totalGrown) + net);
+    op.lastReturn = net; op.lastGross = comp.gross; op.lastSalary = comp.salary; op.lastFee = comp.fee; op.lastComp = comp.comp; op.totalGrown = round(num(op.totalGrown) + net);
     if (!Array.isArray(trust.history)) trust.history = [];
     trust.history.unshift({ age: round(num(s.age)), event: def.name + " grew the family office", amount: net });
     trust.history = trust.history.slice(0, 10);
-    log("🏛️ " + def.name + " grew the family office by " + money(net) + " (after " + money(fee) + " operator fee).");
+    log("🏛️ " + def.name + " grew the family office by " + money(net) + " (after " + money(comp.salary) + " salary and " + money(comp.fee) + " fee).");
   }
   function operatorDesk() {
     var s = S(); if (!s) return "";
@@ -187,16 +253,27 @@
     var titled = titledManagedValue();
     var cur = op.hired ? operatorDef(op.tier) : null;
     var status = cur
-      ? '<div class="row-sub">Current: <b style="color:var(--accent-2)">' + esc(cur.name) + '</b> · last year grew the office ' + money(op.lastReturn) + ' (fee ' + money(op.lastFee) + ') · total grown ' + money(op.totalGrown) + '.</div>'
+      ? '<div class="row-sub">Current: <b style="color:var(--accent-2)">' + esc(cur.name) + '</b> · last year grew the office ' + money(op.lastReturn) + ' after salary ' + money(op.lastSalary) + ' and fee ' + money(op.lastFee) + ' · total grown ' + money(op.totalGrown) + '.</div>'
       : '<div class="row-sub">No operator. Your titled holdings (' + money(titled) + ') sit protected but aren\'t actively grown — hire someone to run + compound them into the trust each year.</div>';
+    var compControls = "";
+    if (cur) {
+      var opts = operatorCompOptions(cur).map(function (opt) {
+        var selected = round(op.salary) === clampOperatorSalary(cur, opt.salary) && Math.round(num(op.feeRate) * 1000) === Math.round(clampFeeRate(opt.feeRate) * 1000);
+        return '<button class="money-btn ' + (selected ? "blue" : "gold") + '" onclick="event.preventDefault();event.stopPropagation();setOperatorCompPresetV1872(\'' + opt.id + '\')">' + esc(opt.name) + '</button>';
+      }).join("");
+      compControls = '<div class="fo72-comp-box"><div class="fo72-comp-line"><b>Compensation</b><span>Salary ' + esc(money(op.salary)) + ' + ' + Math.round(num(op.feeRate) * 100) + '% fee</span></div>' +
+        '<div class="row-sub">Negotiate higher salary for a lower fee percentage, or lower salary for more upside fee. Total annual operator compensation is capped at ' + money(OPERATOR_COMP_CAP) + '.</div>' +
+        '<div class="mini-actions fo72-comp-actions">' + opts + '</div></div>';
+    }
     var cards = OPERATORS.map(function (d) {
       var active = op.hired && op.tier === d.id;
       var est = round(d.returnRate * titled);
       return '<div class="fo72-op-card' + (active ? " on" : "") + '"><div class="fo72-op-top"><b>' + esc(d.name) + '</b><span>' + esc(money(d.cost)) + '</span></div>' +
         '<div class="row-sub">' + esc(d.desc) + '</div>' +
-        '<div class="lf-pill-row"><span class="lf-pill good">~' + (d.returnRate * 100).toFixed(1) + '%/yr</span><span class="lf-pill">' + Math.round(d.annualFeeRate * 100) + '% fee</span>' + (titled > 0 ? '<span class="lf-pill money">~' + esc(money(est)) + '/yr</span>' : '') + '</div>' +
+        '<div class="lf-pill-row"><span class="lf-pill good">~' + (d.returnRate * 100).toFixed(1) + '%/yr</span><span class="lf-pill">' + Math.round(d.annualFeeRate * 100) + '% fee</span><span class="lf-pill">salary ' + esc(money(d.salaryMin)) + '-' + esc(money(d.salaryMax)) + '</span>' + (titled > 0 ? '<span class="lf-pill money">~' + esc(money(est)) + '/yr gross</span>' : '') + '</div>' +
         '<div class="mini-actions" style="margin-top:8px"><button class="money-btn ' + (active ? "blue" : "gold") + '" onclick="event.preventDefault();event.stopPropagation();hireOperatorV1872(\'' + d.id + '\')" ' + (active ? "disabled" : "") + '>' + (active ? "Running" : "Hire") + '</button></div></div>';
     }).join("");
+    status += compControls;
     var fire = op.hired ? '<div class="mini-actions" style="margin-top:8px"><button class="money-btn red" onclick="event.preventDefault();event.stopPropagation();fireOperatorV1872()">Let operator go</button></div>' : "";
     return '<section class="panel" data-fo72-panel="operator"><div class="section-label">🤝 Family office operator</div>' + status + '<div class="fo72-op-grid">' + cards + '</div>' + fire + '</section>';
   }
@@ -350,8 +427,7 @@
   function injectTrustPanels(html) {
     html = String(html || "");
     var top = "", desks = "";
-    try { top = launcherPanel(); } catch (e1) {}
-    try { desks += operatorDesk(); } catch (e2) {}
+    try { top = launcherPanel() + operatorDesk(); } catch (e1) {}
     try { desks += founderTitlingDesk(); } catch (e3) {}
     var bottom = desks ? '<div class="fo72-trust-desks" data-fo72-panel="desks">' + desks + '</div>' : "";
     var shellOpen = /<div class="v1839-legal-shell"[^>]*>/;
@@ -426,6 +502,9 @@
       ".fo72-op-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:10px}",
       ".fo72-op-card{border:1px solid var(--line);border-radius:12px;background:rgba(12,10,7,.4);padding:12px}.fo72-op-card.on{border-color:rgba(201,155,85,.6);background:rgba(50,37,20,.45)}",
       ".fo72-op-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px}.fo72-op-top b{color:var(--ink);font-size:14px}.fo72-op-top span{font-family:'JetBrains Mono',monospace;color:var(--money);font-size:11px}",
+      ".fo72-comp-box{border:1px solid rgba(201,155,85,.35);border-radius:12px;background:rgba(50,37,20,.22);padding:10px;margin-top:10px}",
+      ".fo72-comp-line{display:flex;justify-content:space-between;align-items:center;gap:10px}.fo72-comp-line b{color:var(--ink);font-size:13px}.fo72-comp-line span{font-family:'JetBrains Mono',monospace;color:var(--money);font-size:10px;text-align:right}",
+      ".fo72-comp-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}",
       "@media(max-width:460px){.fo72-hero{grid-template-columns:1fr}}"
     ].join("\n");
     document.head.appendChild(st);
@@ -451,8 +530,8 @@
       id: "family-office",
       file: "pages/systems/family-office.js",
       status: "active",
-      globals: ["openFamilyOfficeV1872", "closeFamilyOfficeV1872"],
-      notes: "v18.72 Family Office. Holdings popup, operator, and per-company founder-company titling are active."
+      globals: ["openFamilyOfficeV1872", "closeFamilyOfficeV1872", "setOperatorCompPresetV1872"],
+      notes: "v18.72 Family Office. Holdings popup, negotiable operator compensation, and per-company founder-company titling are active."
     });
   }
 })();

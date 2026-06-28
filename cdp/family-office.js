@@ -4,6 +4,13 @@
   function num(v) { return Number.isFinite(Number(v)) ? Number(v) : 0; }
   function round(v) { return Math.round(num(v)); }
   function trust() { return ((state && state.finance) || {}).familyTrustV1839 || {}; }
+  function operatorComp(gross, salary, feeRate, cap) {
+    gross = Math.max(0, round(gross));
+    cap = cap || 1000000000;
+    var paidSalary = Math.min(gross, cap, round(salary));
+    var fee = Math.min(Math.max(0, gross - paidSalary), Math.max(0, cap - paidSalary), round(gross * feeRate));
+    return { salary: paidSalary, fee: fee, comp: paidSalary + fee, net: Math.max(0, gross - paidSalary - fee) };
+  }
   function net() {
     try { if (typeof window.legacyNetWorth === "function") return round(window.legacyNetWorth()); } catch (e) {}
     try { if (typeof window.financeNetWorth === "function") return round(window.financeNetWorth()); } catch (e2) {}
@@ -94,20 +101,36 @@
     var op = trust().operatorV1872 || {};
     ok("operator_hired", op.hired === true && op.tier === "associate", "op=" + JSON.stringify(op));
     ok("operator_hire_cost_charged", num(state.money) === moneyBeforeHire - 50000, "money=" + num(state.money));
+    ok("operator_has_negotiable_comp", num(op.salary) === 150000 && Math.abs(num(op.feeRate) - 0.15) < 0.001 && num(op.compCap) === 1000000000, "op=" + JSON.stringify(op));
+    window.setOperatorCompPresetV1872("lower_salary");
+    op = trust().operatorV1872 || {};
+    ok("operator_comp_preset_changes_salary_and_fee", num(op.salary) === 75000 && Math.abs(num(op.feeRate) - 0.18) < 0.001, "op=" + JSON.stringify(op));
     var corpusBefore = num(trust().corpus);
     state.age += 1;
     if (typeof window.resolveLifeAndFinanceYear === "function") window.resolveLifeAndFinanceYear();
     var heldAfterFirstYear = num(window.trustHeldEntrepreneurshipValueV1868());
     var expectedGross = round(heldAfterFirstYear * 0.025);
-    var expectedFee = round(expectedGross * 0.15);
-    var expectedNet = expectedGross - expectedFee;
+    var expectedComp = operatorComp(expectedGross, 75000, 0.18);
+    var expectedFee = expectedComp.fee;
+    var expectedNet = expectedComp.net;
     var corpusAfter = num(trust().corpus);
     var opAfterFirst = trust().operatorV1872 || {};
-    ok("operator_records_expected_return", num(opAfterFirst.lastReturn) === expectedNet && num(opAfterFirst.lastFee) === expectedFee, "op=" + JSON.stringify(opAfterFirst) + " expectedNet=" + expectedNet + " expectedFee=" + expectedFee);
+    ok("operator_records_expected_return", num(opAfterFirst.lastReturn) === expectedNet && num(opAfterFirst.lastSalary) === expectedComp.salary && num(opAfterFirst.lastFee) === expectedFee && num(opAfterFirst.lastComp) === expectedComp.comp, "op=" + JSON.stringify(opAfterFirst) + " expectedNet=" + expectedNet + " expectedFee=" + expectedFee);
     ok("operator_adds_to_corpus", corpusAfter > corpusBefore, "before=" + corpusBefore + " after=" + corpusAfter);
     var totalGrownAfterFirst = num(opAfterFirst.totalGrown);
     if (typeof window.resolveLifeAndFinanceYear === "function") window.resolveLifeAndFinanceYear();
     ok("operator_runs_once_per_age", num((trust().operatorV1872 || {}).totalGrown) === totalGrownAfterFirst, "afterSecond=" + num((trust().operatorV1872 || {}).totalGrown) + " afterFirst=" + totalGrownAfterFirst);
+
+    state.money += 10000000;
+    window.hireOperatorV1872("chief");
+    op = trust().operatorV1872 || {};
+    op.salary = 2000000000;
+    op.feeRate = 1;
+    state.finance.bizV1860.businesses[0].valuation = 50000000000;
+    state.age += 1;
+    if (typeof window.resolveLifeAndFinanceYear === "function") window.resolveLifeAndFinanceYear();
+    op = trust().operatorV1872 || {};
+    ok("operator_compensation_cap_is_one_billion", num(op.lastComp) <= 1000000000 && num(op.lastSalary) <= 1000000000, "op=" + JSON.stringify(op));
 
     var heldAtDeath = num(window.trustHeldEntrepreneurshipValueV1868());
     state.alive = false;

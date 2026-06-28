@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-06-28T16:20:49.959Z",
+  "builtAt": "2026-06-28T16:49:00.242Z",
   "source": "outputs/ledger18_modular_v18_35",
   "entries": [
     {
@@ -130,8 +130,8 @@
           "bytes": 45857
         },
         {
-          "src": "pages/systems/family-office.js?v=20260627-familyoffice5",
-          "bytes": 29426
+          "src": "pages/systems/family-office.js?v=20260628-familyoffice6",
+          "bytes": 34814
         },
         {
           "src": "pages/hubs/00-hub-registry.js",
@@ -182,7 +182,7 @@
           "bytes": 15386
         }
       ],
-      "bytes": 3419039
+      "bytes": 3424427
     },
     {
       "entry": "index.html",
