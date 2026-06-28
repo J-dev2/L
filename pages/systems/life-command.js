@@ -42,6 +42,190 @@
     return sign + "$" + abs.toLocaleString();
   }
 
+  function copyV18333(obj) {
+    try { if (typeof structuredClone === "function") return structuredClone(obj); } catch (e) {}
+    try { return JSON.parse(JSON.stringify(obj)); } catch (e2) { return null; }
+  }
+
+  function activeSlotV18333() {
+    var idx = 1;
+    try { idx = Number(activeSlot) || 1; } catch (e) {}
+    return Math.max(1, Math.min(Number(window.NUM_SLOTS || 5) || 5, Math.round(idx)));
+  }
+
+  function slotKeyV18333(idx) {
+    try { if (typeof slotKey === "function") return slotKey(idx); } catch (e) {}
+    return "ledger-life-slot-" + idx;
+  }
+
+  function syncStateV18333(s) {
+    if (!s) return null;
+    window.state = s;
+    try { state = s; } catch (e) {}
+    try { if (typeof ensureStateShape === "function") ensureStateShape(); } catch (e2) {}
+    if (!Array.isArray(s.timeSnapshotsV1814)) s.timeSnapshotsV1814 = [];
+    if (!s.saveHealthV1826) s.saveHealthV1826 = { backups: 0, repairs: 0, lastBackupAt: 0 };
+    return s;
+  }
+
+  function ensureStateV18333() {
+    var s = getStateV1844();
+    if (!s) return null;
+    return syncStateV18333(s);
+  }
+
+  function saveSlotV18333(idx, s) {
+    idx = Math.max(1, Math.min(Number(window.NUM_SLOTS || 5) || 5, Math.round(numberV1844(idx) || activeSlotV18333())));
+    s = syncStateV18333(s || ensureStateV18333());
+    if (!s) return false;
+    try { localStorage.setItem(slotKeyV18333(idx), JSON.stringify(s)); } catch (e) { return false; }
+    try { localStorage.setItem("ledger-active-slot", String(idx)); } catch (e2) {}
+    try { activeSlot = idx; } catch (e3) {}
+    return true;
+  }
+
+  function renderNowV18333() {
+    try { if (typeof render === "function") render(); } catch (e) {}
+  }
+
+  function netWorthV18333(s) {
+    s = s || {};
+    try { if (typeof legacyNetWorth === "function") return legacyNetWorth(s); } catch (e) {}
+    return netWorthV1844(s);
+  }
+
+  function snapshotV18333(s) {
+    s = s || ensureStateV18333();
+    if (!s) return null;
+    var snap = copyV18333(s);
+    if (!snap) return null;
+    delete snap.pending;
+    delete snap.activeModal;
+    delete snap.timeSnapshotsV1814;
+    return snap;
+  }
+
+  function sortedSnapshotsV18333(s) {
+    s = s || ensureStateV18333();
+    var snaps = Array.isArray(s && s.timeSnapshotsV1814) ? s.timeSnapshotsV1814 : [];
+    return snaps.map(function (item, idx) {
+      item = item || {};
+      var copy = {};
+      Object.keys(item).forEach(function (key) { copy[key] = item[key]; });
+      copy.__idx = idx;
+      return copy;
+    }).reverse();
+  }
+
+  function toastV18333(message) {
+    try { if (typeof addToast === "function") return addToast(message); } catch (e) {}
+    try { if (typeof addLog === "function") return addLog(message, {}); } catch (e2) {}
+  }
+
+  function logV18333(message, deltas) {
+    try { if (typeof addLog === "function") return addLog(message, deltas || {}); } catch (e) {}
+  }
+
+  function labelV18333(item, fallback) {
+    return item && (item.label || item.reason || item.name) || fallback || "Checkpoint";
+  }
+
+  window.createWaybackCheckpointV18333 = function (label) {
+    var s = ensureStateV18333();
+    if (!s) return toastV18333("Open a life before saving a Wayback checkpoint.");
+    var snap = snapshotV18333(s);
+    if (!snap) return toastV18333("Could not create a Wayback checkpoint.");
+    s.timeSnapshotsV1814.push({
+      id: Date.now(),
+      age: s.age || 0,
+      at: Date.now(),
+      label: label || "Manual checkpoint",
+      netWorth: netWorthV18333(s),
+      state: snap
+    });
+    s.timeSnapshotsV1814 = s.timeSnapshotsV1814.slice(-18);
+    logV18333("Saved Wayback checkpoint at age " + (s.age || 0) + ".", {});
+    saveSlotV18333(activeSlotV18333(), s);
+    renderNowV18333();
+  };
+
+  window.restoreWaybackIndexV18333 = function (displayIndex) {
+    var current = ensureStateV18333();
+    if (!current) return toastV18333("Open a life before restoring a Wayback checkpoint.");
+    var shown = sortedSnapshotsV18333(current);
+    var shownItem = shown[Math.round(numberV1844(displayIndex))];
+    if (!shownItem || shownItem.__idx == null) return toastV18333("That Wayback checkpoint is not readable.");
+    var originalIndex = shownItem.__idx;
+    var item = current.timeSnapshotsV1814[originalIndex];
+    var restored = copyV18333(item && item.state);
+    if (!restored) return toastV18333("That Wayback checkpoint is damaged.");
+    restored.timeSnapshotsV1814 = current.timeSnapshotsV1814.slice(0, originalIndex).concat(current.timeSnapshotsV1814.slice(originalIndex + 1));
+    syncStateV18333(restored);
+    saveSlotV18333(activeSlotV18333(), restored);
+    toastV18333("Wayback restored this life to age " + (restored.age == null ? "?" : restored.age) + ".");
+    renderNowV18333();
+  };
+
+  window.deleteWaybackIndexV18333 = function (displayIndex) {
+    var s = ensureStateV18333();
+    if (!s) return;
+    var shown = sortedSnapshotsV18333(s);
+    var item = shown[Math.round(numberV1844(displayIndex))];
+    if (!item || item.__idx == null) return;
+    s.timeSnapshotsV1814.splice(item.__idx, 1);
+    saveSlotV18333(activeSlotV18333(), s);
+    renderNowV18333();
+  };
+
+  window.waybackLifeSlotV18333 = function (idx) {
+    idx = Math.max(1, Math.min(Number(window.NUM_SLOTS || 5) || 5, Math.round(numberV1844(idx) || activeSlotV18333())));
+    var raw = null;
+    try { raw = localStorage.getItem(slotKeyV18333(idx)); } catch (e) {}
+    if (!raw) return toastV18333("No saved life in slot " + idx + ".");
+    var saved = null;
+    try { saved = JSON.parse(raw); } catch (e2) {}
+    if (!saved) return toastV18333("Slot " + idx + " could not be read.");
+    var snaps = Array.isArray(saved.timeSnapshotsV1814) ? saved.timeSnapshotsV1814 : [];
+    if (!snaps.length) {
+      var fresh = snapshotV18333(saved);
+      if (fresh) {
+        saved.timeSnapshotsV1814 = [{
+          id: Date.now(),
+          age: saved.age || 0,
+          at: Date.now(),
+          label: "Starting checkpoint",
+          netWorth: netWorthV18333(saved),
+          state: fresh
+        }];
+        try { localStorage.setItem(slotKeyV18333(idx), JSON.stringify(saved)); } catch (e3) {}
+      }
+      return toastV18333("Slot " + idx + " has no older checkpoint yet. I saved one for next time.");
+    }
+    var item = snaps[snaps.length - 1];
+    var restored = copyV18333(item && item.state);
+    if (!restored) return toastV18333("The latest checkpoint in slot " + idx + " is damaged.");
+    restored.timeSnapshotsV1814 = snaps.slice(0, -1);
+    syncStateV18333(restored);
+    saveSlotV18333(idx, restored);
+    toastV18333("Wayback restored slot " + idx + " to age " + (restored.age == null ? "?" : restored.age) + ".");
+    renderNowV18333();
+  };
+
+  window.createWaybackCheckpointV1826 = window.createWaybackCheckpointV18333;
+  window.restoreWaybackIndexV1826 = window.restoreWaybackIndexV18333;
+  window.deleteWaybackIndexV1826 = window.deleteWaybackIndexV18333;
+  window.createWaybackCheckpointV1823 = window.createWaybackCheckpointV18333;
+  window.waybackLifeSlotV1823 = window.waybackLifeSlotV18333;
+  window.waybackLifeSlotV1820 = window.waybackLifeSlotV18333;
+  try {
+    createWaybackCheckpointV1826 = window.createWaybackCheckpointV1826;
+    restoreWaybackIndexV1826 = window.restoreWaybackIndexV1826;
+    deleteWaybackIndexV1826 = window.deleteWaybackIndexV1826;
+    createWaybackCheckpointV1823 = window.createWaybackCheckpointV1823;
+    waybackLifeSlotV1823 = window.waybackLifeSlotV1823;
+    waybackLifeSlotV1820 = window.waybackLifeSlotV1820;
+  } catch (e) {}
+
   function stageV1844(s) {
     try {
       if (typeof lifeStage === "function") return lifeStage();
@@ -555,6 +739,25 @@
     '</div>';
   }
 
+  function renderWaybackPanelV18333() {
+    var s = ensureStateV18333();
+    var rows = "";
+    var count = 0;
+    if (s) {
+      var shown = sortedSnapshotsV18333(s);
+      count = shown.length;
+      rows = shown.length ? shown.map(function (item, displayIdx) {
+        var age = item.age == null ? "?" : item.age;
+        var when = item.at ? new Date(item.at).toLocaleString() : "saved";
+        var net = item.netWorth ? " - net " + moneyV1844(item.netWorth) : "";
+        return '<div class="v18333-wayback-row"><div><b>' + escapeV1844(labelV18333(item, "Checkpoint")) + '</b><span>Age ' + escapeV1844(age) + ' - ' + escapeV1844(when) + escapeV1844(net) + '</span></div><div class="v18333-wayback-actions"><button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();restoreWaybackIndexV18333(' + displayIdx + ')">Restore</button><button class="money-btn red" onclick="event.preventDefault();event.stopPropagation();deleteWaybackIndexV18333(' + displayIdx + ')">Delete</button></div></div>';
+      }).join("") : '<div class="v18333-wayback-empty">No checkpoints yet. Hit Save Checkpoint before risky choices, or age up once to create an automatic rewind point.</div>';
+    } else {
+      rows = '<div class="v18333-wayback-empty">Open or continue a life to use Wayback.</div>';
+    }
+    return '<section class="money-section v18333-wayback"><div class="money-section-title">Wayback Machine <span>' + count + ' checkpoints</span></div><div class="money-row"><div><div class="money-row-title">Restore this life from a checkpoint</div><div class="money-row-sub">Newest checkpoints show first. Restore updates the active slot immediately, so the age and money should change right away.</div></div><div class="bank-actions-row"><button class="money-btn green" onclick="event.preventDefault();event.stopPropagation();createWaybackCheckpointV18333(\'Manual checkpoint\')" ' + (!s ? "disabled" : "") + '>Save Checkpoint</button><button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();waybackLifeSlotV18333(activeSlot)" ' + (!count ? "disabled" : "") + '>Restore Latest</button></div></div><div class="v18333-wayback-list">' + rows + '</div></section>';
+  }
+
   function removeSectionByClassV1844(html, className) {
     html = String(html || "");
     var idx = html.indexOf(className);
@@ -622,9 +825,10 @@
       if (id === "lifehub" || id === "life" || id === "stack" || id === "life-stack") {
         html = cleanLifeHubHtmlV1844(html);
         if (String(html).indexOf("lifehub-command-v1844") < 0) {
-          return renderLifeHubCommandV1844() + html;
+          return renderLifeHubCommandV1844() + renderWaybackPanelV18333() + html;
         }
       }
+      if (id === "more") return renderWaybackPanelV18333() + cleanLifeHubHtmlV1844(html);
       return html;
     };
     wrapped.__v1844LifeCommandHub = true;
@@ -652,6 +856,7 @@
       ".life-v1844-meter{height:7px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:10px}.life-v1844-meter span{display:block;height:100%;border-radius:999px}.life-v1844-meter.good span{background:#b9dc8a}.life-v1844-meter.warn span{background:#f2c978}.life-v1844-meter.bad span{background:#e9927d}",
       ".lifehub-command-v1844{display:grid;gap:12px;margin-bottom:14px}.life-v1844-hub-hero{grid-template-columns:minmax(0,1fr) minmax(170px,230px);border:1px solid rgba(126,160,172,.36);border-radius:16px;background:linear-gradient(135deg,rgba(17,38,38,.82),rgba(31,25,18,.88));padding:15px}.life-v1844-hub-hero h2{margin:6px 0;color:#fff3df;font-size:34px;line-height:1;letter-spacing:0}.life-v1844-hub-grid{margin-bottom:0}.life-v1844-hub-two{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.life-v1844-timeline-item,.life-v1844-memory{border-top:1px solid rgba(255,255,255,.08);padding:10px 0}.life-v1844-timeline-item:first-of-type,.life-v1844-memory:first-of-type{border-top:0}.life-v1844-timeline-item span,.life-v1844-memory span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.12em;font-size:9px}.life-v1844-timeline-item b,.life-v1844-memory b{display:block;color:#f6ead8;line-height:1.25;margin-top:3px}.life-v1844-empty{color:#cdbf9f;font-family:'JetBrains Mono',monospace;font-size:11px}",
       ".life-v1844-tool-desk{border:1px solid rgba(216,173,109,.24);border-radius:15px;background:linear-gradient(135deg,rgba(42,31,18,.68),rgba(16,35,36,.62));padding:13px}.life-v1844-tool-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:9px}.life-v1844-tool-card{border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(0,0,0,.18);padding:11px;min-width:0}.life-v1844-tool-card h3{margin:0 0 5px;color:#fff3df;font-size:18px;line-height:1.05}.life-v1844-tool-card p{margin:0 0 10px;color:#cdbf9f;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.35}.life-v1844-tool-row{display:flex;flex-wrap:wrap;gap:7px}.life-v1844-tool{border:1px solid rgba(216,173,109,.4);border-radius:999px;background:rgba(36,28,18,.82);color:#f6ead8;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:8px 10px;cursor:pointer}.life-v1844-tool.blue{border-color:rgba(126,160,172,.5);background:rgba(23,43,46,.7)}.life-v1844-tool.gold{border-color:rgba(216,173,109,.58);background:rgba(66,45,18,.66)}.life-v1844-tool:disabled{opacity:.45;cursor:not-allowed}",
+      ".v18333-wayback{border-color:rgba(146,130,220,.48)!important;background:linear-gradient(135deg,rgba(33,29,54,.97),rgba(23,28,29,.98))!important;overflow:hidden!important}.v18333-wayback-list{display:grid;gap:8px;margin-top:10px}.v18333-wayback-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(255,255,255,.045);padding:10px;min-width:0}.v18333-wayback-row b{display:block;color:#fff3df;overflow-wrap:anywhere}.v18333-wayback-row span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.4;margin-top:3px}.v18333-wayback-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}.v18333-wayback-actions .money-btn{min-width:82px}.v18333-wayback-empty{border:1px dashed rgba(255,255,255,.14);border-radius:12px;padding:11px;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.45;background:rgba(0,0,0,.12)}",
       ".life-v1844-bond-scan{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid rgba(126,160,172,.24);border-radius:12px;background:linear-gradient(135deg,rgba(18,38,39,.68),rgba(35,27,17,.55));padding:10px;margin:10px 0 0}.life-v1844-bond-scan span,.life-v1844-bond-scan em{display:block;font-family:'JetBrains Mono',monospace;font-style:normal;color:#b9a98e;font-size:9px;text-transform:uppercase;letter-spacing:.11em}.life-v1844-bond-scan b{display:block;color:#f2c978;font-size:28px;line-height:1}.life-v1844-bond-scan strong{border:1px solid rgba(216,173,109,.28);border-radius:999px;padding:7px 9px;color:#f2c978;background:rgba(0,0,0,.16);font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}.life-v1844-bond-scan strong.good{border-color:rgba(185,220,138,.36);color:#b9dc8a;background:rgba(30,55,25,.22)}.life-v1844-bond-scan strong.people{border-color:rgba(126,160,172,.38);color:#9fc8d3;background:rgba(18,44,47,.24)}",
       ".lifehub-command-v1844 .life-v1844-hub-grid{grid-template-columns:repeat(auto-fit,minmax(132px,1fr))!important}.lifehub-command-v1844 .life-v1844-stat{min-height:82px}",
       ".hub-lifehub .life-dashboard{display:grid!important;gap:12px!important}.hub-lifehub .life-dashboard>.panel:not(.v1816-life-tools){position:relative;border:1px solid rgba(216,173,109,.22)!important;border-radius:15px!important;background:linear-gradient(135deg,rgba(36,29,21,.86),rgba(20,18,14,.92))!important;box-shadow:0 12px 28px rgba(0,0,0,.18)!important;padding:14px!important;overflow:hidden}.hub-lifehub .life-dashboard>.panel:not(.v1816-life-tools):before{content:\"\";position:absolute;inset:0;background:linear-gradient(110deg,rgba(216,173,109,.055),transparent 34%,rgba(126,160,172,.045));pointer-events:none}.hub-lifehub .life-dashboard>.panel:not(.v1816-life-tools)>*{position:relative}.hub-lifehub .life-dashboard .section-label{font-size:9px!important;letter-spacing:.18em!important;color:#d8ad6d!important}.hub-lifehub .life-dashboard .row-title{font-size:20px!important;line-height:1.08!important;color:#fff3df!important;overflow-wrap:anywhere}.hub-lifehub .life-dashboard .row-sub{font-size:10px!important;line-height:1.45!important;color:#cdbf9f!important}.hub-lifehub .life-dashboard .lf-pill-row{display:flex!important;flex-wrap:wrap!important;gap:7px!important;margin-top:10px!important}.hub-lifehub .life-dashboard .lf-pill{min-width:0!important;border-radius:999px!important;padding:4px 7px!important;font-size:9px!important;line-height:1.15!important;background:rgba(0,0,0,.18)!important}",
@@ -695,8 +900,8 @@
       id: "life-command",
       file: "pages/systems/life-command.js",
       status: "active",
-      globals: ["openLifeCommandHubV1844", "runLifeCommandActionV1844", "runLifeUtilityV1844"],
-      notes: "Reworks the Life home surface and Life hub with status cards, next moves, timeline, and chapter planning."
+      globals: ["openLifeCommandHubV1844", "runLifeCommandActionV1844", "runLifeUtilityV1844", "createWaybackCheckpointV18333", "restoreWaybackIndexV18333", "waybackLifeSlotV18333"],
+      notes: "Reworks the Life home surface and Life hub with status cards, next moves, timeline, chapter planning, and Wayback checkpoint controls."
     });
   }
 })();

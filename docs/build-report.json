@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-06-28T06:55:47.071Z",
+  "builtAt": "2026-06-28T16:20:49.959Z",
   "source": "outputs/ledger18_modular_v18_35",
   "entries": [
     {
@@ -22,68 +22,8 @@
           "bytes": 1157
         },
         {
-          "src": "pages/runtime/00-core-app-runtime.js?v=20260627-businessage21",
-          "bytes": 1271688
-        },
-        {
-          "src": "pages/patches/01-patch-v18-24.js",
-          "bytes": 41825
-        },
-        {
-          "src": "pages/patches/02-patch-v18-25.js",
-          "bytes": 42159
-        },
-        {
-          "src": "pages/patches/03-patch-v18-26.js",
-          "bytes": 59393
-        },
-        {
-          "src": "pages/patches/04-patch-v18-27.js",
-          "bytes": 48327
-        },
-        {
-          "src": "pages/patches/05-patch-v18-28.js",
-          "bytes": 45316
-        },
-        {
-          "src": "pages/patches/06-patch-v18-29.js",
-          "bytes": 27433
-        },
-        {
-          "src": "pages/patches/07-patch-v18-30.js",
-          "bytes": 36765
-        },
-        {
-          "src": "pages/patches/08-patch-v18-31.js",
-          "bytes": 47508
-        },
-        {
-          "src": "pages/patches/09-patch-v18-32.js",
-          "bytes": 60141
-        },
-        {
-          "src": "pages/patches/11-patch-v18-33-2.js",
-          "bytes": 16349
-        },
-        {
-          "src": "pages/patches/12-patch-v18-33-3.js",
-          "bytes": 14035
-        },
-        {
-          "src": "pages/patches/13-patch-v18-33-4.js",
-          "bytes": 10115
-        },
-        {
-          "src": "pages/patches/14-patch-v18-33-5.js",
-          "bytes": 8578
-        },
-        {
-          "src": "pages/patches/15-patch-v18-33-6.js",
-          "bytes": 6314
-        },
-        {
-          "src": "pages/patches/16-patch-v18-33-7.js",
-          "bytes": 3579
+          "src": "pages/runtime/00-core-app-runtime.js?v=20260628-absorbedpatches1",
+          "bytes": 1681487
         },
         {
           "src": "state/state-map.js",
@@ -162,20 +102,20 @@
           "bytes": 208807
         },
         {
-          "src": "pages/systems/save-recovery.js",
-          "bytes": 8028
+          "src": "pages/systems/save-recovery.js?v=20260628-recovery2",
+          "bytes": 18122
         },
         {
           "src": "pages/systems/scroll-stability.js?v=20260628-flicker1",
           "bytes": 12519
         },
         {
-          "src": "pages/systems/life-command.js",
-          "bytes": 49733
+          "src": "pages/systems/life-command.js?v=20260628-wayback1",
+          "bytes": 60648
         },
         {
-          "src": "pages/systems/scroll-nav.js",
-          "bytes": 8690
+          "src": "pages/systems/scroll-nav.js?v=20260628-nav2",
+          "bytes": 15830
         },
         {
           "src": "pages/systems/more-command.js",
@@ -242,7 +182,7 @@
           "bytes": 15386
         }
       ],
-      "bytes": 3449075
+      "bytes": 3419039
     },
     {
       "entry": "index.html",

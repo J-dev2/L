@@ -17361,3 +17361,5566 @@ getSuggestedActions = function(s) {
   ].join("\n");
   document.head.appendChild(style);
 })();
+
+/* Absorbed legacy patch scripts v18.24-v18.32 on 2026-06-28. Keep after core runtime and before modular systems. */
+
+
+/* BEGIN absorbed 01-patch-v18-24.js */
+
+/* LEDGER PATCH v18.24: solution-notebook pass — liquid tax payoff, cash-flow command, credit depth, job/business requirements */
+(function () {
+  if (window.__ledgerV1824Loaded) return;
+  window.__ledgerV1824Loaded = true;
+
+  function esc1824(v) {
+    return String(v == null ? "" : v).replace(/[&<>"']/g, function (ch) {
+      return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch];
+    });
+  }
+  function num1824(v, fallback) {
+    var n = Number(v);
+    return Number.isFinite(n) ? n : (fallback || 0);
+  }
+  function money1824(v) {
+    try { if (typeof money === "function") return money(Math.round(num1824(v))); } catch(e) {}
+    v = Math.round(num1824(v));
+    var sign = v < 0 ? "-" : "";
+    v = Math.abs(v);
+    if (v >= 1e15) return sign + "$" + (v / 1e15).toFixed(1).replace(/\.0$/, "") + "Q";
+    if (v >= 1e12) return sign + "$" + (v / 1e12).toFixed(1).replace(/\.0$/, "") + "T";
+    if (v >= 1e9) return sign + "$" + (v / 1e9).toFixed(1).replace(/\.0$/, "") + "B";
+    if (v >= 1e6) return sign + "$" + (v / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+    if (v >= 10000) return sign + "$" + Math.round(v / 1000) + "K";
+    return sign + "$" + v.toLocaleString();
+  }
+  function signed1824(v) {
+    v = Math.round(num1824(v));
+    return (v >= 0 ? "+" : "-") + money1824(Math.abs(v));
+  }
+  function pct1824(v) {
+    return (num1824(v) * 100).toFixed(1).replace(".0", "") + "%";
+  }
+  function toast1824(msg) {
+    try { if (typeof addToast === "function") return addToast(msg); } catch(e) {}
+    try { if (typeof addLog === "function") return addLog(msg); } catch(e) {}
+  }
+  function log1824(msg, deltas) {
+    try { if (typeof addLog === "function") return addLog(msg, deltas || {}); } catch(e) {}
+  }
+  function saveRender1824() {
+    try { if (typeof save === "function") save(); } catch(e) {}
+    try { if (typeof render === "function") render(); } catch(e) {}
+  }
+  function ensure1824() {
+    try { if (typeof ensureStateShape === "function") ensureStateShape(); } catch(e) {}
+    if (!window.state) return false;
+    state.finance = state.finance || {};
+    state.stats = state.stats || {};
+    state.flags = state.flags || {};
+    state.actionsTaken = state.actionsTaken || {};
+    state.finance.debts = state.finance.debts || {};
+    state.finance.incomeSources = state.finance.incomeSources || {};
+    state.finance.externalManager = state.finance.externalManager || { id:null, capital:0, lastReturn:0, lastFee:0 };
+    state.finance.personalFirm = state.finance.personalFirm || { hired:false, staff:{ advisor:1, analyst:1, risk:1, tax:1 } };
+    state.finance.personalFirm.staff = state.finance.personalFirm.staff || { advisor:1, analyst:1, risk:1, tax:1 };
+    if (!Array.isArray(state.finance.cashFlowHistoryV1824)) state.finance.cashFlowHistoryV1824 = [];
+    if (!Array.isArray(state.finance.taxTrueUpsV1824)) state.finance.taxTrueUpsV1824 = [];
+    if (state.finance.creditScore == null) state.finance.creditScore = Math.max(520, Math.min(820, 650 + Math.round((num1824(state.stats.discipline, 50) - 50) * 1.2)));
+    state.finance.creditCardDebt = Math.max(0, Math.round(num1824(state.finance.creditCardDebt)));
+    state.finance.taxDebt = Math.max(0, Math.round(num1824(state.finance.taxDebt || state.finance.debts.taxDebt || state.taxDebt)));
+    state.finance.debts.taxDebt = state.finance.taxDebt;
+    return true;
+  }
+  function stockValue1824() {
+    var m = (state.finance || {}).stocksV18 || {};
+    if (!Array.isArray(m.holdings)) return 0;
+    return Math.round(m.holdings.reduce(function (sum, h) {
+      var price = m.prices && m.prices[h.id] != null ? num1824(m.prices[h.id]) : num1824(h.avgCost);
+      return sum + num1824(h.shares) * price;
+    }, 0));
+  }
+  function liquidBuckets1824(includeChecking) {
+    ensure1824();
+    var f = state.finance || {};
+    var buckets = [];
+    if (includeChecking !== false) buckets.push({ id:"checking", label:"Checking", obj:state, key:"money", value:Math.max(0, num1824(state.money)), liquid:true });
+    buckets.push({ id:"savings", label:"Savings", obj:state, key:"savings", value:Math.max(0, num1824(state.savings)), liquid:true });
+    buckets.push({ id:"super", label:"Super Saver", obj:f, key:"superSaver", value:Math.max(0, num1824(f.superSaver)), liquid:true });
+    buckets.push({ id:"brokerage", label:"Brokerage Cash", obj:f, key:"brokerage", value:Math.max(0, num1824(f.brokerage)), liquid:true });
+    buckets.push({ id:"managed", label:"Personal Firm", obj:f, key:"managedPortfolio", value:Math.max(0, num1824(f.managedPortfolio)), liquid:true });
+    buckets.push({ id:"external", label:"Outside Manager", obj:f.externalManager, key:"capital", value:Math.max(0, num1824(f.externalManager && f.externalManager.capital)), liquid:true });
+    return buckets;
+  }
+  function totalLiquid1824(includeChecking) {
+    return liquidBuckets1824(includeChecking).reduce(function (sum, b) { return sum + Math.max(0, Math.round(num1824(b.value))); }, 0);
+  }
+  function totalAssets1824() {
+    ensure1824();
+    var homeVal = 0, rentalVal = 0, carVal = 0;
+    try { var h = (typeof homes !== "undefined" ? homes : []).find(function (x) { return x.id === state.home; }); homeVal = num1824(h && (h.price || h.value)); } catch(e) {}
+    try { (Array.isArray(state.rentals) ? state.rentals : []).forEach(function (id) { var r = (typeof rentals !== "undefined" ? rentals : []).find(function (x) { return x.id === id; }); rentalVal += num1824(r && (r.price || r.value)); }); } catch(e) {}
+    try { var c = (typeof cars !== "undefined" ? cars : []).find(function (x) { return x.id === state.car; }); carVal = num1824(c && (c.price || c.value)); } catch(e) {}
+    var f = state.finance || {};
+    return Math.round(totalLiquid1824(true) + stockValue1824() + Math.max(0, num1824(state.ira)) + Math.max(0, num1824(state.retirement401k)) + Math.max(0, homeVal + rentalVal + carVal));
+  }
+  function totalDebts1824() {
+    ensure1824();
+    var f = state.finance || {};
+    return Math.round(Math.max(0, num1824(state.debt)) + Math.max(0, num1824(f.creditCardDebt)) + Math.max(0, num1824(f.assetBackedLoan)) + Math.max(0, num1824(f.taxDebt)) + Math.max(0, num1824(f.medicalDebt || state.medicalDebt)) + Math.max(0, num1824(f.personalDebt)));
+  }
+  function netWorth1824() {
+    try { if (typeof financeNetWorth === "function") return Math.round(num1824(financeNetWorth())); } catch(e) {}
+    return totalAssets1824() - totalDebts1824();
+  }
+  function pullFromBuckets1824(amount, options) {
+    ensure1824();
+    amount = Math.max(0, Math.round(num1824(amount)));
+    options = options || {};
+    var remaining = amount;
+    var used = [];
+    liquidBuckets1824(options.includeChecking !== false).forEach(function (b) {
+      if (remaining <= 0 || !b.obj || !b.key) return;
+      var have = Math.max(0, Math.round(num1824(b.obj[b.key])));
+      var take = Math.min(have, remaining);
+      if (take <= 0) return;
+      b.obj[b.key] = Math.max(0, have - take);
+      remaining -= take;
+      used.push({ label:b.label, amount:take });
+    });
+    return { requested:amount, paid:amount - remaining, remaining:remaining, used:used };
+  }
+  function sourceText1824(used) {
+    used = Array.isArray(used) ? used : [];
+    if (!used.length) return "no assets";
+    return used.map(function (u) { return u.label + " " + money1824(u.amount); }).join(", ");
+  }
+  function setTaxDebt1824(value) {
+    ensure1824();
+    value = Math.max(0, Math.round(num1824(value)));
+    state.finance.taxDebt = value;
+    state.finance.debts.taxDebt = value;
+    state.taxDebt = value;
+    if (state.tax && typeof state.tax === "object") state.tax.taxDebt = value;
+  }
+  window.payTaxDebtV1824 = function (amount) {
+    ensure1824();
+    var debt = Math.max(0, num1824(state.finance.taxDebt));
+    if (!debt) return toast1824("No tax debt to pay.");
+    var requested = amount === "max" || amount === Infinity ? debt : Math.round(num1824(amount));
+    requested = Math.min(debt, Math.max(0, requested));
+    if (!requested) return toast1824("Enter a tax payoff amount.");
+    var pull = pullFromBuckets1824(requested, { includeChecking:true });
+    if (!pull.paid) return toast1824("No liquid assets available for tax payoff.");
+    setTaxDebt1824(debt - pull.paid);
+    state.finance.taxLegalRisk = Math.max(0, Math.round(num1824(state.finance.taxLegalRisk)) - Math.ceil(pull.paid / 10000));
+    log1824("Paid " + money1824(pull.paid) + " toward tax debt from " + sourceText1824(pull.used) + ".", { taxDebt:-pull.paid });
+    saveRender1824();
+  };
+  window.payCustomTaxDebtV1824 = function (inputId) {
+    var el = document.getElementById(inputId);
+    var val = el ? String(el.value || "").replace(/[^0-9.]/g, "") : "";
+    if (el) el.value = "";
+    return window.payTaxDebtV1824(val);
+  };
+  window.raiseCashFromAssetsV1824 = function (amount) {
+    ensure1824();
+    var available = totalLiquid1824(false);
+    var requested = amount === "max" || amount === Infinity ? available : Math.round(num1824(amount));
+    requested = Math.max(0, Math.min(requested, available));
+    if (!requested) return toast1824("No non-checking liquid assets available.");
+    var pull = pullFromBuckets1824(requested, { includeChecking:false });
+    state.money = Math.round(num1824(state.money) + pull.paid);
+    log1824("Raised " + money1824(pull.paid) + " into checking from " + sourceText1824(pull.used) + ".", { money:pull.paid });
+    saveRender1824();
+  };
+  window.payDebtWithAssetsV1824 = function (kind, amount) {
+    ensure1824();
+    var key = kind === "education" ? "debt" : kind;
+    var current = key === "debt" ? Math.max(0, num1824(state.debt)) : Math.max(0, num1824(state.finance[key]));
+    if (!current) return toast1824("No " + kind + " debt to pay.");
+    var requested = amount === "max" ? current : Math.round(num1824(amount));
+    var pull = pullFromBuckets1824(Math.min(current, requested), { includeChecking:true });
+    if (!pull.paid) return toast1824("No liquid assets available for payoff.");
+    if (key === "debt") state.debt = Math.max(0, current - pull.paid);
+    else state.finance[key] = Math.max(0, current - pull.paid);
+    log1824("Paid " + money1824(pull.paid) + " toward " + kind + " debt from " + sourceText1824(pull.used) + ".", {});
+    saveRender1824();
+  };
+  function taxAccountantFactor1824() {
+    var raw = String((state.finance || {}).accountant || (state.finance || {}).accountantPlan || "none").toLowerCase();
+    if (/elite|tax_law|wealth|family|global/.test(raw)) return { label:"Elite tax counsel", reduction:.16, audit:-12 };
+    if (/cpa|advisor|pro/.test(raw)) return { label:"CPA Advisor", reduction:.10, audit:-8 };
+    if (/local|preparer|basic/.test(raw)) return { label:"Local tax preparer", reduction:.055, audit:-4 };
+    return { label:"No accountant", reduction:0, audit:4 };
+  }
+  function currentTaxTrueUpBase1824() {
+    ensure1824();
+    var f = state.finance || {};
+    var m = f.stocksV18 || {};
+    var realizedTotal = Math.max(0, num1824(m.realizedGain));
+    var realizedDelta = Math.max(0, realizedTotal - Math.max(0, num1824(f.realizedGainTaxedV1824)));
+    var business = Math.max(0, num1824(f.lastEntrepreneurIncome || f.lastBusinessIncome));
+    var dividends = Math.max(0, num1824(m.lastDividends));
+    var firmDistribution = Math.max(0, num1824(f.lastFirmDistribution));
+    var fundFees = Math.max(0, num1824((f.fundTrackV189 || {}).lastFees));
+    var outsideFees = Math.max(0, num1824((f.externalManager || {}).lastFee));
+    var investment = Math.max(0, dividends + realizedDelta + firmDistribution + fundFees - outsideFees);
+    return { business:business, dividends:dividends, realizedGain:realizedDelta, firmDistribution:firmDistribution, fundFees:fundFees, outsideFees:outsideFees, investment:investment, taxable:business + investment, realizedTotal:realizedTotal };
+  }
+  function taxRateFor1824(taxable) {
+    taxable = Math.max(0, num1824(taxable));
+    if (taxable >= 1000000) return .32;
+    if (taxable >= 250000) return .26;
+    if (taxable >= 100000) return .21;
+    if (taxable >= 25000) return .16;
+    if (taxable > 0) return .10;
+    return 0;
+  }
+  function applyBusinessInvestmentTaxTrueUp1824() {
+    ensure1824();
+    var age = Math.round(num1824(state.age));
+    if (state.finance.lastTaxTrueUpAgeV1824 === age) return;
+    var base = currentTaxTrueUpBase1824();
+    if (base.taxable <= 0) {
+      state.finance.lastTaxTrueUpAgeV1824 = age;
+      state.finance.realizedGainTaxedV1824 = base.realizedTotal;
+      return;
+    }
+    var helper = taxAccountantFactor1824();
+    var rawTax = Math.round(base.taxable * taxRateFor1824(base.taxable));
+    var tax = Math.max(0, Math.round(rawTax * (1 - helper.reduction)));
+    if (!tax) return;
+    var paidNow = Math.min(Math.max(0, num1824(state.money)), tax);
+    if (paidNow > 0) state.money = Math.round(num1824(state.money) - paidNow);
+    var unpaid = tax - paidNow;
+    if (unpaid > 0) setTaxDebt1824(num1824(state.finance.taxDebt) + unpaid);
+    state.finance.lastYearTaxes = Math.round(num1824(state.finance.lastYearTaxes) + tax);
+    state.finance.lastBusinessInvestmentTaxV1824 = tax;
+    state.finance.lastTaxTrueUpAgeV1824 = age;
+    state.finance.realizedGainTaxedV1824 = base.realizedTotal;
+    state.finance.taxLegalRisk = Math.max(0, Math.min(100, Math.round(num1824(state.finance.taxLegalRisk) + (unpaid ? 7 : 1) + helper.audit)));
+    state.finance.taxTrueUpsV1824.push({ age:age, taxable:base.taxable, tax:tax, paid:paidNow, unpaid:unpaid, business:base.business, investment:base.investment, accountant:helper.label });
+    state.finance.taxTrueUpsV1824 = state.finance.taxTrueUpsV1824.slice(-12);
+    log1824("Business/investment tax true-up: " + money1824(base.taxable) + " taxable, " + money1824(tax) + " due after " + helper.label + "." + (unpaid ? " Unpaid balance became tax debt." : " Paid from checking."), { money:-paidNow, taxDebt:unpaid });
+  }
+  function recordCashFlow1824() {
+    ensure1824();
+    var age = Math.round(num1824(state.age));
+    var cf = cashFlowSnapshot1824();
+    var arr = state.finance.cashFlowHistoryV1824 || [];
+    if (arr.length && arr[arr.length - 1].age === age) arr[arr.length - 1] = cf;
+    else arr.push(cf);
+    state.finance.cashFlowHistoryV1824 = arr.slice(-20);
+  }
+  function cashFlowSnapshot1824() {
+    ensure1824();
+    var cf = {};
+    try { if (typeof cashFlowV6 === "function") cf = cashFlowV6() || {}; } catch(e) {}
+    try { if ((!cf || !Object.keys(cf).length) && typeof computeAnnualCashFlowV6 === "function") cf = computeAnnualCashFlowV6() || {}; } catch(e) {}
+    var base = currentTaxTrueUpBase1824();
+    var salary = state.job ? Math.round(num1824(state.job.salary)) : 0;
+    var allowance = (state.age >= 5 && state.age <= 17) ? Math.round(num1824(state.allowance)) : 0;
+    var business = Math.round(num1824(cf.businessIncome || state.finance.lastEntrepreneurIncome || state.finance.lastBusinessIncome));
+    var investmentCash = Math.round(base.investment);
+    var rental = 0;
+    try { (Array.isArray(state.rentals) ? state.rentals : []).forEach(function (id) { var r = (typeof rentals !== "undefined" ? rentals : []).find(function (x) { return x.id === id; }); if (r) rental += Math.round(num1824(r.rent) - num1824(r.upkeep)); }); } catch(e) {}
+    var taxes = Math.round(num1824((typeof cf.tax === "object" ? cf.tax.finalTax : cf.tax) || cf.taxes || state.finance.lastYearTaxes));
+    var living = Math.round(num1824(cf.lifestyleCost || cf.living || cf.outflow));
+    var insurance = Math.round(num1824(cf.insuranceCost || state.finance.lastInsuranceCost));
+    var debtInterest = Math.round(num1824(cf.debtInterest));
+    var inflow = Math.round(num1824(cf.inflow) || (salary + allowance + Math.max(0, business) + Math.max(0, investmentCash) + Math.max(0, rental)));
+    var outflow = Math.round(num1824(cf.outflow) || (taxes + living + insurance + debtInterest));
+    var change = Math.round(num1824(cf.checkingChange || state.finance.lastCashFlow || (inflow - outflow)));
+    return { age:Math.round(num1824(state.age)), inflow:inflow, outflow:outflow, checkingChange:change, salary:salary, allowance:allowance, business:business, investmentCash:investmentCash, rental:rental, taxes:taxes, living:living, insurance:insurance, debtInterest:debtInterest, netWorth:netWorth1824() };
+  }
+  var prevResolve1824 = window.resolveLifeAndFinanceYear || (typeof resolveLifeAndFinanceYear === "function" ? resolveLifeAndFinanceYear : null);
+  if (prevResolve1824 && !window.__ledgerResolve1824Wrapped) {
+    window.__ledgerResolve1824Wrapped = true;
+    window.resolveLifeAndFinanceYear = function () {
+      var out = prevResolve1824.apply(this, arguments);
+      try { applyBusinessInvestmentTaxTrueUp1824(); recordCashFlow1824(); } catch(e) { try { console.warn("v18.24 yearly tax/cashflow failed", e); } catch(ignore) {} }
+      return out;
+    };
+    try { resolveLifeAndFinanceYear = window.resolveLifeAndFinanceYear; } catch(e) {}
+  }
+  function scoreBand1824(score) {
+    score = Math.round(num1824(score, 650));
+    if (score >= 800) return { label:"Elite", cls:"good" };
+    if (score >= 740) return { label:"Excellent", cls:"good" };
+    if (score >= 680) return { label:"Good", cls:"gold" };
+    if (score >= 620) return { label:"Fair", cls:"gold" };
+    if (score >= 560) return { label:"Weak", cls:"bad" };
+    return { label:"Very risky", cls:"bad" };
+  }
+  function creditLimit1824() {
+    ensure1824();
+    var score = Math.round(num1824(state.finance.creditScore, 650));
+    var reserve = totalLiquid1824(true);
+    if (typeof window.ledgerCreditLimit === "function") return window.ledgerCreditLimit(score, reserve);
+    var base = score >= 800 ? 50000 : score >= 740 ? 30000 : score >= 680 ? 15000 : score >= 620 ? 6000 : score >= 560 ? 2000 : 500;
+    if (reserve >= 100000) base *= 1.5;
+    if (reserve >= 1000000) base *= 2;
+    return Math.round(base);
+  }
+  window.useCreditLineV1824 = function (amount) {
+    ensure1824();
+    if (num1824(state.age) < 18) return toast1824("Credit unlocks at 18.");
+    var limit = creditLimit1824();
+    var debt = Math.max(0, num1824(state.finance.creditCardDebt));
+    var room = Math.max(0, limit - debt);
+    var amt = amount === "max" ? room : Math.min(room, Math.round(num1824(amount)));
+    if (!amt) return toast1824("No credit room available. Pay down the balance or improve score.");
+    state.finance.creditCardDebt = debt + amt;
+    state.money = Math.round(num1824(state.money) + amt);
+    state.finance.creditScore = Math.max(300, Math.round(num1824(state.finance.creditScore, 650) - Math.ceil(amt / 1200)));
+    log1824("Used credit line for " + money1824(amt) + ". Cash increased, card balance increased, score pressure rose.", { money:amt, creditCardDebt:amt });
+    saveRender1824();
+  };
+  window.payCreditLineV1824 = function (amount) {
+    ensure1824();
+    var debt = Math.max(0, num1824(state.finance.creditCardDebt));
+    if (!debt) return toast1824("No credit card balance to pay.");
+    var amt = amount === "max" ? debt : Math.round(num1824(amount));
+    var pull = pullFromBuckets1824(Math.min(debt, amt), { includeChecking:true });
+    if (!pull.paid) return toast1824("No liquid assets available for card payoff.");
+    state.finance.creditCardDebt = Math.max(0, debt - pull.paid);
+    state.finance.creditScore = Math.min(850, Math.round(num1824(state.finance.creditScore, 650) + Math.ceil(pull.paid / 900)));
+    log1824("Paid " + money1824(pull.paid) + " toward the credit line from " + sourceText1824(pull.used) + ".", { creditCardDebt:-pull.paid });
+    saveRender1824();
+  };
+  window.reviewCreditV1824 = function () {
+    ensure1824();
+    var key = "creditReviewV1824_" + state.age;
+    if (state.actionsTaken[key]) return toast1824("Credit already reviewed this year.");
+    var limit = creditLimit1824();
+    var util = limit ? num1824(state.finance.creditCardDebt) / limit : 0;
+    var gain = util <= .05 ? 10 : util <= .15 ? 7 : util <= .30 ? 3 : util <= .60 ? -5 : -14;
+    if (totalLiquid1824(true) > 10000) gain += 2;
+    if (num1824(state.finance.taxDebt) > 0) gain -= 2;
+    state.finance.creditScore = Math.max(300, Math.min(850, Math.round(num1824(state.finance.creditScore, 650) + gain)));
+    state.actionsTaken[key] = true;
+    log1824("Credit review: utilization " + Math.round(util * 100) + "%, score changed " + (gain >= 0 ? "+" : "") + gain + ".", {});
+    saveRender1824();
+  };
+  function btn1824(label, cls, action, disabled) {
+    return '<button class="money-btn ' + esc1824(cls || "") + '" onclick="event.preventDefault();event.stopPropagation();' + esc1824(action) + '" ' + (disabled ? "disabled" : "") + '>' + esc1824(label) + '</button>';
+  }
+
+  function debtPayoffDesk1824() {
+    ensure1824();
+    var f = state.finance || {};
+    var lines = [
+      { id:"education", label:"Education Debt", key:"debt", value:Math.max(0, num1824(state.debt)), note:"School loans / tuition balances" },
+      { id:"medicalDebt", label:"Medical Debt", key:"medicalDebt", value:Math.max(0, num1824(f.medicalDebt || state.medicalDebt)), note:"Uncovered hospital bills" },
+      { id:"assetBackedLoan", label:"Secured Loan", key:"assetBackedLoan", value:Math.max(0, num1824(f.assetBackedLoan)), note:"Borrowing against assets" }
+    ];
+    var total = lines.reduce(function (sum, x) { return sum + x.value; }, 0);
+    if (!total) return '<section class="money-section v1824-debt-payoff"><div class="money-section-title">Debt Payoff Board <span>clear</span></div><div class="row"><div><div class="row-title">No education, medical, or secured payoff needed.</div><div class="row-sub">Credit and tax still have their own live controls when balances exist.</div></div></div></section>';
+    var cards = lines.map(function (x) {
+      return '<div class="v1824-debt-card ' + (x.value ? "bad" : "good") + '"><div><b>' + esc1824(x.label) + '</b><span>' + esc1824(x.note) + '</span><strong>' + money1824(x.value) + '</strong></div><div class="v1824-action-row small">' + btn1824("Pay $1K", "red", "payDebtWithAssetsV1824('" + esc1824(x.id) + "',1000)", x.value <= 0 || totalLiquid1824(true) <= 0) + btn1824("Pay Max", "red", "payDebtWithAssetsV1824('" + esc1824(x.id) + "','max')", x.value <= 0 || totalLiquid1824(true) <= 0) + '</div></div>';
+    }).join("");
+    return '<section class="money-section v1824-debt-payoff"><div class="money-section-title">Debt Payoff Board <span>assets allowed</span></div><div class="row-sub">Payments can pull from checking, savings, Super Saver, brokerage cash, outside manager capital, or personal firm capital.</div><div class="v1824-debt-grid">' + cards + '</div></section>';
+  }
+
+  function liquidityTaxDesk1824(mode) {
+    ensure1824();
+    var debt = Math.max(0, num1824(state.finance.taxDebt));
+    var checking = Math.max(0, num1824(state.money));
+    var nonChecking = totalLiquid1824(false);
+    var allLiquid = totalLiquid1824(true);
+    var canPay = debt > 0 && allLiquid > 0;
+    var id = "v1824-tax-custom-" + (mode || "money");
+    var lines = liquidBuckets1824(true).map(function (b) { return '<span>' + esc1824(b.label) + ' ' + money1824(b.value) + '</span>'; }).join("");
+    return '<section class="money-section v1824-tax-liquidity"><div class="money-section-title">Tax Payoff + Liquidity <span>pays from assets</span></div><div class="v1824-tile-grid"><div class="' + (debt ? "bad" : "good") + '"><span>Tax debt</span><b>' + money1824(debt) + '</b><em>Directly payable now.</em></div><div class="' + (checking ? "good" : "gold") + '"><span>Checking</span><b>' + money1824(checking) + '</b><em>Spendable cash.</em></div><div class="good"><span>Total liquid</span><b>' + money1824(allLiquid) + '</b><em>Checking + savings + brokerage + firm.</em></div><div class="gold"><span>Non-checking</span><b>' + money1824(nonChecking) + '</b><em>Can be raised into checking.</em></div></div><div class="v1824-pill-row">' + lines + '</div><div class="v1824-action-row">' + btn1824("Pay $10K", "red", "payTaxDebtV1824(10000)", !canPay || Math.min(debt, allLiquid) < 10000) + btn1824("Pay $1M", "red", "payTaxDebtV1824(1000000)", !canPay || Math.min(debt, allLiquid) < 1000000) + btn1824("Pay Max", "red", "payTaxDebtV1824('max')", !canPay) + btn1824("Raise $10K", "green", "raiseCashFromAssetsV1824(10000)", nonChecking < 10000) + btn1824("Raise Max Cash", "green", "raiseCashFromAssetsV1824('max')", nonChecking <= 0) + '</div><div class="v1824-custom-row"><input id="' + esc1824(id) + '" inputmode="numeric" placeholder="Custom tax payoff $"><button class="money-btn red" onclick="event.preventDefault();event.stopPropagation();payCustomTaxDebtV1824(\'' + esc1824(id) + '\')" ' + (!canPay ? "disabled" : "") + '>Pay Custom</button></div></section>';
+  }
+  function cashFlowCommand1824() {
+    ensure1824();
+    var cf = cashFlowSnapshot1824();
+    var history = (state.finance.cashFlowHistoryV1824 || []).slice(-8);
+    var max = Math.max(1, history.reduce(function (m, x) { return Math.max(m, Math.abs(num1824(x.checkingChange))); }, Math.abs(cf.checkingChange)));
+    var bars = (history.length ? history : [cf]).map(function (x) {
+      var h = Math.max(7, Math.round(Math.abs(num1824(x.checkingChange)) / max * 100));
+      var cls = num1824(x.checkingChange) >= 0 ? "good" : "bad";
+      return '<div class="v1824-flow-bar"><i class="' + cls + '" style="height:' + h + '%"></i><span>' + esc1824(x.age) + '</span></div>';
+    }).join("");
+    var rows = [
+      ["Salary", cf.salary, "Job income"],
+      ["Business", cf.business, "Companies / NIL"],
+      ["Investment cash", cf.investmentCash, "Dividends, gains, firm/fund"],
+      ["Taxes", -Math.abs(cf.taxes), "Income + true-up"],
+      ["Living", -Math.abs(cf.living), "Lifestyle / home / car"],
+      ["Insurance/debt", -Math.abs(cf.insurance + cf.debtInterest), "Premiums and interest"]
+    ].map(function (r) {
+      var cls = r[1] >= 0 ? "good" : "bad";
+      return '<div class="v1824-mini-line"><div><b>' + esc1824(r[0]) + '</b><span>' + esc1824(r[2]) + '</span></div><strong class="' + cls + '">' + signed1824(r[1]) + '</strong></div>';
+    }).join("");
+    return '<section class="money-section v1824-cashflow-command"><div class="money-section-title">Cash Flow Command <span>green/red movement</span></div><div class="v1824-tile-grid"><div class="good"><span>Inflow</span><b>' + money1824(cf.inflow) + '</b><em>Money entering this year.</em></div><div class="bad"><span>Outflow</span><b>' + money1824(cf.outflow) + '</b><em>Bills, taxes, debt, living.</em></div><div class="' + (cf.checkingChange >= 0 ? "good" : "bad") + '"><span>Checking change</span><b>' + signed1824(cf.checkingChange) + '</b><em>What actually hits cash.</em></div><div class="gold"><span>Net worth</span><b>' + money1824(cf.netWorth) + '</b><em>Assets minus debts.</em></div></div><div class="v1824-flow-chart">' + bars + '</div><div class="v1824-mini-lines">' + rows + '</div></section>';
+  }
+  function creditDesk1824() {
+    ensure1824();
+    var score = Math.round(num1824(state.finance.creditScore, 650));
+    var band = scoreBand1824(score);
+    var debt = Math.max(0, num1824(state.finance.creditCardDebt));
+    var limit = creditLimit1824();
+    var util = limit ? debt / limit : 0;
+    return '<section class="money-section v1824-credit-desk"><div class="money-section-title">Credit Score + Borrowing <span>' + esc1824(band.label) + '</span></div><div class="v1824-tile-grid"><div class="' + band.cls + '"><span>Score</span><b>' + score + '</b><em>' + esc1824(band.label) + '</em></div><div class="gold"><span>Credit limit</span><b>' + money1824(limit) + '</b><em>Based on score and reserves.</em></div><div class="' + (util <= .3 ? "good" : "bad") + '"><span>Utilization</span><b>' + Math.round(util * 100) + '%</b><em>Lower is better.</em></div><div class="' + (debt ? "bad" : "good") + '"><span>Balance</span><b>' + money1824(debt) + '</b><em>Can be paid from assets.</em></div></div><div class="v1824-action-row">' + btn1824("Use $500", "blue", "useCreditLineV1824(500)", state.age < 18 || limit - debt < 500) + btn1824("Use $2K", "blue", "useCreditLineV1824(2000)", state.age < 18 || limit - debt < 2000) + btn1824("Pay $500", "red", "payCreditLineV1824(500)", debt <= 0 || totalLiquid1824(true) < 1) + btn1824("Pay Max", "red", "payCreditLineV1824('max')", debt <= 0 || totalLiquid1824(true) < 1) + btn1824("Review Score", "green", "reviewCreditV1824()", !!state.actionsTaken["creditReviewV1824_" + state.age]) + '</div></section>';
+  }
+  function businessTaxDesk1824() {
+    ensure1824();
+    var base = currentTaxTrueUpBase1824();
+    var helper = taxAccountantFactor1824();
+    var projected = Math.round(base.taxable * taxRateFor1824(base.taxable) * (1 - helper.reduction));
+    return '<section class="money-section v1824-business-tax"><div class="money-section-title">Business + Investment Tax Desk <span>automatic true-up</span></div><div class="v1824-tile-grid"><div class="' + (base.business ? "good" : "gold") + '"><span>Business income</span><b>' + money1824(base.business) + '</b><em>Company and entrepreneur income.</em></div><div class="' + (base.investment ? "good" : "gold") + '"><span>Investment taxable</span><b>' + money1824(base.investment) + '</b><em>Dividends, gains, firm/fund cash.</em></div><div class="bad"><span>Projected true-up</span><b>' + money1824(projected) + '</b><em>' + esc1824(helper.label) + ' applied.</em></div><div class="' + (state.finance.taxDebt ? "bad" : "good") + '"><span>Tax debt</span><b>' + money1824(state.finance.taxDebt) + '</b><em>Pay from the liquidity desk.</em></div></div><div class="v1824-action-row">' + btn1824("Open Law", "blue", "setTabV16 ? setTabV16('law') : setTab('law')", false) + (typeof distributeFirmGainsV1822 === "function" ? btn1824("Distribute Firm Gains", "green", "distributeFirmGainsV1822()", false) : "") + '</div></section>';
+  }
+  function careerRequirementDesk1824() {
+    ensure1824();
+    var jobs = [];
+    try { jobs = (typeof careerCatalog !== "undefined" && Array.isArray(careerCatalog)) ? careerCatalog : (Array.isArray(window.careerCatalog) ? window.careerCatalog : []); } catch(e) { jobs = []; }
+    if (!jobs.length) return "";
+    var ordered = jobs.slice().sort(function (a, b) { return (num1824(a.minAge) - num1824(b.minAge)) || (num1824(b.salary) - num1824(a.salary)); }).slice(0, 18);
+    var cards = ordered.map(function (job) {
+      var unlocked = false;
+      try { unlocked = num1824(state.age) >= num1824(job.minAge) && (!job.req || job.req(state)); } catch(e) { unlocked = false; }
+      var major = state.major ? "Major: " + state.major : (state.education || "No degree yet");
+      var statHint = [];
+      if (num1824(state.stats.smarts) < 70) statHint.push("Smarts");
+      if (num1824(state.stats.discipline) < 65) statHint.push("Discipline");
+      if (num1824(state.stats.confidence) < 60) statHint.push("Confidence");
+      var req = "Age " + (job.minAge || 0) + "+ · " + (job.desc || "Build education, stats, or items to qualify.");
+      return '<div class="v1824-req-card ' + (unlocked ? "unlocked" : "locked") + '"><div class="v1824-req-head"><b>' + esc1824(job.title || job.name || job.id) + '</b><span>' + (unlocked ? "Unlocked" : "Locked") + '</span></div><p>' + esc1824(req) + '</p><div class="v1824-pill-row"><span>Start ' + money1824(job.salary || 0) + '/yr</span><span>' + esc1824(major) + '</span>' + (!unlocked && statHint.length ? '<span>Build ' + esc1824(statHint.join(" / ")) + '</span>' : '') + '</div></div>';
+    }).join("");
+    return '<section class="panel v1824-career-reqs"><div class="section-label">Career Unlock Board</div><div class="row"><div><div class="row-title">Requirement boxes are expanded.</div><div class="row-sub">Locked jobs now show age, path, pay, and the likely stats to build before you qualify.</div></div></div><div class="v1824-req-grid">' + cards + '</div></section>';
+  }
+  function businessRequirementDesk1824() {
+    ensure1824();
+    var list = [];
+    try { if (typeof entrepreneurshipCatalog !== "undefined" && Array.isArray(entrepreneurshipCatalog)) list = list.concat(entrepreneurshipCatalog); } catch(e) {}
+    try { if (typeof acquisitions !== "undefined" && Array.isArray(acquisitions)) list = list.concat(acquisitions); } catch(e) {}
+    if (!list.length) return "";
+    var cash = totalLiquid1824(true);
+    var businesses = (state.finance.businesses || []);
+    var seen = {};
+    var cards = list.filter(function (v) { if (seen[v.id]) return false; seen[v.id] = true; return true; }).slice(0, 18).map(function (v) {
+      var price = Math.round(num1824(v.startup || v.buy));
+      var minAge = Math.round(num1824(v.minAge, 18));
+      var owned = businesses.some(function (b) { return b.id === v.id || b.baseId === v.id; });
+      var ok = num1824(state.age) >= minAge && cash >= price && !owned;
+      var missing = [];
+      if (num1824(state.age) < minAge) missing.push("Age " + minAge + "+");
+      if (cash < price) missing.push(money1824(price - cash) + " more liquid");
+      if (owned) missing.push("Already owned");
+      if (v.scaleStat) missing.push(String(v.scaleStat).toUpperCase() + " scales profit");
+      return '<div class="v1824-req-card ' + (ok ? "unlocked" : "locked") + '"><div class="v1824-req-head"><b>' + esc1824(v.name || v.id) + '</b><span>' + (ok ? "Ready" : "Need") + '</span></div><p>' + esc1824(v.desc || "Business path.") + '</p><div class="v1824-pill-row"><span>Cost ' + money1824(price) + '</span><span>Age ' + minAge + '+</span><span>' + esc1824(missing.join(" · ") || "Launchable now") + '</span></div></div>';
+    }).join("");
+    return '<section class="money-section v1824-business-reqs"><div class="money-section-title">Business Requirement Board <span>unlock clarity</span></div><div class="v1824-req-grid">' + cards + '</div></section>';
+  }
+  function removeSections1824(html) {
+    html = String(html || "");
+    ["v1824-tax-liquidity", "v1824-cashflow-command", "v1824-credit-desk", "v1824-business-tax", "v1824-business-reqs", "v1824-career-reqs", "v1824-debt-payoff", "v1823-tax-payoff", "v1822-education-debt"].forEach(function (cls) {
+      var idx = html.indexOf(cls);
+      while (idx >= 0) {
+        var start = html.lastIndexOf("<section", idx);
+        var end = html.indexOf("</section>", idx);
+        if (start < 0 || end < 0) break;
+        html = html.slice(0, start) + html.slice(end + 10);
+        idx = html.indexOf(cls);
+      }
+    });
+    return html;
+  }
+  function insertAfterFirstSection1824(html, chunk) {
+    html = String(html || "");
+    var end = html.indexOf("</section>");
+    return end >= 0 ? html.slice(0, end + 10) + chunk + html.slice(end + 10) : chunk + html;
+  }
+  var prevRenderHubContent1824 = window.renderHubContent || (typeof renderHubContent === "function" ? renderHubContent : null);
+  if (prevRenderHubContent1824) {
+    window.renderHubContent = function (hubId) {
+      ensure1824();
+      var html = "";
+      try { html = prevRenderHubContent1824.apply(this, arguments) || ""; }
+      catch(e) { html = '<section class="panel"><div class="section-label">Recovered render</div><div class="row-sub">' + esc1824(e && (e.message || e)) + '</div></section>'; }
+      html = removeSections1824(html);
+      if (hubId === "money") {
+        html = insertAfterFirstSection1824(html, cashFlowCommand1824() + liquidityTaxDesk1824("money") + debtPayoffDesk1824() + creditDesk1824());
+      }
+      if (hubId === "finance" || hubId === "networth" || hubId === "network") {
+        html = insertAfterFirstSection1824(html, cashFlowCommand1824() + businessTaxDesk1824() + liquidityTaxDesk1824("finance") + debtPayoffDesk1824() + creditDesk1824());
+      }
+      if (hubId === "law" || hubId === "legal") {
+        html = insertAfterFirstSection1824(html, liquidityTaxDesk1824("law") + businessTaxDesk1824());
+      }
+      if (hubId === "brokerage") {
+        html += liquidityTaxDesk1824("brokerage") + businessTaxDesk1824();
+      }
+      if (hubId === "business") {
+        html = insertAfterFirstSection1824(html, businessTaxDesk1824() + businessRequirementDesk1824());
+      }
+      if (hubId === "career") {
+        html += careerRequirementDesk1824();
+      }
+      return html;
+    };
+    try { renderHubContent = window.renderHubContent; } catch(e) {}
+  }
+  var style = document.createElement("style");
+  style.textContent = [
+    ".v1824-tax-liquidity,.v1824-cashflow-command,.v1824-credit-desk,.v1824-business-tax,.v1824-business-reqs,.v1824-debt-payoff{border-color:rgba(126,160,172,.42)!important;background:linear-gradient(135deg,rgba(21,36,40,.96),rgba(34,29,22,.97))!important;overflow:hidden!important}.v1824-tax-liquidity{border-color:rgba(233,146,125,.48)!important;background:linear-gradient(135deg,rgba(49,28,24,.98),rgba(28,24,19,.98))!important}.v1824-credit-desk{border-color:rgba(201,155,85,.46)!important;background:linear-gradient(135deg,rgba(48,38,22,.98),rgba(29,25,20,.98))!important}.v1824-business-tax{border-color:rgba(185,220,138,.42)!important;background:linear-gradient(135deg,rgba(24,42,28,.96),rgba(31,27,21,.97))!important}",
+    ".v1824-tile-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:8px}.v1824-tile-grid>div{min-width:0;border:1px solid rgba(255,255,255,.10);border-radius:11px;background:rgba(255,255,255,.045);padding:10px}.v1824-tile-grid span{display:block;font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:#b9a98e}.v1824-tile-grid b{display:block;font-family:'JetBrains Mono',monospace;font-size:18px;line-height:1.1;color:#fff3df;margin-top:5px;overflow-wrap:anywhere}.v1824-tile-grid em{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:9px;line-height:1.35;margin-top:5px;font-style:normal}.v1824-tile-grid .good b{color:#b9dc8a}.v1824-tile-grid .bad b{color:#e9927d}.v1824-tile-grid .gold b{color:#f0ca7b}",
+    ".v1824-action-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:11px}.v1824-action-row .money-btn{min-width:92px;white-space:normal!important}.v1824-custom-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:9px}.v1824-custom-row input{min-width:0;border:1px solid rgba(216,173,109,.32);border-radius:8px;background:#100d0a;color:#f6ead8;padding:10px;font-family:'JetBrains Mono',monospace;font-size:11px}.v1824-pill-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}.v1824-pill-row span{border:1px solid rgba(255,255,255,.10);border-radius:999px;padding:5px 8px;color:#d6c5aa;font-family:'JetBrains Mono',monospace;font-size:9px;line-height:1.2}",
+    ".v1824-flow-chart{height:96px;display:flex;align-items:end;gap:7px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:rgba(0,0,0,.18);padding:10px 10px 22px;margin-top:10px}.v1824-flow-bar{flex:1;min-width:18px;height:100%;position:relative;display:flex;align-items:end}.v1824-flow-bar i{display:block;width:100%;min-height:8px;border-radius:7px 7px 2px 2px;background:linear-gradient(180deg,#f0ca7b,#80602a)}.v1824-flow-bar i.good{background:linear-gradient(180deg,#b9dc8a,#4f6c3d)}.v1824-flow-bar i.bad{background:linear-gradient(180deg,#e9927d,#73362d)}.v1824-flow-bar span{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);font-family:'JetBrains Mono',monospace;font-size:8px;color:#b9a98e}.v1824-mini-lines{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px;margin-top:10px}.v1824-mini-line{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;border-top:1px solid rgba(255,255,255,.08);padding:8px 0}.v1824-mini-line b{display:block;color:#fff3df;font-size:13px}.v1824-mini-line span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:9px}.v1824-mini-line strong{font-family:'JetBrains Mono',monospace;white-space:nowrap}.v1824-mini-line strong.good{color:#b9dc8a}.v1824-mini-line strong.bad{color:#e9927d}",
+    ".v1824-debt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:9px;margin-top:10px}.v1824-debt-card{border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(255,255,255,.045);padding:11px}.v1824-debt-card b{display:block;color:#fff3df;font-size:14px}.v1824-debt-card span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.4;margin-top:3px}.v1824-debt-card strong{display:block;color:#e9927d;font-family:'JetBrains Mono',monospace;font-size:18px;margin-top:6px}.v1824-action-row.small .money-btn{font-size:9px!important;min-width:78px!important}.v1824-req-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:9px;margin-top:10px}.v1824-req-card{border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(255,255,255,.045);padding:11px;min-width:0}.v1824-req-card.locked{border-color:rgba(233,146,125,.34)}.v1824-req-card.unlocked{border-color:rgba(185,220,138,.42)}.v1824-req-head{display:flex;justify-content:space-between;gap:8px}.v1824-req-head b{display:block;color:#fff3df;font-size:14px}.v1824-req-head span{font-family:'JetBrains Mono',monospace;font-size:9px;color:#f0ca7b;text-transform:uppercase;letter-spacing:.12em}.v1824-req-card.unlocked .v1824-req-head span{color:#b9dc8a}.v1824-req-card p{color:#d6c5aa;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.45;margin:7px 0 2px}.v1824-career-reqs{border-color:rgba(126,160,172,.38)!important;background:linear-gradient(135deg,rgba(22,38,42,.96),rgba(34,28,22,.96))!important}",
+    "@media(max-width:820px){.v1824-tile-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.v1824-mini-lines{grid-template-columns:1fr}}@media(max-width:520px){.v1824-tile-grid{grid-template-columns:1fr}.v1824-custom-row{grid-template-columns:1fr}.v1824-action-row .money-btn{flex:1 1 44%}.v1824-req-grid{grid-template-columns:1fr}}"
+  ].join("\n");
+  document.head.appendChild(style);
+})();
+
+
+
+/* END absorbed 01-patch-v18-24.js */
+
+
+/* BEGIN absorbed 02-patch-v18-25.js */
+
+/* LEDGER PATCH v18.25: people rhythm, family depth, multiple degrees, fund investor economics */
+(function () {
+  if (window.__ledgerV1825Loaded) return;
+  window.__ledgerV1825Loaded = true;
+
+  function esc1825(v) {
+    return String(v == null ? "" : v).replace(/[&<>"']/g, function (ch) {
+      return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch];
+    });
+  }
+  function num1825(v, fallback) {
+    var n = Number(v);
+    return Number.isFinite(n) ? n : (fallback || 0);
+  }
+  function clamp1825(v, min, max) {
+    min = min == null ? 0 : min;
+    max = max == null ? 100 : max;
+    v = num1825(v);
+    return Math.max(min, Math.min(max, v));
+  }
+  function cap1825(s) {
+    s = String(s || "");
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+  }
+  function money1825(v) {
+    try { if (typeof money === "function") return money(Math.round(num1825(v))); } catch(e) {}
+    v = Math.round(num1825(v));
+    var sign = v < 0 ? "-" : "";
+    v = Math.abs(v);
+    if (v >= 1e12) return sign + "$" + (v / 1e12).toFixed(1).replace(/\.0$/, "") + "T";
+    if (v >= 1e9) return sign + "$" + (v / 1e9).toFixed(1).replace(/\.0$/, "") + "B";
+    if (v >= 1e6) return sign + "$" + (v / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+    if (v >= 1e4) return sign + "$" + Math.round(v / 1000) + "K";
+    return sign + "$" + v.toLocaleString();
+  }
+  function signedMoney1825(v) {
+    v = Math.round(num1825(v));
+    return (v >= 0 ? "+" : "-") + money1825(Math.abs(v));
+  }
+  function pct1825(v) {
+    return (num1825(v) * 100).toFixed(1).replace(/\.0$/, "") + "%";
+  }
+  function toast1825(msg) {
+    try { if (typeof addToast === "function") return addToast(msg); } catch(e) {}
+    try { if (typeof addLog === "function") return addLog(msg); } catch(e) {}
+  }
+  function log1825(msg, deltas) {
+    try { if (typeof addLog === "function") return addLog(msg, deltas || {}); } catch(e) {}
+  }
+  function saveRender1825() {
+    try { if (typeof save === "function") save(); } catch(e) {}
+    try { if (typeof render === "function") render(); } catch(e) {}
+  }
+  function ensure1825() {
+    try { if (typeof ensureStateShape === "function") ensureStateShape(); } catch(e) {}
+    if (!window.state) return false;
+    state.stats = state.stats || {};
+    state.flags = state.flags || {};
+    state.actionsTaken = state.actionsTaken || {};
+    state.relationships = state.relationships || {};
+    state.finance = state.finance || {};
+    state.finance.incomeSources = state.finance.incomeSources || {};
+    state.finance.fundTrackV189 = state.finance.fundTrackV189 || { active:false, outsideCapital:0, risk:"balanced", reputation:0, lastReturn:0, lastFees:0, years:0 };
+    state.peopleV1825 = state.peopleV1825 || { actionCounts:{}, dateCounts:{}, findDateCounts:{}, childActivityCounts:{}, yearlySocialEnergy:12 };
+    state.familyV1825 = state.familyV1825 || { childcarePlan:"family", lastChildcareCost:0, childFocus:"balanced" };
+    state.educationV1825 = state.educationV1825 || { degrees:[], activeDegree:null, lastDegreeProgressAge:null };
+    state.finance.fundInvestorLedgerV1825 = Array.isArray(state.finance.fundInvestorLedgerV1825) ? state.finance.fundInvestorLedgerV1825 : [];
+    seedExistingDegree1825();
+    ensureChildrenProfiles1825();
+    return true;
+  }
+  function rand1825(min, max) {
+    try { if (typeof rand === "function") return rand(min, max); } catch(e) {}
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+  function chance1825(p) {
+    try { if (typeof chance === "function") return chance(p); } catch(e) {}
+    return Math.random() < p;
+  }
+  function applyDeltas1825(deltas) {
+    deltas = deltas || {};
+    try { if (typeof applyDeltas === "function") return applyDeltas(deltas); } catch(e) {}
+    Object.keys(deltas).forEach(function (k) {
+      if (k === "money") state.money = Math.round(num1825(state.money) + num1825(deltas[k]));
+      else if (state.stats && k in state.stats) state.stats[k] = clamp1825(num1825(state.stats[k]) + num1825(deltas[k]));
+      else state[k] = num1825(state[k]) + num1825(deltas[k]);
+    });
+  }
+  function currentAgeKey1825() { return String(Math.round(num1825(state && state.age))); }
+  function countBucket1825(kind, key) {
+    ensure1825();
+    var age = currentAgeKey1825();
+    state.peopleV1825[kind] = state.peopleV1825[kind] || {};
+    state.peopleV1825[kind][age] = state.peopleV1825[kind][age] || {};
+    if (state.peopleV1825[kind][age][key] == null) state.peopleV1825[kind][age][key] = 0;
+    return state.peopleV1825[kind][age];
+  }
+  function getCount1825(kind, key) { return countBucket1825(kind, key)[key] || 0; }
+  function incCount1825(kind, key) {
+    var bucket = countBucket1825(kind, key);
+    bucket[key] = (bucket[key] || 0) + 1;
+    return bucket[key];
+  }
+  function socialEnergyUsed1825() {
+    ensure1825();
+    var age = currentAgeKey1825();
+    var total = 0;
+    ["actionCounts", "dateCounts", "findDateCounts", "childActivityCounts"].forEach(function (kind) {
+      var bucket = state.peopleV1825[kind] && state.peopleV1825[kind][age] || {};
+      Object.keys(bucket).forEach(function (k) { total += Math.max(0, num1825(bucket[k])); });
+    });
+    return total;
+  }
+  function socialEnergyLeft1825() {
+    ensure1825();
+    return Math.max(0, Math.round(num1825(state.peopleV1825.yearlySocialEnergy, 12) - socialEnergyUsed1825()));
+  }
+  function spendSocialEnergy1825() {
+    if (socialEnergyLeft1825() <= 0) {
+      toast1825("Social energy is used up for this year. Age up or focus on major life choices.");
+      return false;
+    }
+    return true;
+  }
+
+  var repeatRelation1825 = {
+    talk:{ max:6, bond:5, trust:3, deltas:{ happiness:2 }, label:"Talk" },
+    gift:{ max:3, bond:8, trust:1, deltas:{ money:-120 }, label:"Gift" },
+    apologize:{ max:4, bond:4, trust:7, deltas:{ stress:-2 }, label:"Apologize" },
+    argue:{ max:3, bond:-7, trust:-4, deltas:{ stress:5, confidence:2 }, label:"Argue" },
+    bigGift:{ max:2, bond:14, trust:2, deltas:{ money:-400, happiness:1 }, label:"Big gift" },
+    allowance:{ max:4, bond:6, trust:1, deltas:{ money:-200 }, label:"Allowance" },
+    punish:{ max:4, bond:-6, trust:-2, deltas:{ discipline:2, stress:2 }, label:"Punish" }
+  };
+  var prevRelationAction1825 = window.relationAction || (typeof relationAction === "function" ? relationAction : null);
+  window.relationAction = function (key, action) {
+    ensure1825();
+    var spec = repeatRelation1825[action];
+    if (!spec) return prevRelationAction1825 ? prevRelationAction1825.apply(this, arguments) : undefined;
+    var r = state.relationships && state.relationships[key];
+    if (!r || !r.alive) return;
+    var countKey = key + "_" + action;
+    if (getCount1825("actionCounts", countKey) >= spec.max) return toast1825(spec.label + " is at its yearly rhythm limit for " + r.name + ".");
+    if (!spendSocialEnergy1825()) return;
+    var deltas = Object.assign({}, spec.deltas || {});
+    if (deltas.money && num1825(state.money) + deltas.money < 0) return toast1825("Not enough money.");
+    r.bond = clamp1825(num1825(r.bond, 50) + spec.bond + ((state.sandbox && state.sandbox.easyRelationships) ? 4 : 0));
+    r.trust = clamp1825(num1825(r.trust, 50) + spec.trust);
+    applyDeltas1825(deltas);
+    incCount1825("actionCounts", countKey);
+    delete state.actionsTaken[countKey];
+    log1825(spec.label + " with " + r.name + " (" + getCount1825("actionCounts", countKey) + "/" + spec.max + " this year).", deltas);
+    saveRender1825();
+  };
+  try { relationAction = window.relationAction; } catch(e) {}
+
+  function makeCrush1825(method) {
+    try { if (typeof generateCrush === "function") return generateCrush(state, method); } catch(e) {}
+    var first = ["Jordan","Taylor","Casey","Morgan","Riley","Avery","Cameron","Drew"][rand1825(0,7)];
+    var last = ["Parker","Reed","Brooks","Hayes","Bennett","Carter"][rand1825(0,5)];
+    return { name:first + " " + last, role:"Crush", vibe:method, bond:rand1825(25,45), trust:rand1825(30,50), looks:rand1825(30,90), smarts:rand1825(30,90), alive:true, age:num1825(state.age) + rand1825(-3,4) };
+  }
+  var prevFindDate1825 = window.findDate || (typeof findDate === "function" ? findDate : null);
+  window.findDate = function (method) {
+    ensure1825();
+    if (num1825(state.age) < 16) return toast1825("Dating unlocks at 16.");
+    if (state.relationships.partner || state.married) return toast1825("You're not single.");
+    if (method === "bar" && num1825(state.age) < 21) return toast1825("Bars are 21+.");
+    var key = "findDate_" + method;
+    var max = method === "bar" ? 2 : 3;
+    if (getCount1825("findDateCounts", key) >= max) return toast1825("You've pushed that dating lane enough this year.");
+    if (!spendSocialEnergy1825()) return;
+    var vibe = method === "app" ? "Match from app" : method === "bar" ? "Met out socially" : "Set up by a friend";
+    var crush = makeCrush1825(vibe);
+    state.relationships["crush_" + Date.now().toString(36) + "_" + Math.floor(Math.random()*999)] = crush;
+    incCount1825("findDateCounts", key);
+    delete state.actionsTaken.findDate;
+    log1825("You met " + crush.name + ". " + vibe + " (" + getCount1825("findDateCounts", key) + "/" + max + " tries this year).", { confidence:1, happiness:1 });
+    saveRender1825();
+  };
+  try { findDate = window.findDate; } catch(e) {}
+
+  var prevDateAction1825 = window.dateAction || (typeof dateAction === "function" ? dateAction : null);
+  window.dateAction = function (key, action) {
+    ensure1825();
+    if (action === "ghost" || action === "official") return prevDateAction1825 ? prevDateAction1825.apply(this, arguments) : undefined;
+    var crush = state.relationships && state.relationships[key];
+    if (!crush || crush.role !== "Crush") return;
+    var specs = {
+      dinner:{ max:4, cost:60, bond:[5,12], trustDiv:2, deltas:{ happiness:4 }, label:"dinner date" },
+      trip:{ max:2, cost:800, bond:[15,25], trustDiv:2, deltas:{ happiness:10, stress:-3 }, label:"weekend trip" }
+    };
+    var spec = specs[action];
+    if (!spec) return prevDateAction1825 ? prevDateAction1825.apply(this, arguments) : undefined;
+    var countKey = key + "_" + action;
+    if (getCount1825("dateCounts", countKey) >= spec.max) return toast1825("That date type is maxed with " + crush.name + " this year.");
+    if (!spendSocialEnergy1825()) return;
+    if (num1825(state.money) < spec.cost) return toast1825("Not enough money.");
+    var gain = rand1825(spec.bond[0], spec.bond[1]);
+    state.money = Math.round(num1825(state.money) - spec.cost);
+    crush.bond = clamp1825(num1825(crush.bond, 40) + gain);
+    crush.trust = clamp1825(num1825(crush.trust, 40) + Math.floor(gain / spec.trustDiv));
+    var deltas = Object.assign({}, spec.deltas, { money:-spec.cost });
+    applyDeltas1825(spec.deltas);
+    incCount1825("dateCounts", countKey);
+    delete state.actionsTaken["date_" + key + "_" + action];
+    log1825("Took " + crush.name + " on a " + spec.label + ". Bond +" + gain + " (" + getCount1825("dateCounts", countKey) + "/" + spec.max + " this year).", deltas);
+    saveRender1825();
+  };
+  try { dateAction = window.dateAction; } catch(e) {}
+
+  var childcarePlans1825 = {
+    family:{ name:"Family Help", cost:2500, bond:2, trust:1, child:{ happiness:2 }, note:"Low cost, strong family bonds, less academic push." },
+    standard:{ name:"Standard Childcare", cost:9000, bond:1, trust:1, child:{ smarts:1, happiness:1 }, note:"Reliable care and normal development support." },
+    private:{ name:"Private Enrichment", cost:18000, bond:1, trust:2, child:{ smarts:3, confidence:2, stress:1 }, note:"Expensive enrichment with stronger school readiness." },
+    nanny:{ name:"Nanny + Activities", cost:32000, bond:3, trust:2, child:{ smarts:2, confidence:3, happiness:2 }, note:"High-touch support with major lifestyle cost." }
+  };
+  function children1825() {
+    ensure1825();
+    return Object.entries(state.relationships || {}).filter(function (pair) { return pair[1] && pair[1].role === "Child" && pair[1].alive !== false; });
+  }
+  function ensureChildrenProfiles1825() {
+    if (!window.state || !state.relationships) return;
+    Object.keys(state.relationships).forEach(function (k) {
+      var r = state.relationships[k];
+      if (!r || r.role !== "Child") return;
+      r.developmentV1825 = r.developmentV1825 || {
+        smarts: Math.round((num1825(state.stats && state.stats.smarts, 50) + rand1825(35, 75)) / 2),
+        confidence: Math.round((num1825(state.stats && state.stats.confidence, 50) + rand1825(35, 75)) / 2),
+        health: Math.round((num1825(state.stats && state.stats.health, 70) + rand1825(45, 85)) / 2),
+        happiness: Math.round((num1825(r.bond, 70) + num1825(r.trust, 60)) / 2)
+      };
+    });
+  }
+  function charge1825(amount, label) {
+    ensure1825();
+    amount = Math.max(0, Math.round(num1825(amount)));
+    if (!amount) return { paid:0, debt:0 };
+    var paid = Math.min(Math.max(0, num1825(state.money)), amount);
+    state.money = Math.round(num1825(state.money) - paid);
+    var debt = amount - paid;
+    if (debt > 0) {
+      state.debt = Math.max(0, Math.round(num1825(state.debt) + debt));
+      if (state.finance) state.finance.familyDebtV1825 = Math.max(0, Math.round(num1825(state.finance.familyDebtV1825) + debt));
+    }
+    if (label) log1825(label + " cost " + money1825(amount) + (debt ? "; " + money1825(debt) + " became debt." : "."), { money:-paid, debt:debt });
+    return { paid:paid, debt:debt };
+  }
+  window.setChildcarePlanV1825 = function (plan) {
+    ensure1825();
+    if (!childcarePlans1825[plan]) plan = "family";
+    state.familyV1825.childcarePlan = plan;
+    log1825("Childcare plan set to " + childcarePlans1825[plan].name + ".");
+    saveRender1825();
+  };
+  window.childActivityV1825 = function (childKey, activity) {
+    ensure1825();
+    var child = state.relationships && state.relationships[childKey];
+    if (!child || child.role !== "Child") return;
+    var specs = {
+      read:{ label:"Read together", cost:30, bond:4, trust:2, child:{ smarts:2, happiness:1 }, deltas:{ happiness:2, stress:-1 } },
+      sports:{ label:"Sports practice", cost:120, bond:3, trust:1, child:{ health:3, confidence:2 }, deltas:{ health:1, happiness:2 } },
+      tutor:{ label:"Tutor", cost:500, bond:1, trust:2, child:{ smarts:5, confidence:1, stress:1 }, deltas:{ discipline:1, stress:1 } },
+      familyDay:{ label:"Family day", cost:180, bond:7, trust:3, child:{ happiness:4, confidence:1 }, deltas:{ happiness:5, stress:-3 } }
+    };
+    var spec = specs[activity];
+    if (!spec) return;
+    var key = childKey + "_" + activity;
+    if (getCount1825("childActivityCounts", key) >= 3) return toast1825(spec.label + " is maxed for " + child.name + " this year.");
+    if (!spendSocialEnergy1825()) return;
+    if (num1825(state.money) < spec.cost) return toast1825("Not enough money.");
+    state.money = Math.round(num1825(state.money) - spec.cost);
+    child.bond = clamp1825(num1825(child.bond, 70) + spec.bond);
+    child.trust = clamp1825(num1825(child.trust, 60) + spec.trust);
+    child.developmentV1825 = child.developmentV1825 || {};
+    Object.keys(spec.child || {}).forEach(function (k) { child.developmentV1825[k] = clamp1825(num1825(child.developmentV1825[k], 50) + spec.child[k]); });
+    applyDeltas1825(spec.deltas || {});
+    incCount1825("childActivityCounts", key);
+    var deltas = Object.assign({}, spec.deltas || {}, { money:-spec.cost });
+    log1825(spec.label + " with " + child.name + " (" + getCount1825("childActivityCounts", key) + "/3 this year).", deltas);
+    saveRender1825();
+  };
+  function applyChildcareYear1825() {
+    ensure1825();
+    var kids = children1825();
+    if (!kids.length) return;
+    var age = Math.round(num1825(state.age));
+    if (state.familyV1825.lastChildcareAge === age) return;
+    state.familyV1825.lastChildcareAge = age;
+    var plan = childcarePlans1825[state.familyV1825.childcarePlan] || childcarePlans1825.family;
+    var total = plan.cost * kids.length;
+    state.familyV1825.lastChildcareCost = total;
+    if (total) charge1825(total, plan.name + " for " + kids.length + " child" + (kids.length === 1 ? "" : "ren"));
+    kids.forEach(function (pair) {
+      var r = pair[1];
+      r.bond = clamp1825(num1825(r.bond, 70) + plan.bond + rand1825(-1, 2));
+      r.trust = clamp1825(num1825(r.trust, 60) + plan.trust + rand1825(-1, 2));
+      r.developmentV1825 = r.developmentV1825 || {};
+      Object.keys(plan.child || {}).forEach(function (k) { r.developmentV1825[k] = clamp1825(num1825(r.developmentV1825[k], 50) + plan.child[k] + rand1825(0, 1)); });
+      r.developmentV1825.happiness = clamp1825(num1825(r.developmentV1825.happiness, 60) + Math.round((num1825(r.bond) - 55) / 18));
+    });
+    log1825("Family year: " + plan.name + " shaped your children's development.", { stress:kids.length > 2 ? 2 : 0 });
+  }
+
+  function degreeMajors1825() {
+    try { if (Array.isArray(collegeMajors)) return collegeMajors; } catch(e) {}
+    return [
+      { id:"business", name:"Business", desc:"Management and money.", jobs:["Marketing Associate","Office Manager"] },
+      { id:"cs", name:"Computer Science", desc:"Software and systems.", jobs:["Software Developer"] },
+      { id:"nursing", name:"Nursing", desc:"Healthcare.", jobs:["Nurse"] },
+      { id:"criminaljustice", name:"Criminal Justice", desc:"Courts and investigation.", jobs:["Paralegal"] }
+    ];
+  }
+  function degreeSchools1825() {
+    try { if (Array.isArray(collegeSchools)) return collegeSchools; } catch(e) {}
+    return [{ id:"state", name:"State School", tier:"State University", cost:14000, quality:.85 }];
+  }
+  function seedExistingDegree1825() {
+    if (!window.state || !state.educationV1825) return;
+    var degrees = state.educationV1825.degrees;
+    if (!Array.isArray(degrees)) degrees = state.educationV1825.degrees = [];
+    if ((state.flags && state.flags.hasDegree) || state.education === "College") {
+      var majorId = state.major || "general";
+      if (!degrees.some(function (d) { return d.majorId === majorId; })) {
+        var major = degreeMajors1825().find(function (m) { return m.id === majorId; });
+        degrees.push({ majorId:majorId, majorName:(major && major.name) || cap1825(majorId), schoolId:state.college || "completed", schoolName:"Completed College", level:"Bachelor's", completedAge:num1825(state.age), seeded:true });
+      }
+    }
+  }
+  function hasDegreeMajor1825(majorId) {
+    ensure1825();
+    return (state.educationV1825.degrees || []).some(function (d) { return d.majorId === majorId; }) || state.major === majorId;
+  }
+  function bestSchool1825(schoolId) {
+    var schools = degreeSchools1825();
+    return schools.find(function (s) { return s.id === schoolId; }) || schools.find(function (s) { return s.id === "state"; }) || schools[0];
+  }
+  function bestMajor1825(majorId) {
+    var majors = degreeMajors1825();
+    return majors.find(function (m) { return m.id === majorId; }) || majors[0];
+  }
+  window.startDegreeV1825 = function (majorId, schoolId) {
+    ensure1825();
+    if (num1825(state.age) < 18 && !(state.flags && state.flags.earlyCollege)) return toast1825("Additional degrees unlock at 18 or early college.");
+    if (state.educationV1825.activeDegree) return toast1825("Finish or pause the active degree first.");
+    var major = bestMajor1825(majorId);
+    var school = bestSchool1825(schoolId || state.college || "state");
+    if (!major || !school) return toast1825("Degree option unavailable.");
+    if (hasDegreeMajor1825(major.id)) return toast1825("You already have this degree path.");
+    var cost = Math.round(num1825(school.cost, 14000));
+    state.educationV1825.activeDegree = { majorId:major.id, majorName:major.name, schoolId:school.id, schoolName:school.name, annualCost:cost, yearsCompleted:0, targetYears:4, startedAge:num1825(state.age), quality:num1825(school.quality, .85) };
+    charge1825(cost, "First year of " + major.name + " at " + school.name);
+    applyDeltas1825({ smarts:2, stress:2, discipline:1 });
+    log1825("Started a " + major.name + " degree at " + school.name + ".");
+    saveRender1825();
+  };
+  window.pauseDegreeV1825 = function () {
+    ensure1825();
+    if (!state.educationV1825.activeDegree) return toast1825("No active degree to pause.");
+    state.educationV1825.pausedDegree = state.educationV1825.activeDegree;
+    state.educationV1825.activeDegree = null;
+    log1825("Paused the active degree path. You can restart a degree later.");
+    saveRender1825();
+  };
+  function applyDegreeYear1825() {
+    ensure1825();
+    var active = state.educationV1825.activeDegree;
+    if (!active) return;
+    var age = Math.round(num1825(state.age));
+    if (state.educationV1825.lastDegreeProgressAge === age) return;
+    state.educationV1825.lastDegreeProgressAge = age;
+    charge1825(num1825(active.annualCost), active.majorName + " degree tuition");
+    var iq = num1825(state.iq || (state.stats && state.stats.iq), 100);
+    var gpa = 2.6;
+    try { if (typeof calcGPA === "function") gpa = calcGPA(); } catch(e) {}
+    var progress = iq >= 170 && gpa >= 3.2 ? 2 : iq >= 140 && gpa >= 3.0 ? 1.5 : 1;
+    active.yearsCompleted = Math.min(active.targetYears, num1825(active.yearsCompleted) + progress);
+    applyDeltas1825({ smarts:2, discipline:1, stress:2 });
+    if (active.yearsCompleted >= active.targetYears) {
+      state.educationV1825.degrees.push({ majorId:active.majorId, majorName:active.majorName, schoolId:active.schoolId, schoolName:active.schoolName, level:"Bachelor's", completedAge:age, quality:active.quality });
+      state.flags.hasDegree = true;
+      state.flags["degree_" + active.majorId] = true;
+      state.major = active.majorId;
+      state.education = "College";
+      state.educationV1825.activeDegree = null;
+      log1825("Completed a " + active.majorName + " degree. New career doors opened.", { smarts:5, confidence:6, stress:-3 });
+      applyDeltas1825({ smarts:5, confidence:6, stress:-3 });
+    } else {
+      log1825("Degree progress: " + active.majorName + " is " + Math.round((active.yearsCompleted / active.targetYears) * 100) + "% complete.");
+    }
+  }
+  function jobUnlockedByDegrees1825(job) {
+    ensure1825();
+    if (!job) return false;
+    if (typeof job.req === "function") {
+      try { if (job.req(state)) return true; } catch(e) {}
+    }
+    var degrees = (state.educationV1825 && state.educationV1825.degrees) || [];
+    for (var i = 0; i < degrees.length; i++) {
+      var oldMajor = state.major;
+      try {
+        state.major = degrees[i].majorId;
+        if (typeof job.req === "function" && job.req(state)) return true;
+      } catch(e) {}
+      finally { state.major = oldMajor; }
+    }
+    return false;
+  }
+  var prevTakeCareer1825 = window.takeCareer || (typeof takeCareer === "function" ? takeCareer : null);
+  window.takeCareer = function (jobId) {
+    ensure1825();
+    var job = null;
+    try { job = (careerCatalog || []).find(function (j) { return j.id === jobId; }); } catch(e) {}
+    if (job && num1825(state.age) >= num1825(job.minAge) && jobUnlockedByDegrees1825(job)) {
+      state.job = { jobId:job.id, title:job.title, salary:job.salary, performance:50, stress:0, tier:0 };
+      applyDeltas1825({ happiness:4, stress:3, confidence:1 });
+      log1825("You started working as a " + job.title + " using your education background.", { happiness:4, stress:3, confidence:1 });
+      saveRender1825();
+      return;
+    }
+    return prevTakeCareer1825 ? prevTakeCareer1825.apply(this, arguments) : undefined;
+  };
+  try { takeCareer = window.takeCareer; } catch(e) {}
+
+  function fundPolicy1825() {
+    ensure1825();
+    var p = state.finance.fundPayoutPolicyV1825 || "balanced";
+    var map = { growth:{ label:"Growth", dividend:.08, carry:.035 }, balanced:{ label:"Balanced", dividend:.15, carry:.05 }, income:{ label:"Income", dividend:.25, carry:.065 } };
+    return map[p] || map.balanced;
+  }
+  window.setFundPayoutPolicyV1825 = function (policy) {
+    ensure1825();
+    if (!["growth","balanced","income"].includes(policy)) policy = "balanced";
+    state.finance.fundPayoutPolicyV1825 = policy;
+    log1825("Fund payout policy set to " + fundPolicy1825().label + ".");
+    saveRender1825();
+  };
+  window.applyFundInvestorShareV1825 = function (manual) {
+    ensure1825();
+    var fund = state.finance.fundTrackV189;
+    if (!fund || !fund.active) {
+      if (manual) toast1825("Launch a client fund first.");
+      return;
+    }
+    var yearKey = String(fund.years || state.age || 0);
+    if (fund.lastInvestorShareYearV1825 === yearKey && !manual) return;
+    if (fund.lastInvestorShareYearV1825 === yearKey && manual) return toast1825("Investor share already processed for this fund year.");
+    var positive = Math.max(0, Math.round(num1825(fund.lastReturn)));
+    var policy = fundPolicy1825();
+    var dividend = Math.min(Math.max(0, num1825(fund.outsideCapital)), Math.round(positive * policy.dividend));
+    var carry = positive > 0 ? Math.round(positive * policy.carry + Math.max(0, num1825(fund.outsideCapital)) * .002) : 0;
+    if (dividend > 0) fund.outsideCapital = Math.max(0, Math.round(num1825(fund.outsideCapital) - dividend));
+    if (carry > 0) state.money = Math.round(num1825(state.money) + carry);
+    fund.lastInvestorDividendV1825 = dividend;
+    fund.lastCarryV1825 = carry;
+    fund.lastInvestorShareYearV1825 = yearKey;
+    state.finance.lastFundCarryV1825 = carry;
+    state.finance.incomeSources.fundCarryV1825 = carry;
+    state.finance.fundInvestorLedgerV1825.push({ age:num1825(state.age), fundYear:num1825(fund.years), policy:policy.label, positiveReturn:positive, investorDividend:dividend, carry:carry, outsideCapital:num1825(fund.outsideCapital) });
+    state.finance.fundInvestorLedgerV1825 = state.finance.fundInvestorLedgerV1825.slice(-12);
+    if (dividend || carry || manual) log1825("Fund investor economics: " + money1825(dividend) + " paid to investors, " + money1825(carry) + " carry to checking.", { money:carry });
+    if (manual) saveRender1825();
+  };
+
+  var prevAgeUp1825 = window.ageUp || (typeof ageUp === "function" ? ageUp : null);
+  if (prevAgeUp1825 && !window.__ledgerAgeUp1825Wrapped) {
+    window.__ledgerAgeUp1825Wrapped = true;
+    window.ageUp = function () {
+      var beforeAge = state && state.age;
+      var out = prevAgeUp1825.apply(this, arguments);
+      try {
+        if (state && state.age !== beforeAge && state.alive !== false) {
+          applyChildcareYear1825();
+          applyDegreeYear1825();
+          window.applyFundInvestorShareV1825(false);
+          saveRender1825();
+        }
+      } catch(e) { try { console.warn("v18.25 annual systems failed", e); } catch(ignore) {} }
+      return out;
+    };
+    try { ageUp = window.ageUp; } catch(e) {}
+  }
+
+  function relationUsageText1825() {
+    var left = socialEnergyLeft1825();
+    var total = Math.round(num1825(state.peopleV1825.yearlySocialEnergy, 12));
+    return left + " / " + total + " actions left";
+  }
+  function peopleRhythmPanel1825() {
+    ensure1825();
+    var used = socialEnergyUsed1825();
+    var total = Math.round(num1825(state.peopleV1825.yearlySocialEnergy, 12));
+    var pct = total ? Math.min(100, Math.round((used / total) * 100)) : 0;
+    return '<section class="panel v1825-people-rhythm"><div class="section-label">People Rhythm</div><div class="v1825-hero-line"><div><b>Relationships are no longer one-click-per-year.</b><span>Small actions can repeat several times until social energy runs out. Money asks and major commitments still stay limited.</span></div><strong>' + esc1825(relationUsageText1825()) + '</strong></div><div class="v1825-meter"><i style="width:' + pct + '%"></i></div><div class="v1825-pill-row"><span>Talk 6x/person</span><span>Gift 3x/person</span><span>Dates repeat</span><span>Child activities 3x/type</span></div></section>';
+  }
+  function familyCommandPanel1825() {
+    ensure1825();
+    var kids = children1825();
+    if (!kids.length) return '';
+    var planId = state.familyV1825.childcarePlan || "family";
+    var plan = childcarePlans1825[planId] || childcarePlans1825.family;
+    var planButtons = Object.keys(childcarePlans1825).map(function (id) {
+      var p = childcarePlans1825[id];
+      return '<button class="money-btn ' + (id === planId ? 'green' : '') + '" onclick="setChildcarePlanV1825(\'' + esc1825(id) + '\')">' + esc1825(p.name) + ' · ' + money1825(p.cost) + '/kid</button>';
+    }).join('');
+    var childRows = kids.map(function (pair) {
+      var k = pair[0], child = pair[1], d = child.developmentV1825 || {};
+      return '<div class="v1825-child-card"><div class="v1825-child-top"><div><b>' + esc1825(child.name) + '</b><span>Age ' + esc1825(child.age == null ? 0 : child.age) + ' · Bond ' + Math.round(num1825(child.bond)) + ' · Trust ' + Math.round(num1825(child.trust)) + '</span></div><strong>' + Math.round(num1825(d.happiness, 60)) + ' mood</strong></div><div class="v1825-pill-row"><span>Smarts ' + Math.round(num1825(d.smarts, 50)) + '</span><span>Confidence ' + Math.round(num1825(d.confidence, 50)) + '</span><span>Health ' + Math.round(num1825(d.health, 60)) + '</span></div><div class="v1825-button-grid"><button onclick="childActivityV1825(\'' + esc1825(k) + '\',\'read\')">Read</button><button onclick="childActivityV1825(\'' + esc1825(k) + '\',\'sports\')">Sports</button><button onclick="childActivityV1825(\'' + esc1825(k) + '\',\'tutor\')">Tutor</button><button onclick="childActivityV1825(\'' + esc1825(k) + '\',\'familyDay\')">Family Day</button></div></div>';
+    }).join('');
+    return '<section class="panel v1825-family-command"><div class="section-label">Family Command</div><div class="v1825-hero-line"><div><b>' + kids.length + ' child' + (kids.length === 1 ? '' : 'ren') + ' at home</b><span>' + esc1825(plan.note) + '</span></div><strong>' + esc1825(plan.name) + '</strong></div><div class="v1825-action-row">' + planButtons + '</div><div class="v1825-child-grid">' + childRows + '</div></section>';
+  }
+  function degreeDesk1825() {
+    ensure1825();
+    var degrees = state.educationV1825.degrees || [];
+    var active = state.educationV1825.activeDegree;
+    var school = bestSchool1825(state.college || "state");
+    var activeHtml = active ? '<div class="v1825-degree-active"><b>' + esc1825(active.majorName) + '</b><span>' + esc1825(active.schoolName) + ' · ' + Math.round((num1825(active.yearsCompleted) / num1825(active.targetYears, 4)) * 100) + '% complete · ' + money1825(active.annualCost) + '/yr</span><button class="money-btn" onclick="pauseDegreeV1825()">Pause</button></div>' : '<div class="row-sub">No active additional degree. Start one to unlock more career requirements without replacing the whole education system.</div>';
+    var degreeChips = degrees.length ? degrees.map(function (d) { return '<span>' + esc1825(d.majorName) + ' · age ' + esc1825(d.completedAge || '?') + '</span>'; }).join('') : '<span>No completed degree recorded yet</span>';
+    var cards = degreeMajors1825().slice(0, 10).map(function (m) {
+      var owned = hasDegreeMajor1825(m.id);
+      return '<div class="v1825-degree-card ' + (owned ? 'owned' : '') + '"><b>' + esc1825(m.name) + '</b><p>' + esc1825(m.desc || 'Degree path.') + '</p><div class="v1825-pill-row"><span>' + money1825(school && school.cost || 14000) + '/yr</span><span>' + esc1825((m.jobs || []).slice(0,2).join(' / ') || 'Career unlocks') + '</span></div><button class="money-btn green" onclick="startDegreeV1825(\'' + esc1825(m.id) + '\',\'' + esc1825(school && school.id || 'state') + '\')" ' + (owned || !!active ? 'disabled' : '') + '>' + (owned ? 'Completed' : active ? 'Busy' : 'Start') + '</button></div>';
+    }).join('');
+    return '<section class="panel v1825-degree-desk"><div class="section-label">Multiple Degrees</div>' + activeHtml + '<div class="v1825-pill-row degree-list">' + degreeChips + '</div><div class="v1825-degree-grid">' + cards + '</div></section>';
+  }
+  function fundEconomicsPanel1825() {
+    ensure1825();
+    var fund = state.finance.fundTrackV189 || {};
+    var policy = fundPolicy1825();
+    if (!fund.active && !fund.outsideCapital) {
+      return '<section class="money-section v1825-fund-econ"><div class="money-section-title">Fund Investor Economics <span>locked</span></div><div class="row-sub">Launch the fund track first. Once active, this desk separates investor dividends from your carry and management/performance fees.</div></section>';
+    }
+    var ledger = state.finance.fundInvestorLedgerV1825 || [];
+    var rows = ledger.slice(-4).reverse().map(function (x) {
+      return '<div class="v1825-ledger-row"><span>Age ' + esc1825(x.age) + ' · ' + esc1825(x.policy) + '</span><b>Investor ' + money1825(x.investorDividend) + '</b><strong>Carry ' + money1825(x.carry) + '</strong></div>';
+    }).join('') || '<div class="row-sub">No investor distribution has been processed yet.</div>';
+    return '<section class="money-section v1825-fund-econ"><div class="money-section-title">Fund Investor Economics <span>' + esc1825(policy.label) + '</span></div><div class="v1825-fund-grid"><div><span>Outside capital</span><b>' + money1825(fund.outsideCapital || 0) + '</b></div><div><span>Last return</span><b class="' + (num1825(fund.lastReturn) >= 0 ? 'good' : 'bad') + '">' + signedMoney1825(fund.lastReturn || 0) + '</b></div><div><span>Investor dividend</span><b>' + money1825(fund.lastInvestorDividendV1825 || 0) + '</b></div><div><span>Your carry</span><b class="good">' + money1825(fund.lastCarryV1825 || 0) + '</b></div></div><div class="v1825-action-row"><button class="money-btn ' + (state.finance.fundPayoutPolicyV1825 === 'growth' ? 'green' : '') + '" onclick="setFundPayoutPolicyV1825(\'growth\')">Growth</button><button class="money-btn ' + ((!state.finance.fundPayoutPolicyV1825 || state.finance.fundPayoutPolicyV1825 === 'balanced') ? 'green' : '') + '" onclick="setFundPayoutPolicyV1825(\'balanced\')">Balanced</button><button class="money-btn ' + (state.finance.fundPayoutPolicyV1825 === 'income' ? 'green' : '') + '" onclick="setFundPayoutPolicyV1825(\'income\')">Income</button><button class="money-btn gold" onclick="applyFundInvestorShareV1825(true)" ' + (!fund.active ? 'disabled' : '') + '>Run Distribution</button></div><div class="v1825-ledger-mini">' + rows + '</div></section>';
+  }
+  function careerDegreePanel1825() {
+    ensure1825();
+    var jobs = [];
+    try { jobs = Array.isArray(careerCatalog) ? careerCatalog : []; } catch(e) {}
+    if (!jobs.length) return '';
+    var degrees = (state.educationV1825.degrees || []).map(function (d) { return d.majorName; }).join(', ') || 'No completed degrees';
+    var unlocked = jobs.filter(jobUnlockedByDegrees1825).slice(0, 10);
+    return '<section class="panel v1825-career-degree"><div class="section-label">Career Unlocks From Degrees</div><div class="row-sub">Degrees on file: ' + esc1825(degrees) + '</div><div class="v1825-pill-row">' + (unlocked.length ? unlocked.map(function (j) { return '<span>' + esc1825(j.title) + ' · ' + money1825(j.salary) + '</span>'; }).join('') : '<span>No degree-based job unlocks yet</span>') + '</div></section>';
+  }
+  function cleanPeopleHtml1825(html) {
+    html = String(html || "");
+    // Old buttons disabled after one use. v18.25 action functions enforce repeat limits, so remove stale one-use locks.
+    html = html.replace(/(<button[^>]+onclick="relationAction\('[^']+','(?:talk|gift|bigGift|apologize|argue|allowance|punish)'\)"[^>]*?)\sdisabled(="")?/g, "$1");
+    html = html.replace(/(<button[^>]+onclick="dateAction\('[^']+','(?:dinner|trip)'\)"[^>]*?)\sdisabled(="")?/g, "$1");
+    html = html.replace(/(<button[^>]+onclick="findDate\('(?:app|bar|friends)'\)"[^>]*?)\sdisabled(="")?/g, "$1");
+    return html;
+  }
+  function removeExisting1825(html) {
+    html = String(html || "");
+    ["v1825-people-rhythm","v1825-family-command","v1825-degree-desk","v1825-fund-econ","v1825-career-degree"].forEach(function (cls) {
+      var idx = html.indexOf(cls);
+      while (idx >= 0) {
+        var start = html.lastIndexOf("<section", idx);
+        var end = html.indexOf("</section>", idx);
+        if (start < 0 || end < 0) break;
+        html = html.slice(0, start) + html.slice(end + 10);
+        idx = html.indexOf(cls);
+      }
+    });
+    return html;
+  }
+  function afterFirstSection1825(html, insert) {
+    html = String(html || "");
+    var end = html.indexOf("</section>");
+    return end >= 0 ? html.slice(0, end + 10) + insert + html.slice(end + 10) : insert + html;
+  }
+  var prevRenderHubContent1825 = window.renderHubContent || (typeof renderHubContent === "function" ? renderHubContent : null);
+  if (prevRenderHubContent1825 && !window.__ledgerRenderHub1825Wrapped) {
+    window.__ledgerRenderHub1825Wrapped = true;
+    window.renderHubContent = function (hubId) {
+      ensure1825();
+      var html = "";
+      try { html = prevRenderHubContent1825.apply(this, arguments) || ""; }
+      catch(e) { html = '<section class="panel"><div class="section-label">Recovered hub</div><div class="row-sub">' + esc1825(e && (e.message || e)) + '</div></section>'; }
+      html = removeExisting1825(html);
+      if (hubId === "people") {
+        html = cleanPeopleHtml1825(html);
+        html = peopleRhythmPanel1825() + familyCommandPanel1825() + html;
+      }
+      if (hubId === "school" || hubId === "education") html = afterFirstSection1825(html, degreeDesk1825());
+      if (hubId === "career") html = afterFirstSection1825(html, careerDegreePanel1825() + degreeDesk1825());
+      if (hubId === "business" || hubId === "brokerage" || hubId === "finance" || hubId === "money") html = afterFirstSection1825(html, fundEconomicsPanel1825());
+      return html;
+    };
+    try { renderHubContent = window.renderHubContent; } catch(e) {}
+  }
+  var style = document.createElement("style");
+  style.textContent = [
+    ".v1825-people-rhythm,.v1825-family-command,.v1825-degree-desk,.v1825-career-degree{border-color:rgba(126,160,172,.40)!important;background:linear-gradient(135deg,rgba(21,36,40,.96),rgba(34,29,22,.96))!important}.v1825-family-command{border-color:rgba(185,220,138,.38)!important}.v1825-degree-desk{border-color:rgba(201,155,85,.42)!important}.v1825-fund-econ{border-color:rgba(240,202,123,.44)!important;background:linear-gradient(135deg,rgba(48,38,22,.98),rgba(24,42,45,.95))!important}",
+    ".v1825-hero-line{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:start}.v1825-hero-line b{display:block;color:#fff3df;font-size:15px}.v1825-hero-line span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.45;margin-top:3px}.v1825-hero-line strong{font-family:'JetBrains Mono',monospace;color:#f0ca7b;font-size:12px;white-space:nowrap}.v1825-meter{height:7px;background:rgba(0,0,0,.26);border-radius:999px;overflow:hidden;margin-top:10px}.v1825-meter i{display:block;height:100%;background:linear-gradient(90deg,#b9dc8a,#f0ca7b,#e9927d);border-radius:inherit}",
+    ".v1825-pill-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}.v1825-pill-row span{border:1px solid rgba(255,255,255,.10);border-radius:999px;padding:5px 8px;color:#d6c5aa;font-family:'JetBrains Mono',monospace;font-size:9px;line-height:1.2;background:rgba(255,255,255,.045)}.v1825-action-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}.v1825-action-row .money-btn{white-space:normal!important;min-width:95px}",
+    ".v1825-child-grid,.v1825-degree-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:9px;margin-top:10px}.v1825-child-card,.v1825-degree-card,.v1825-degree-active{border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(255,255,255,.045);padding:11px;min-width:0}.v1825-child-top{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}.v1825-child-card b,.v1825-degree-card b,.v1825-degree-active b{display:block;color:#fff3df;font-size:14px}.v1825-child-card span,.v1825-degree-card p,.v1825-degree-active span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.45;margin-top:3px}.v1825-child-card strong{font-family:'JetBrains Mono',monospace;color:#b9dc8a;font-size:12px}.v1825-button-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:9px}.v1825-button-grid button{border:1px solid rgba(216,173,109,.30);background:rgba(0,0,0,.18);color:#f6ead8;border-radius:8px;padding:8px;font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.07em}",
+    ".v1825-degree-card.owned{border-color:rgba(185,220,138,.40);background:rgba(65,91,48,.18)}.v1825-degree-card .money-btn,.v1825-degree-active .money-btn{margin-top:9px}.v1825-fund-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:8px}.v1825-fund-grid>div{border:1px solid rgba(255,255,255,.10);border-radius:11px;background:rgba(255,255,255,.045);padding:10px}.v1825-fund-grid span{display:block;font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:#b9a98e}.v1825-fund-grid b{display:block;font-family:'JetBrains Mono',monospace;font-size:17px;color:#fff3df;margin-top:5px;overflow-wrap:anywhere}.v1825-fund-grid b.good{color:#b9dc8a}.v1825-fund-grid b.bad{color:#e9927d}",
+    ".v1825-ledger-mini{display:grid;gap:7px;margin-top:10px}.v1825-ledger-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px}.v1825-ledger-row span{color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:9px}.v1825-ledger-row b,.v1825-ledger-row strong{font-family:'JetBrains Mono',monospace;font-size:10px;color:#f0ca7b}.v1825-ledger-row strong{color:#b9dc8a}",
+    "@media(max-width:760px){.v1825-hero-line,.v1825-child-top{grid-template-columns:1fr}.v1825-fund-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.v1825-ledger-row{grid-template-columns:1fr}.v1825-hero-line strong{white-space:normal}.v1825-child-grid,.v1825-degree-grid{grid-template-columns:1fr}}@media(max-width:480px){.v1825-fund-grid{grid-template-columns:1fr}.v1825-button-grid{grid-template-columns:1fr}}"
+  ].join("\n");
+  document.head.appendChild(style);
+})();
+
+
+
+/* END absorbed 02-patch-v18-25.js */
+
+
+/* BEGIN absorbed 03-patch-v18-26.js */
+
+/* LEDGER PATCH v18.26: legal clarity, health insurance effects, relocation, wayback browser, save repair, sandbox calm */
+(function () {
+  if (window.__ledgerV1826Loaded) return;
+  window.__ledgerV1826Loaded = true;
+
+  function esc1826(v) {
+    return String(v == null ? "" : v).replace(/[&<>"']/g, function (ch) {
+      return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch];
+    });
+  }
+  function num1826(v, fallback) {
+    var n = Number(v);
+    return Number.isFinite(n) ? n : (fallback || 0);
+  }
+  function clamp1826(v, min, max) {
+    min = min == null ? 0 : min;
+    max = max == null ? 100 : max;
+    return Math.max(min, Math.min(max, num1826(v)));
+  }
+  function money1826(v) {
+    try { if (typeof money === "function") return money(Math.round(num1826(v))); } catch(e) {}
+    v = Math.round(num1826(v));
+    var sign = v < 0 ? "-" : "";
+    v = Math.abs(v);
+    if (v >= 1e15) return sign + "$" + (v / 1e15).toFixed(1).replace(/\.0$/, "") + "Q";
+    if (v >= 1e12) return sign + "$" + (v / 1e12).toFixed(1).replace(/\.0$/, "") + "T";
+    if (v >= 1e9) return sign + "$" + (v / 1e9).toFixed(1).replace(/\.0$/, "") + "B";
+    if (v >= 1e6) return sign + "$" + (v / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+    if (v >= 10000) return sign + "$" + Math.round(v / 1000) + "K";
+    return sign + "$" + v.toLocaleString();
+  }
+  function signed1826(v) {
+    v = Math.round(num1826(v));
+    return (v >= 0 ? "+" : "-") + money1826(Math.abs(v));
+  }
+  function pct1826(v) { return (num1826(v) * 100).toFixed(1).replace(".0", "") + "%"; }
+  function toast1826(msg) {
+    try { if (typeof addToast === "function") return addToast(msg); } catch(e) {}
+    try { if (typeof addLog === "function") return addLog(msg); } catch(e) {}
+  }
+  function log1826(msg, deltas) {
+    try { if (typeof addLog === "function") return addLog(msg, deltas || {}); } catch(e) {}
+  }
+  function saveOnly1826() { try { if (typeof save === "function") save(); } catch(e) {} }
+  function saveRender1826() { saveOnly1826(); try { if (typeof render === "function") render(); } catch(e) {} }
+  function deepCopy1826(obj) {
+    try { if (typeof structuredClone === "function") return structuredClone(obj); } catch(e) {}
+    try { return JSON.parse(JSON.stringify(obj)); } catch(e) { return null; }
+  }
+
+  var TAX_PROFILES1826 = [
+    { id:"us", name:"United States", dash:"Federal + state", brackets:[[0,.10],[45000,.16],[90000,.22],[180000,.28],[400000,.35]], moveCost:4500, regions:[["pa","Pennsylvania",.0307],["de","Delaware",.055],["hi","Hawaii",.082],["nj","New Jersey",.064],["ny","New York",.065],["ca","California",.093],["ga","Georgia",.052],["tx","Texas",0],["fl","Florida",0],["nv","Nevada",0]] },
+    { id:"canada", name:"Canada", dash:"Federal + province", brackets:[[0,.15],[55000,.21],[110000,.27],[180000,.33]], moveCost:9000, regions:[["on","Ontario",.0915],["bc","British Columbia",.077],["ab","Alberta",.10],["qc","Quebec",.15]] },
+    { id:"uk", name:"United Kingdom", dash:"UK tax", brackets:[[0,.12],[50000,.20],[125000,.40],[300000,.45]], moveCost:10000, regions:[["eng","England/Wales",0],["sct","Scotland",.025],["ni","Northern Ireland",0]] },
+    { id:"germany", name:"Germany", dash:"Social-tax", brackets:[[0,.18],[45000,.28],[90000,.36],[180000,.42]], moveCost:12000, regions:[["standard","Standard region",0]] },
+    { id:"france", name:"France", dash:"Public-service", brackets:[[0,.14],[45000,.24],[90000,.34],[180000,.41]], moveCost:12000, regions:[["standard","Standard region",0]] },
+    { id:"singapore", name:"Singapore", dash:"Low-tax", brackets:[[0,.04],[45000,.07],[90000,.12],[180000,.18],[400000,.22]], moveCost:15000, regions:[["standard","Standard region",0]] },
+    { id:"uae", name:"UAE", dash:"0% personal income", brackets:[[0,0]], moveCost:18000, regions:[["standard","Standard region",0]] },
+    { id:"thailand", name:"Thailand", dash:"Expat progressive", brackets:[[0,.05],[25000,.10],[75000,.20],[160000,.30],[300000,.35]], moveCost:11000, regions:[["bkk","Bangkok",.01],["phuket","Phuket",.008],["standard","Standard region",0]] },
+    { id:"vietnam", name:"Vietnam", dash:"Regional progressive", brackets:[[0,.05],[25000,.10],[60000,.20],[140000,.30],[300000,.35]], moveCost:9500, regions:[["danang","Da Nang",.006],["hcmc","Ho Chi Minh City",.01],["hanoi","Hanoi",.01],["standard","Standard region",0]] }
+  ];
+  var ACCOUNTANTS1826 = [
+    { id:"none", name:"No Accountant", cost:0, reduction:0, feePct:0, audit:-0, desc:"No tax planning. Cheapest now, riskiest when income gets complicated." },
+    { id:"local", name:"Local Tax Preparer", cost:500, reduction:.05, feePct:.12, audit:8, desc:"Basic filing help. Good for normal wages and small side income." },
+    { id:"cpa", name:"CPA Advisor", cost:5000, reduction:.075, feePct:.06, audit:18, desc:"Better bookkeeping, deductions, and audit prevention." },
+    { id:"elite", name:"Elite Tax Counsel", cost:50000, reduction:.10, feePct:.03, audit:30, desc:"High-net-worth planning for businesses, investments, and relocation." }
+  ];
+  var ATTORNEYS1826 = [
+    { id:"none", name:"No Attorney", cost:0, protection:0, settlement:.00, desc:"No dedicated legal coverage." },
+    { id:"basic", name:"Legal Retainer", cost:2500, protection:12, settlement:.15, desc:"Document review, demand letters, and first response help." },
+    { id:"family", name:"Family Attorney", cost:15000, protection:24, settlement:.30, desc:"Ongoing protection for contracts, lawsuits, custody, and estates." },
+    { id:"elite", name:"Elite Legal Team", cost:90000, protection:42, settlement:.48, desc:"Wealth, business, tax defense, and litigation strategy." }
+  ];
+  var HEALTH_PLANS1826 = [
+    { id:"none", name:"No Insurance", coverage:0, premium:0, deductible:0, desc:"No premium, but every emergency hits cash or debt." },
+    { id:"basic50", name:"Basic 50% Plan", coverage:.50, premium:1200, deductible:1200, desc:"Starter coverage. Cuts many surprise bills roughly in half after deductible." },
+    { id:"premium90", name:"Premium 90% Plan", coverage:.90, premium:6000, deductible:500, desc:"Strong plan. Most emergency bills are handled." },
+    { id:"elite100", name:"Elite 100% Plan", coverage:1.00, premium:18000, deductible:0, desc:"Expensive but nearly eliminates medical debt risk." }
+  ];
+
+  function profile1826(id) { return TAX_PROFILES1826.find(function (x) { return x.id === id; }) || TAX_PROFILES1826[0]; }
+  function region1826(countryId, regionId) {
+    var p = profile1826(countryId);
+    return (p.regions || []).find(function (r) { return r[0] === regionId; }) || (p.regions || [["standard","Standard region",0]])[0];
+  }
+  function progressive1826(income, brackets) {
+    income = Math.max(0, Math.round(num1826(income)));
+    var total = 0;
+    var rows = (brackets || [[0,0]]).slice().sort(function (a,b) { return a[0] - b[0]; });
+    for (var i = 0; i < rows.length; i++) {
+      var start = rows[i][0], rate = rows[i][1], end = i + 1 < rows.length ? rows[i + 1][0] : Infinity;
+      if (income > start) total += (Math.min(income, end) - start) * rate;
+    }
+    return Math.round(total);
+  }
+  function optionById1826(list, id) { return list.find(function (x) { return x.id === id; }) || list[0]; }
+  function normalizedAccountant1826() {
+    var f = state.finance || {};
+    var raw = f.accountant;
+    if (typeof raw === "string") raw = { id: raw };
+    var id = raw && raw.id ? raw.id : "none";
+    var base = optionById1826(ACCOUNTANTS1826, id);
+    return Object.assign({}, base, raw || {});
+  }
+  function normalizedAttorney1826() {
+    var f = state.finance || {};
+    var raw = f.attorney;
+    if (typeof raw === "string") raw = { id: raw };
+    var id = raw && raw.id ? raw.id : "none";
+    var base = optionById1826(ATTORNEYS1826, id);
+    return Object.assign({}, base, raw || {});
+  }
+  function healthPlan1826() {
+    var f = state.finance || {};
+    var raw = f.insurance;
+    var id = raw === true ? "basic50" : raw === false || raw == null ? "none" : (typeof raw === "object" ? raw.id : String(raw));
+    return optionById1826(HEALTH_PLANS1826, id || "none");
+  }
+  function taxableIncome1826() {
+    if (!window.state) return 0;
+    var f = state.finance || {};
+    var salary = state.job ? num1826(state.job.salary) : 0;
+    var business = Math.max(0, num1826(f.lastBusinessIncome || f.lastEntrepreneurIncome || f.incomeSources?.business));
+    var investment = Math.max(0, num1826(f.incomeSources?.dividends) + num1826(f.incomeSources?.realizedGains) + num1826(f.incomeSources?.firmDistribution) + num1826(f.lastFirmDistribution) + num1826(f.fundTrackV189?.lastFees));
+    return Math.max(0, Math.round(salary + business + investment));
+  }
+  function projectedTax1826(countryId, regionId, income) {
+    var p = profile1826(countryId || state.finance.taxCountry || "us");
+    var r = region1826(p.id, regionId || state.finance.taxRegion || (p.regions[0] && p.regions[0][0]));
+    var acc = normalizedAccountant1826();
+    var base = progressive1826(income, p.brackets);
+    var regional = Math.round(Math.max(0, income) * num1826(r[2]));
+    var gross = base + regional;
+    var savings = Math.round(gross * clamp1826(acc.reduction, 0, .2));
+    var fee = Math.round(savings * clamp1826(acc.feePct, 0, .2));
+    return { country:p, region:r, base:base, regional:regional, gross:gross, savings:savings, fee:fee, finalTax:Math.max(0, gross - savings + fee), effective:income ? Math.max(0, gross - savings + fee) / income : 0 };
+  }
+  function legalRisk1826() {
+    if (!window.state) return 0;
+    var f = state.finance || {};
+    var acc = normalizedAccountant1826();
+    var atty = normalizedAttorney1826();
+    var risk = num1826(f.taxLegalRisk) + Math.min(35, Math.max(0, num1826(f.taxDebt) / 5000)) + Math.min(20, Math.max(0, num1826(f.creditCardDebt) / 12000));
+    if (taxableIncome1826() > 150000 && acc.id === "none") risk += 12;
+    risk -= num1826(acc.audit) + num1826(atty.protection);
+    return Math.round(clamp1826(risk, 0, 100));
+  }
+  function caseStatus1826(c) { return c.closed ? "Closed" : (c.severity >= 70 ? "Critical" : c.severity >= 40 ? "Active" : "Watch"); }
+
+  function ensure1826() {
+    try { if (typeof ensureStateShape === "function") ensureStateShape(); } catch(e) {}
+    if (!window.state) return false;
+    state.finance = state.finance || {};
+    state.stats = state.stats || {};
+    state.flags = state.flags || {};
+    state.actionsTaken = state.actionsTaken || {};
+    state.sandbox = state.sandbox || {};
+    state.finance.taxCountry = state.finance.taxCountry || "us";
+    state.finance.taxRegion = state.finance.taxRegion || region1826(state.finance.taxCountry)[0];
+    state.finance.taxDebt = Math.max(0, Math.round(num1826(state.finance.taxDebt || state.finance.debts?.taxDebt || state.taxDebt)));
+    state.finance.taxLegalRisk = Math.max(0, Math.round(num1826(state.finance.taxLegalRisk)));
+    state.finance.accountant = normalizedAccountant1826();
+    state.finance.attorney = normalizedAttorney1826();
+    state.finance.insurance = healthPlan1826().id;
+    state.finance.medicalDebt = Math.max(0, Math.round(num1826(state.finance.medicalDebt || state.medicalDebt)));
+    if (!Array.isArray(state.finance.legalCasesV1826)) state.finance.legalCasesV1826 = [];
+    if (!Array.isArray(state.finance.healthClaimsV1826)) state.finance.healthClaimsV1826 = [];
+    if (!Array.isArray(state.finance.relocationHistoryV1826)) state.finance.relocationHistoryV1826 = [];
+    if (!Array.isArray(state.timeSnapshotsV1814)) state.timeSnapshotsV1814 = [];
+    if (!state.saveHealthV1826) state.saveHealthV1826 = { backups:0, repairs:0, lastBackupAt:0 };
+    if (state.sandbox.noStress || state.sandbox.stressFreeLife) state.stats.stress = 0;
+    return true;
+  }
+
+  function ensureOpenCases1826() {
+    ensure1826();
+    var cases = state.finance.legalCasesV1826;
+    var openTax = cases.some(function (c) { return !c.closed && c.type === "tax"; });
+    if (state.finance.taxDebt > 0 && !openTax) {
+      cases.unshift({ id:"tax-" + Date.now(), age:state.age || 0, type:"tax", title:"Tax Balance Notice", severity:clamp1826(25 + state.finance.taxDebt / 2500, 25, 95), exposure:Math.round(state.finance.taxDebt * 1.25), note:"Unpaid taxes can create penalties, audits, and stress.", closed:false });
+    }
+    var risk = legalRisk1826();
+    var openAudit = cases.some(function (c) { return !c.closed && c.type === "audit"; });
+    if (risk >= 55 && !openAudit) {
+      cases.unshift({ id:"audit-" + Date.now(), age:state.age || 0, type:"audit", title:"Audit / Lawsuit Risk", severity:risk, exposure:Math.round(Math.max(5000, taxableIncome1826() * .08)), note:"Your income, debt, or lack of coverage is creating legal pressure.", closed:false });
+    }
+    state.finance.legalCasesV1826 = cases.slice(0, 10);
+  }
+
+  window.hireAccountantV1826 = function (planId) {
+    if (!ensure1826()) return;
+    var plan = optionById1826(ACCOUNTANTS1826, planId);
+    if (plan.id !== "none" && num1826(state.money) < plan.cost) return toast1826(plan.name + " needs " + money1826(plan.cost) + " cash.");
+    if (plan.id !== "none") state.money = Math.round(num1826(state.money) - plan.cost);
+    state.finance.accountant = Object.assign({}, plan, { hiredAge:state.age || 0, retainerPaid:num1826(state.finance.accountant?.retainerPaid) + plan.cost });
+    state.finance.taxLegalRisk = Math.max(0, Math.round(num1826(state.finance.taxLegalRisk) - plan.audit));
+    log1826(plan.id === "none" ? "Ended accountant coverage." : "Hired " + plan.name + " for tax planning and audit prevention.", { money: -plan.cost, stress: plan.id === "none" ? 2 : -2 });
+    try { if (typeof applyDeltas === "function") applyDeltas({ stress: plan.id === "none" ? 2 : -2 }); } catch(e) {}
+    saveRender1826();
+  };
+  window.hireAttorneyV1826 = function (planId) {
+    if (!ensure1826()) return;
+    var plan = optionById1826(ATTORNEYS1826, planId);
+    if (plan.id !== "none" && num1826(state.money) < plan.cost) return toast1826(plan.name + " needs " + money1826(plan.cost) + " cash.");
+    if (plan.id !== "none") state.money = Math.round(num1826(state.money) - plan.cost);
+    state.finance.attorney = Object.assign({}, plan, { hiredAge:state.age || 0, retainerPaid:num1826(state.finance.attorney?.retainerPaid) + plan.cost });
+    state.finance.taxLegalRisk = Math.max(0, Math.round(num1826(state.finance.taxLegalRisk) - plan.protection));
+    log1826(plan.id === "none" ? "Ended attorney coverage." : "Hired " + plan.name + " for legal protection.", { money:-plan.cost, stress:plan.id === "none" ? 2 : -3 });
+    try { if (typeof applyDeltas === "function") applyDeltas({ stress: plan.id === "none" ? 2 : -3 }); } catch(e) {}
+    saveRender1826();
+  };
+  window.legalCaseActionV1826 = function (caseId, action) {
+    if (!ensure1826()) return;
+    ensureOpenCases1826();
+    var c = state.finance.legalCasesV1826.find(function (x) { return x.id === caseId; });
+    if (!c || c.closed) return toast1826("That legal issue is already closed.");
+    var acc = normalizedAccountant1826();
+    var atty = normalizedAttorney1826();
+    var exposure = Math.max(0, Math.round(num1826(c.exposure)));
+    if (action === "consult") {
+      var consult = Math.max(150, Math.round(exposure * .025 * (1 - num1826(atty.settlement))));
+      if (num1826(state.money) < consult) return toast1826("Consult needs " + money1826(consult) + ".");
+      state.money -= consult;
+      c.severity = clamp1826(num1826(c.severity) - 18 - Math.round(num1826(acc.audit) / 2), 0, 100);
+      state.finance.taxLegalRisk = Math.max(0, Math.round(num1826(state.finance.taxLegalRisk) - 10));
+      log1826("Legal consult completed for " + money1826(consult) + ". The issue is clearer and risk dropped.", { money:-consult, stress:-3 });
+      try { if (typeof applyDeltas === "function") applyDeltas({ stress:-3 }); } catch(e) {}
+    } else if (action === "settle") {
+      var discount = Math.min(.65, num1826(atty.settlement) + num1826(acc.reduction));
+      var settlement = Math.max(250, Math.round(exposure * (1 - discount)));
+      if (num1826(state.money) < settlement) return toast1826("Settlement needs " + money1826(settlement) + " cash.");
+      state.money -= settlement;
+      if (c.type === "tax") state.finance.taxDebt = Math.max(0, Math.round(num1826(state.finance.taxDebt) - exposure));
+      c.closed = true;
+      c.closedAge = state.age || 0;
+      c.outcome = "Settled for " + money1826(settlement);
+      state.finance.taxLegalRisk = Math.max(0, Math.round(num1826(state.finance.taxLegalRisk) - 26));
+      log1826("Settled " + c.title + " for " + money1826(settlement) + ".", { money:-settlement, stress:-6 });
+      try { if (typeof applyDeltas === "function") applyDeltas({ stress:-6 }); } catch(e) {}
+    } else if (action === "defend") {
+      var defense = Math.max(500, Math.round(exposure * (.09 - Math.min(.06, num1826(atty.settlement) / 5))));
+      if (num1826(state.money) < defense) return toast1826("Defense needs " + money1826(defense) + " cash.");
+      state.money -= defense;
+      var win = (num1826(atty.protection) + num1826(acc.audit) + num1826(state.stats?.smarts) / 4 + num1826(state.stats?.discipline) / 5) >= (35 + num1826(c.severity) / 2);
+      if (win) {
+        c.closed = true; c.closedAge = state.age || 0; c.outcome = "Defended successfully";
+        if (c.type === "tax") state.finance.taxDebt = Math.max(0, Math.round(num1826(state.finance.taxDebt) * .35));
+        state.finance.taxLegalRisk = Math.max(0, Math.round(num1826(state.finance.taxLegalRisk) - 32));
+        log1826("Your legal team defended " + c.title + ". Exposure dropped sharply.", { money:-defense, stress:-4, confidence:2 });
+        try { if (typeof applyDeltas === "function") applyDeltas({ stress:-4, confidence:2 }); } catch(e) {}
+      } else {
+        c.severity = clamp1826(num1826(c.severity) + 8, 0, 100);
+        var penalty = Math.round(exposure * .18);
+        state.finance.taxDebt += c.type === "tax" ? penalty : 0;
+        state.finance.taxLegalRisk = Math.min(100, Math.round(num1826(state.finance.taxLegalRisk) + 12));
+        log1826("The defense did not fully work. Pressure increased and costs continue.", { money:-defense, stress:5 });
+        try { if (typeof applyDeltas === "function") applyDeltas({ stress:5 }); } catch(e) {}
+      }
+    }
+    state.finance.legalCasesV1826 = state.finance.legalCasesV1826.slice(0, 10);
+    saveRender1826();
+  };
+
+  window.setTaxResidenceV1826 = function (countryId, regionId) {
+    if (!ensure1826()) return;
+    var p = profile1826(countryId || "us");
+    var r = region1826(p.id, regionId || (p.regions[0] && p.regions[0][0]));
+    var currentKey = (state.finance.taxCountry || "us") + ":" + (state.finance.taxRegion || "");
+    var nextKey = p.id + ":" + r[0];
+    var international = p.id !== (state.finance.taxCountry || "us");
+    var cost = nextKey === currentKey ? 0 : Math.round((p.moveCost || 5000) + (international ? 6000 : 1500));
+    if (cost && num1826(state.money) < cost) return toast1826("Relocation needs " + money1826(cost) + " cash.");
+    if (cost) state.money -= cost;
+    state.finance.taxCountry = p.id;
+    state.finance.taxRegion = r[0];
+    state.finance.taxDashboard = p.dash;
+    state.finance.relocationHistoryV1826.unshift({ age:state.age || 0, country:p.id, region:r[0], cost:cost });
+    state.finance.relocationHistoryV1826 = state.finance.relocationHistoryV1826.slice(0, 8);
+    var stress = international ? 5 : 2;
+    log1826("Moved tax residence to " + p.name + " / " + r[1] + (cost ? " for " + money1826(cost) : "") + ".", { money:-cost, stress:stress });
+    try { if (typeof applyDeltas === "function") applyDeltas({ stress:stress }); } catch(e) {}
+    saveRender1826();
+  };
+  window.updateTaxRegionSelectV1826 = function (countryId, selectId) {
+    var el = document.getElementById(selectId || "v1826-tax-region");
+    if (!el) return;
+    var p = profile1826(countryId || "us");
+    el.innerHTML = (p.regions || []).map(function (r) { return '<option value="' + esc1826(r[0]) + '">' + esc1826(r[1]) + (r[2] ? " · +" + pct1826(r[2]) : " · no extra") + '</option>'; }).join("");
+  };
+
+  window.setHealthPlanV1826 = function (planId) {
+    if (!ensure1826()) return;
+    if (num1826(state.age) < 18) return toast1826("Health plans unlock at 18.");
+    var plan = optionById1826(HEALTH_PLANS1826, planId);
+    if (plan.id !== "none" && num1826(state.money) < plan.premium) return toast1826(plan.name + " first premium needs " + money1826(plan.premium) + ".");
+    if (plan.id !== "none") state.money -= plan.premium;
+    state.finance.insurance = plan.id;
+    state.finance.lastInsuranceCost = (num1826(state.finance.lastInsuranceCost) + plan.premium);
+    log1826(plan.id === "none" ? "Dropped health insurance." : "Enrolled in " + plan.name + ".", { money:-plan.premium, stress:plan.coverage >= .9 ? -5 : plan.id === "none" ? 4 : -2 });
+    try { if (typeof applyDeltas === "function") applyDeltas({ stress:plan.coverage >= .9 ? -5 : plan.id === "none" ? 4 : -2 }); } catch(e) {}
+    saveRender1826();
+  };
+  function medicalOop1826(gross) {
+    var plan = healthPlan1826();
+    var covered = Math.round(Math.max(0, gross - plan.deductible) * plan.coverage);
+    return { plan:plan, gross:gross, covered:covered, oop:Math.max(0, gross - covered) };
+  }
+
+  window.createWaybackCheckpointV1826 = function (label) {
+    if (!ensure1826()) return;
+    var snap = deepCopy1826(state);
+    if (!snap) return toast1826("Could not create checkpoint.");
+    delete snap.pending;
+    delete snap.activeModal;
+    delete snap.timeSnapshotsV1814;
+    state.timeSnapshotsV1814.push({ id:Date.now(), age:state.age || 0, at:Date.now(), label:label || "Manual checkpoint", netWorth:typeof legacyNetWorth === "function" ? legacyNetWorth(state) : 0, state:snap });
+    state.timeSnapshotsV1814 = state.timeSnapshotsV1814.slice(-14);
+    log1826("Saved Wayback checkpoint at age " + (state.age || 0) + ".");
+    saveRender1826();
+  };
+  window.restoreWaybackIndexV1826 = function (idx) {
+    if (!ensure1826()) return;
+    idx = Math.round(num1826(idx));
+    var snaps = state.timeSnapshotsV1814 || [];
+    var item = snaps[idx];
+    if (!item || !item.state) return toast1826("That checkpoint is not readable.");
+    var next = deepCopy1826(item.state);
+    if (!next) return toast1826("Could not restore checkpoint.");
+    next.timeSnapshotsV1814 = snaps.slice(0, idx).concat(snaps.slice(idx + 1));
+    try { state = next; window.state = next; } catch(e) { window.state = next; }
+    try { if (typeof ensureStateShape === "function") ensureStateShape(); } catch(e) {}
+    saveOnly1826();
+    toast1826("Restored checkpoint from age " + (next.age || "?") + ".");
+    try { if (typeof render === "function") render(); } catch(e) {}
+  };
+  window.deleteWaybackIndexV1826 = function (idx) {
+    if (!ensure1826()) return;
+    idx = Math.round(num1826(idx));
+    if (!state.timeSnapshotsV1814[idx]) return;
+    state.timeSnapshotsV1814.splice(idx, 1);
+    saveRender1826();
+  };
+
+  var backupPrefix1826 = "ledger-v1826-backup-slot-";
+  window.backupCurrentSaveV1826 = function () {
+    if (!ensure1826()) return;
+    var idx = typeof activeSlot !== "undefined" ? activeSlot : 1;
+    var copy = deepCopy1826(state);
+    if (!copy) return toast1826("Could not create backup.");
+    try {
+      localStorage.setItem(backupPrefix1826 + idx, JSON.stringify({ at:Date.now(), state:copy }));
+      state.saveHealthV1826.backups = num1826(state.saveHealthV1826.backups) + 1;
+      state.saveHealthV1826.lastBackupAt = Date.now();
+      saveOnly1826();
+      toast1826("Backup written for slot " + idx + ".");
+    } catch(e) { toast1826("Backup failed: " + (e.message || e)); }
+  };
+  window.repairSaveSlotV1826 = function (idx) {
+    idx = Math.max(1, Math.min(5, Math.round(num1826(idx, typeof activeSlot !== "undefined" ? activeSlot : 1))));
+    var raw = null, parsed = null;
+    try { raw = localStorage.getItem(typeof slotKey === "function" ? slotKey(idx) : "ledger-life-slot-" + idx); } catch(e) {}
+    if (raw) { try { parsed = JSON.parse(raw); } catch(e) {} }
+    if (parsed && parsed.stats && Array.isArray(parsed.log)) return toast1826("Slot " + idx + " is readable. No repair needed.");
+    var backup = null;
+    try { backup = JSON.parse(localStorage.getItem(backupPrefix1826 + idx) || "null"); } catch(e) {}
+    if (!backup || !backup.state) return toast1826("No readable backup found for slot " + idx + ".");
+    try {
+      localStorage.setItem(typeof slotKey === "function" ? slotKey(idx) : "ledger-life-slot-" + idx, JSON.stringify(backup.state));
+      if (idx === (typeof activeSlot !== "undefined" ? activeSlot : 1)) { state = backup.state; window.state = backup.state; }
+      if (window.state) { ensure1826(); state.saveHealthV1826.repairs = num1826(state.saveHealthV1826.repairs) + 1; }
+      toast1826("Repaired slot " + idx + " from the last backup.");
+      try { if (typeof render === "function") render(); } catch(e) {}
+    } catch(e) { toast1826("Repair failed: " + (e.message || e)); }
+  };
+
+  window.activateStressFreeV1826 = function () {
+    if (!ensure1826()) return;
+    if (!state.sandboxMode) return toast1826("Stress-free mode is sandbox-only.");
+    state.sandbox.noStress = true;
+    state.sandbox.stressFreeLife = true;
+    state.stats.stress = 0;
+    log1826("Sandbox stress-free life mode activated. Stress gains will be blocked.", { stress:-10 });
+    saveRender1826();
+  };
+  window.deactivateStressFreeV1826 = function () {
+    if (!ensure1826()) return;
+    state.sandbox.noStress = false;
+    state.sandbox.stressFreeLife = false;
+    log1826("Sandbox stress-free life mode turned off.");
+    saveRender1826();
+  };
+
+  var prevApplyDeltas1826 = window.applyDeltas || (typeof applyDeltas === "function" ? applyDeltas : null);
+  if (prevApplyDeltas1826 && !window.__ledgerApplyDeltas1826Wrapped) {
+    window.__ledgerApplyDeltas1826Wrapped = true;
+    window.applyDeltas = function (deltas) {
+      if (window.state && state.sandbox && (state.sandbox.noStress || state.sandbox.stressFreeLife)) {
+        deltas = Object.assign({}, deltas || {});
+        if (num1826(deltas.stress) > 0) deltas.stress = 0;
+      }
+      var result = prevApplyDeltas1826.apply(this, arguments.length ? [deltas] : arguments);
+      try { if (window.state && state.sandbox && (state.sandbox.noStress || state.sandbox.stressFreeLife)) state.stats.stress = 0; } catch(e) {}
+      return result;
+    };
+    try { applyDeltas = window.applyDeltas; } catch(e) {}
+  }
+
+  var prevHospital1826 = window.goHospital || (typeof goHospital === "function" ? goHospital : null);
+  window.goHospital = function () {
+    if (!ensure1826()) return prevHospital1826 ? prevHospital1826.apply(this, arguments) : null;
+    if (!state.flags.needsHospital) return toast1826("You do not need emergency care right now.");
+    var gross = state.stats && state.stats.health <= 10 ? 12500 : state.stats && state.stats.stress >= 90 ? 7200 : 4200;
+    var bill = medicalOop1826(gross);
+    var paid = Math.min(Math.max(0, Math.round(num1826(state.money))), bill.oop);
+    var unpaid = Math.max(0, bill.oop - paid);
+    state.money = Math.round(num1826(state.money) - paid);
+    state.finance.medicalDebt = Math.round(num1826(state.finance.medicalDebt) + unpaid);
+    state.medicalDebt = state.finance.medicalDebt;
+    state.flags.needsHospital = false;
+    state.finance.healthClaimsV1826.unshift({ age:state.age || 0, gross:gross, covered:bill.covered, oop:bill.oop, paid:paid, debt:unpaid, plan:bill.plan.id });
+    state.finance.healthClaimsV1826 = state.finance.healthClaimsV1826.slice(0, 8);
+    try { if (typeof applyDeltas === "function") applyDeltas({ health:32, stress:-18, mentalHealth:6 }); } catch(e) {}
+    log1826("Hospital care cost " + money1826(gross) + ". " + bill.plan.name + " covered " + money1826(bill.covered) + ", leaving " + money1826(bill.oop) + " out-of-pocket.", { money:-paid, medicalDebt:unpaid, health:32, stress:-18 });
+    saveRender1826();
+  };
+  try { goHospital = window.goHospital; } catch(e) {}
+
+  var prevResolveYear1826 = window.resolveLifeAndFinanceYear || (typeof resolveLifeAndFinanceYear === "function" ? resolveLifeAndFinanceYear : null);
+  if (prevResolveYear1826 && !window.__ledgerResolveYear1826Wrapped) {
+    window.__ledgerResolveYear1826Wrapped = true;
+    window.resolveLifeAndFinanceYear = function () {
+      var result = prevResolveYear1826.apply(this, arguments);
+      try {
+        if (!ensure1826() || !state.alive) return result;
+        if (state.sandbox && (state.sandbox.noStress || state.sandbox.stressFreeLife)) state.stats.stress = 0;
+        var plan = healthPlan1826();
+        if (state.age >= 18 && plan.id !== "none" && state.finance.lastPremiumAgeV1826 !== state.age) {
+          state.finance.lastPremiumAgeV1826 = state.age;
+          if (num1826(state.money) >= plan.premium) {
+            state.money -= plan.premium;
+            state.finance.lastInsuranceCost = num1826(state.finance.lastInsuranceCost) + plan.premium;
+            log1826(plan.name + " premium paid: " + money1826(plan.premium) + ".", { money:-plan.premium });
+          } else {
+            state.finance.insurance = "none";
+            state.finance.medicalDebt += Math.max(0, Math.round(plan.premium - Math.max(0, num1826(state.money))));
+            state.money = Math.min(0, num1826(state.money));
+            log1826("Could not afford " + plan.name + ". Coverage lapsed and unpaid premium pressure became medical debt.", { stress:5 });
+            try { if (typeof applyDeltas === "function") applyDeltas({ stress:5 }); } catch(e) {}
+          }
+        }
+        ensureOpenCases1826();
+        var risk = legalRisk1826();
+        if (risk >= 70 && state.actionsTaken["legalWarningV1826_" + state.age] !== true) {
+          state.actionsTaken["legalWarningV1826_" + state.age] = true;
+          log1826("Legal pressure is high. Open the Law Office before penalties snowball.", { stress:3 });
+          try { if (typeof applyDeltas === "function") applyDeltas({ stress:3 }); } catch(e) {}
+        }
+        saveOnly1826();
+      } catch(e) {}
+      return result;
+    };
+    try { resolveLifeAndFinanceYear = window.resolveLifeAndFinanceYear; } catch(e) {}
+  }
+
+  var prevSave1826 = window.save || (typeof save === "function" ? save : null);
+  if (prevSave1826 && !window.__ledgerSave1826Wrapped) {
+    window.__ledgerSave1826Wrapped = true;
+    window.save = function () {
+      try {
+        if (window.state) {
+          ensure1826();
+          var idx = typeof activeSlot !== "undefined" ? activeSlot : 1;
+          var copy = deepCopy1826(state);
+          if (copy) localStorage.setItem(backupPrefix1826 + idx, JSON.stringify({ at:Date.now(), state:copy }));
+          state.saveHealthV1826.backups = num1826(state.saveHealthV1826.backups) + 1;
+          state.saveHealthV1826.lastBackupAt = Date.now();
+        }
+      } catch(e) {}
+      try { return prevSave1826.apply(this, arguments); }
+      catch(e) { toast1826("Save failed: " + (e.message || e)); }
+    };
+    try { save = window.save; } catch(e) {}
+  }
+  var prevLoadSlot1826 = window.loadFromSlot || (typeof loadFromSlot === "function" ? loadFromSlot : null);
+  if (prevLoadSlot1826 && !window.__ledgerLoadSlot1826Wrapped) {
+    window.__ledgerLoadSlot1826Wrapped = true;
+    window.loadFromSlot = function (idx) {
+      var ok = false;
+      try { ok = prevLoadSlot1826.apply(this, arguments); } catch(e) { ok = false; }
+      if (ok) return true;
+      var backup = null;
+      try { backup = JSON.parse(localStorage.getItem(backupPrefix1826 + idx) || "null"); } catch(e) {}
+      if (backup && backup.state) {
+        try {
+          state = backup.state; window.state = backup.state; activeSlot = idx;
+          ensure1826(); saveOnly1826();
+          toast1826("Loaded slot " + idx + " from v18.26 backup.");
+          return true;
+        } catch(e) {}
+      }
+      return false;
+    };
+    try { loadFromSlot = window.loadFromSlot; } catch(e) {}
+  }
+
+  function button1826(label, cls, action, disabled) {
+    return '<button class="money-btn ' + esc1826(cls || "") + '" onclick="event.preventDefault();event.stopPropagation();' + esc1826(action) + '" ' + (disabled ? "disabled" : "") + '>' + esc1826(label) + '</button>';
+  }
+  function legalCommandDesk1826() {
+    ensure1826(); ensureOpenCases1826();
+    var acc = normalizedAccountant1826();
+    var atty = normalizedAttorney1826();
+    var risk = legalRisk1826();
+    var tax = projectedTax1826(state.finance.taxCountry, state.finance.taxRegion, taxableIncome1826());
+    var cases = (state.finance.legalCasesV1826 || []).filter(function (c) { return !c.closed; });
+    var caseRows = cases.length ? cases.map(function (c) {
+      return '<div class="v1826-case-card ' + (c.severity >= 60 ? "bad" : c.severity >= 35 ? "gold" : "good") + '"><div class="v1826-case-head"><b>' + esc1826(c.title) + '</b><span>' + esc1826(caseStatus1826(c)) + '</span></div><p>' + esc1826(c.note || "Open legal issue.") + '</p><div class="v1826-pill-row"><span>Exposure ' + money1826(c.exposure) + '</span><span>Severity ' + Math.round(num1826(c.severity)) + '/100</span></div><div class="v1826-button-grid mini">' + button1826("Consult", "blue", "legalCaseActionV1826('" + esc1826(c.id) + "','consult')", false) + button1826("Defend", "gold", "legalCaseActionV1826('" + esc1826(c.id) + "','defend')", false) + button1826("Settle", "red", "legalCaseActionV1826('" + esc1826(c.id) + "','settle')", false) + '</div></div>';
+    }).join("") : '<div class="v1826-empty">No open legal cases. Coverage still lowers future risk.</div>';
+    var accountantCards = ACCOUNTANTS1826.map(function (p) {
+      var picked = acc.id === p.id;
+      var disabled = p.id !== "none" && num1826(state.money) < p.cost;
+      return '<button class="v1826-plan ' + (picked ? "selected" : "") + '" onclick="event.preventDefault();event.stopPropagation();hireAccountantV1826(\'' + p.id + '\')" ' + (disabled ? "disabled" : "") + '><b>' + esc1826(p.name) + '</b><span>' + esc1826(p.desc) + '</span><em>Cost ' + money1826(p.cost) + ' · tax save ' + pct1826(p.reduction) + ' · risk -' + p.audit + '</em></button>';
+    }).join("");
+    var attorneyCards = ATTORNEYS1826.map(function (p) {
+      var picked = atty.id === p.id;
+      var disabled = p.id !== "none" && num1826(state.money) < p.cost;
+      return '<button class="v1826-plan ' + (picked ? "selected" : "") + '" onclick="event.preventDefault();event.stopPropagation();hireAttorneyV1826(\'' + p.id + '\')" ' + (disabled ? "disabled" : "") + '><b>' + esc1826(p.name) + '</b><span>' + esc1826(p.desc) + '</span><em>Cost ' + money1826(p.cost) + ' · protection -' + p.protection + ' · settlement help ' + pct1826(p.settlement) + '</em></button>';
+    }).join("");
+    return '<section class="money-section v1826-legal-command"><div class="money-section-title">Legal Command Center <span>canonical coverage hub</span></div><div class="v1826-score-line"><div><span>Legal risk</span><b class="' + (risk >= 60 ? "bad" : risk ? "gold" : "good") + '">' + risk + '/100</b><em>Accountant + attorney coverage now live here, not split across Money.</em></div><div><span>Projected tax</span><b>' + money1826(tax.finalTax) + '</b><em>' + esc1826(tax.country.name) + ' / ' + esc1826(tax.region[1]) + '</em></div><div><span>Tax debt</span><b class="' + (state.finance.taxDebt ? "bad" : "good") + '">' + money1826(state.finance.taxDebt) + '</b><em>Pay or settle before penalties.</em></div></div><div class="v1826-plan-grid"><div><div class="v1826-subtitle">Accountants</div>' + accountantCards + '</div><div><div class="v1826-subtitle">Attorneys</div>' + attorneyCards + '</div></div><div class="v1826-subtitle with-space">Open Cases</div><div class="v1826-case-grid">' + caseRows + '</div></section>';
+  }
+  function taxRelocationDesk1826() {
+    ensure1826();
+    var income = taxableIncome1826();
+    var current = projectedTax1826(state.finance.taxCountry, state.finance.taxRegion, income);
+    var selector = '<div class="v1826-relocate-controls"><select id="v1826-tax-country" onchange="updateTaxRegionSelectV1826(this.value,\'v1826-tax-region\')">' + TAX_PROFILES1826.map(function (p) { return '<option value="' + esc1826(p.id) + '" ' + (p.id === current.country.id ? "selected" : "") + '>' + esc1826(p.name) + '</option>'; }).join("") + '</select><select id="v1826-tax-region">' + (current.country.regions || []).map(function (r) { return '<option value="' + esc1826(r[0]) + '" ' + (r[0] === current.region[0] ? "selected" : "") + '>' + esc1826(r[1]) + (r[2] ? " · +" + pct1826(r[2]) : " · no extra") + '</option>'; }).join("") + '</select>' + button1826("Move Residence", "gold", "setTaxResidenceV1826(document.getElementById('v1826-tax-country').value,document.getElementById('v1826-tax-region').value)", num1826(state.age) < 18) + '</div>';
+    var cards = TAX_PROFILES1826.map(function (p) {
+      var r = region1826(p.id, p.regions && p.regions[0] && p.regions[0][0]);
+      var model = projectedTax1826(p.id, r[0], income);
+      var diff = current.finalTax - model.finalTax;
+      return '<div class="v1826-tax-option ' + (p.id === current.country.id ? "selected" : "") + '"><b>' + esc1826(p.name) + '</b><span>' + esc1826(p.dash) + '</span><strong class="' + (diff > 0 ? "good" : diff < 0 ? "bad" : "") + '">' + (diff ? signed1826(diff) + ' vs current' : 'Current-like') + '</strong><em>Projected tax ' + money1826(model.finalTax) + ' · move cost about ' + money1826((p.moveCost || 5000) + (p.id === current.country.id ? 1500 : 6000)) + '</em></div>';
+    }).join("");
+    return '<section class="money-section v1826-relocation"><div class="money-section-title">Tax Residency + Move Desk <span>country/state model</span></div><div class="v1826-empty">Compare places before moving. Moving costs cash and can add stress, but it affects future tax pressure.</div>' + selector + '<div class="v1826-tax-grid">' + cards + '</div></section>';
+  }
+  function healthInsuranceDesk1826() {
+    ensure1826();
+    var plan = healthPlan1826();
+    var last = (state.finance.healthClaimsV1826 || [])[0];
+    var cards = HEALTH_PLANS1826.map(function (p) {
+      var picked = p.id === plan.id;
+      var disabled = state.age < 18 || (p.id !== "none" && num1826(state.money) < p.premium);
+      return '<button class="v1826-health-card ' + (picked ? "selected" : "") + '" onclick="event.preventDefault();event.stopPropagation();setHealthPlanV1826(\'' + p.id + '\')" ' + (disabled ? "disabled" : "") + '><div class="v1826-case-head"><b>' + esc1826(p.name) + '</b>' + (picked ? '<span>Current</span>' : '') + '</div><p>' + esc1826(p.desc) + '</p><div class="v1826-pill-row"><span>' + Math.round(p.coverage * 100) + '% coverage</span><span>Premium ' + money1826(p.premium) + '/yr</span><span>Deductible ' + money1826(p.deductible) + '</span></div></button>';
+    }).join("");
+    var sample = medicalOop1826(7200);
+    return '<section class="money-section v1826-health-insurance"><div class="money-section-title">Health Insurance Effects <span>' + esc1826(plan.name) + '</span></div><div class="v1826-score-line"><div><span>Plan</span><b>' + esc1826(plan.name) + '</b><em>Premiums bill yearly after age 18.</em></div><div><span>$7.2K emergency</span><b>' + money1826(sample.oop) + '</b><em>Out of pocket after deductible/coverage.</em></div><div><span>Medical debt</span><b class="' + (state.finance.medicalDebt ? "bad" : "good") + '">' + money1826(state.finance.medicalDebt) + '</b><em>' + (last ? 'Last claim covered ' + money1826(last.covered) : 'No recent claim') + '</em></div></div><div class="v1826-health-grid">' + cards + '</div></section>';
+  }
+  function waybackBrowser1826() {
+    ensure1826();
+    var snaps = (state.timeSnapshotsV1814 || []).slice();
+    var rows = snaps.length ? snaps.map(function (s, idx) {
+      return '<div class="v1826-wayback-row"><div><b>' + esc1826(s.label || 'Checkpoint') + '</b><span>Age ' + esc1826(s.age == null ? '?' : s.age) + ' · ' + esc1826(s.at ? new Date(s.at).toLocaleString() : 'saved') + (s.netWorth ? ' · net ' + money1826(s.netWorth) : '') + '</span></div><div class="v1826-row-actions">' + button1826("Restore", "gold", "restoreWaybackIndexV1826(" + idx + ")", false) + button1826("Delete", "red", "deleteWaybackIndexV1826(" + idx + ")", false) + '</div></div>';
+    }).join("") : '<div class="v1826-empty">No checkpoints yet. Save one before risky decisions or age-up.</div>';
+    return '<section class="money-section v1826-wayback"><div class="money-section-title">Wayback Browser <span>' + snaps.length + ' saved</span></div><div class="v1826-button-grid">' + button1826("Save Checkpoint", "green", "createWaybackCheckpointV1826('Manual checkpoint')", false) + (typeof activeSlot !== "undefined" ? button1826("Backup Slot " + activeSlot, "blue", "backupCurrentSaveV1826()", false) : "") + '</div><div class="v1826-wayback-list">' + rows + '</div></section>';
+  }
+  function saveHealthDesk1826() {
+    ensure1826();
+    var idx = typeof activeSlot !== "undefined" ? activeSlot : 1;
+    var h = state.saveHealthV1826 || {};
+    return '<section class="money-section v1826-save-health"><div class="money-section-title">Save Health + Repair <span>slot ' + idx + '</span></div><div class="v1826-score-line"><div><span>Auto backups</span><b>' + Math.round(num1826(h.backups)) + '</b><em>Written beside the normal save.</em></div><div><span>Repairs</span><b>' + Math.round(num1826(h.repairs)) + '</b><em>Recovered from backup.</em></div><div><span>Last backup</span><b>' + (h.lastBackupAt ? new Date(h.lastBackupAt).toLocaleTimeString() : 'None') + '</b><em>Local browser backup.</em></div></div><div class="v1826-button-grid">' + button1826("Backup Now", "green", "backupCurrentSaveV1826()", false) + button1826("Repair Current Slot", "gold", "repairSaveSlotV1826(" + idx + ")", false) + '</div></section>';
+  }
+  function sandboxCalmDesk1826() {
+    ensure1826();
+    var on = !!(state.sandbox && (state.sandbox.noStress || state.sandbox.stressFreeLife));
+    return '<section class="money-section v1826-sandbox-calm"><div class="money-section-title">Sandbox Stress-Free Life <span>' + (on ? 'ON' : 'OFF') + '</span></div><div class="money-row"><div><div class="money-row-title">' + (state.sandboxMode ? (on ? 'Stress gains blocked' : 'Sandbox calm available') : 'Sandbox-only mode') + '</div><div class="money-row-sub">This is a test/dev switch for lives where you want to inspect systems without stress spirals, hospital collapse, or action penalties taking over.</div></div><div class="bank-actions-row">' + button1826(on ? "Turn Off" : "Activate", on ? "red" : "green", on ? "deactivateStressFreeV1826()" : "activateStressFreeV1826()", !state.sandboxMode) + '</div></div></section>';
+  }
+  function moneyLegalShortcut1826() {
+    ensure1826();
+    var risk = legalRisk1826();
+    return '<section class="money-section v1826-money-legal-shortcut"><div class="money-section-title">Legal / Accountant Shortcut <span>single home</span></div><div class="money-row"><div><div class="money-row-title">Use Law Office for coverage decisions</div><div class="money-row-sub">Money shows the warning, but hiring accountants, attorneys, settlements, and audit defense now live in one canonical Legal hub. Current risk: ' + risk + '/100.</div></div><button class="money-btn blue" onclick="event.preventDefault();event.stopPropagation();setTabV16 ? setTabV16(\'law\') : setTab(\'law\')">Open Legal</button></div></section>';
+  }
+
+  function remove1826(html) {
+    html = String(html || "");
+    ["v1826-legal-command", "v1826-relocation", "v1826-health-insurance", "v1826-wayback", "v1826-save-health", "v1826-sandbox-calm", "v1826-money-legal-shortcut"].forEach(function (cls) {
+      var idx = html.indexOf(cls);
+      while (idx >= 0) {
+        var start = html.lastIndexOf("<section", idx);
+        var end = html.indexOf("</section>", idx);
+        if (start < 0 || end < 0) break;
+        html = html.slice(0, start) + html.slice(end + 10);
+        idx = html.indexOf(cls);
+      }
+    });
+    return html;
+  }
+  function insertTop1826(html, chunk) {
+    html = String(html || "");
+    var end = html.indexOf("</section>");
+    return end >= 0 ? html.slice(0, end + 10) + chunk + html.slice(end + 10) : chunk + html;
+  }
+  var prevRenderHub1826 = window.renderHubContent || (typeof renderHubContent === "function" ? renderHubContent : null);
+  if (prevRenderHub1826 && !window.__ledgerRenderHub1826Wrapped) {
+    window.__ledgerRenderHub1826Wrapped = true;
+    window.renderHubContent = function (hubId) {
+      ensure1826();
+      var html = "";
+      try { html = prevRenderHub1826.apply(this, arguments) || ""; }
+      catch(e) { html = '<section class="panel"><div class="section-label">Recovered Render</div><div class="row-sub">' + esc1826(e && (e.message || e)) + '</div></section>'; }
+      html = remove1826(html);
+      if (hubId === "law" || hubId === "legal") html = legalCommandDesk1826() + taxRelocationDesk1826() + healthInsuranceDesk1826() + html;
+      if (hubId === "money" || hubId === "finance") html = insertTop1826(html, moneyLegalShortcut1826());
+      if (hubId === "health") html = healthInsuranceDesk1826() + html;
+      if (hubId === "more") html = waybackBrowser1826() + saveHealthDesk1826() + sandboxCalmDesk1826() + html;
+      if (hubId === "lifehub") html = waybackBrowser1826() + html;
+      return html;
+    };
+    try { renderHubContent = window.renderHubContent; } catch(e) {}
+  }
+  var prevRenderLifeHub1826 = window.renderLifeHub || (typeof renderLifeHub === "function" ? renderLifeHub : null);
+  if (prevRenderLifeHub1826 && !window.__ledgerRenderLifeHub1826Wrapped) {
+    window.__ledgerRenderLifeHub1826Wrapped = true;
+    window.renderLifeHub = function () {
+      var html = "";
+      try { html = prevRenderLifeHub1826.apply(this, arguments) || ""; } catch(e) { html = ""; }
+      html = remove1826(html);
+      return waybackBrowser1826() + html;
+    };
+    try { renderLifeHub = window.renderLifeHub; } catch(e) {}
+  }
+
+  var style = document.createElement("style");
+  style.textContent = [
+    ".v1826-legal-command,.v1826-relocation,.v1826-health-insurance,.v1826-wayback,.v1826-save-health,.v1826-sandbox-calm,.v1826-money-legal-shortcut{border-color:rgba(126,160,172,.42)!important;background:linear-gradient(135deg,rgba(22,38,42,.96),rgba(34,29,22,.97))!important;overflow:hidden!important}.v1826-legal-command{border-color:rgba(216,173,109,.44)!important;background:linear-gradient(135deg,rgba(49,38,22,.97),rgba(25,22,18,.98))!important}.v1826-health-insurance{border-color:rgba(143,175,108,.44)!important;background:linear-gradient(135deg,rgba(22,44,31,.96),rgba(29,25,20,.98))!important}.v1826-relocation{border-color:rgba(126,160,172,.48)!important}.v1826-wayback,.v1826-save-health{border-color:rgba(146,130,220,.38)!important;background:linear-gradient(135deg,rgba(33,29,54,.96),rgba(29,25,20,.98))!important}",
+    ".v1826-score-line{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:9px 0}.v1826-score-line>div{border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(255,255,255,.045);padding:11px;min-width:0}.v1826-score-line span{display:block;font-family:'JetBrains Mono',monospace;color:#b9a98e;text-transform:uppercase;letter-spacing:.12em;font-size:9px}.v1826-score-line b{display:block;color:#fff3df;font-family:'JetBrains Mono',monospace;font-size:19px;line-height:1.1;margin-top:5px;overflow-wrap:anywhere}.v1826-score-line em{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:9px;line-height:1.35;margin-top:5px;font-style:normal}.v1826-score-line .good{color:#b9dc8a}.v1826-score-line .bad{color:#e9927d}.v1826-score-line .gold{color:#f0ca7b}",
+    ".v1826-plan-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:10px}.v1826-subtitle{font-family:'JetBrains Mono',monospace;color:#f0ca7b;text-transform:uppercase;letter-spacing:.14em;font-size:10px;margin:2px 0 8px}.v1826-subtitle.with-space{margin-top:14px}.v1826-plan,.v1826-health-card{display:block;width:100%;text-align:left;border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(255,255,255,.045);color:#d6c5aa;padding:11px;margin-bottom:8px;cursor:pointer}.v1826-plan:hover,.v1826-plan.selected,.v1826-health-card:hover,.v1826-health-card.selected{border-color:rgba(216,173,109,.62);background:rgba(216,173,109,.10)}.v1826-plan:disabled,.v1826-health-card:disabled{opacity:.42;cursor:not-allowed}.v1826-plan b,.v1826-health-card b{display:block;color:#fff3df;font-family:Fraunces,Georgia,serif;font-size:16px}.v1826-plan span,.v1826-plan em,.v1826-health-card p{display:block;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.4;margin-top:4px;color:#b9a98e}.v1826-plan em{color:#f0ca7b;font-style:normal}",
+    ".v1826-case-grid,.v1826-health-grid,.v1826-tax-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:9px;margin-top:9px}.v1826-case-card,.v1826-tax-option{border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(255,255,255,.045);padding:11px;min-width:0}.v1826-case-card.bad{border-color:rgba(233,146,125,.42)}.v1826-case-card.gold{border-color:rgba(240,202,123,.36)}.v1826-case-card.good{border-color:rgba(185,220,138,.36)}.v1826-case-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.v1826-case-head b,.v1826-tax-option b{display:block;color:#fff3df;font-size:15px}.v1826-case-head span{font-family:'JetBrains Mono',monospace;font-size:9px;color:#f0ca7b;text-transform:uppercase;letter-spacing:.12em}.v1826-case-card p{color:#d6c5aa;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.45;margin:7px 0 2px}.v1826-pill-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.v1826-pill-row span{border:1px solid rgba(255,255,255,.10);border-radius:999px;padding:5px 8px;color:#d6c5aa;font-family:'JetBrains Mono',monospace;font-size:9px;line-height:1.2}",
+    ".v1826-button-grid,.v1826-button-grid.mini,.v1826-row-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}.v1826-button-grid .money-btn,.v1826-row-actions .money-btn{min-width:86px;white-space:normal!important}.v1826-button-grid.mini .money-btn{min-width:74px;font-size:9px!important;padding:7px 8px!important}.v1826-empty{border:1px dashed rgba(255,255,255,.12);border-radius:12px;padding:11px;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.45;background:rgba(0,0,0,.12);margin:8px 0}.v1826-relocate-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;margin:10px 0}.v1826-relocate-controls select{min-width:0;border:1px solid rgba(216,173,109,.32);border-radius:8px;background:#100d0a;color:#f6ead8;padding:10px;font-family:'JetBrains Mono',monospace;font-size:11px}.v1826-tax-option.selected{border-color:rgba(216,173,109,.62);background:rgba(216,173,109,.10)}.v1826-tax-option span,.v1826-tax-option em{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.4;margin-top:4px}.v1826-tax-option strong{display:block;color:#fff3df;font-family:'JetBrains Mono',monospace;margin-top:6px}.v1826-tax-option strong.good{color:#b9dc8a}.v1826-tax-option strong.bad{color:#e9927d}",
+    ".v1826-wayback-list{display:grid;gap:8px;margin-top:10px}.v1826-wayback-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(255,255,255,.045);padding:10px}.v1826-wayback-row b{display:block;color:#fff3df}.v1826-wayback-row span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.4;margin-top:3px}.v1826-sandbox-calm{border-color:rgba(185,220,138,.38)!important;background:linear-gradient(135deg,rgba(24,42,28,.96),rgba(29,25,20,.98))!important}",
+    "@media(max-width:760px){.v1826-score-line,.v1826-plan-grid,.v1826-relocate-controls,.v1826-wayback-row{grid-template-columns:1fr}.v1826-case-grid,.v1826-health-grid,.v1826-tax-grid{grid-template-columns:1fr}.v1826-row-actions .money-btn,.v1826-button-grid .money-btn{flex:1 1 42%}}"
+  ].join("\n");
+  document.head.appendChild(style);
+})();
+
+
+/* HOTFIX v18.26.1 inserted */
+/* LEDGER PATCH v18.26.1: state/window sync + undefined.length crash guard */
+(function () {
+  if (window.__ledgerV18261StateHotfix) return;
+  window.__ledgerV18261StateHotfix = true;
+
+  function msg18261(e) { return String(e && (e.message || e) || "Unknown error"); }
+  function toast18261(text) {
+    try { if (typeof addToast === "function") return addToast(text); } catch(e) {}
+    try { if (typeof addLog === "function") return addLog(text); } catch(e) {}
+    try { console.warn(text); } catch(e) {}
+  }
+  function getState18261() {
+    var s = null;
+    try { if (typeof state !== "undefined" && state && typeof state === "object") s = state; } catch(e) {}
+    try { if (!s && window.state && typeof window.state === "object") s = window.state; } catch(e) {}
+    if (s) {
+      try { window.state = s; } catch(e) {}
+    }
+    return s;
+  }
+  function safeObj18261(obj, key) {
+    if (!obj[key] || typeof obj[key] !== "object" || Array.isArray(obj[key])) obj[key] = {};
+    return obj[key];
+  }
+  function safeArr18261(obj, key) {
+    if (!Array.isArray(obj[key])) obj[key] = [];
+    return obj[key];
+  }
+  function syncState18261() {
+    var s = getState18261();
+    if (!s) return null;
+
+    safeObj18261(s, "stats");
+    safeObj18261(s, "flags");
+    safeObj18261(s, "actionsTaken");
+    safeObj18261(s, "sandbox");
+    safeObj18261(s, "finance");
+    safeObj18261(s.finance, "debts");
+    safeObj18261(s.finance, "incomeSources");
+    safeObj18261(s.finance, "externalManager");
+    safeObj18261(s.finance, "personalFirm");
+    safeObj18261(s.finance.personalFirm, "staff");
+    safeObj18261(s.finance, "fundTrackV189");
+    safeObj18261(s, "peopleV1825");
+    safeObj18261(s.peopleV1825, "actionCounts");
+    safeObj18261(s.peopleV1825, "dateCounts");
+    safeObj18261(s.peopleV1825, "findDateCounts");
+    safeObj18261(s.peopleV1825, "childActivityCounts");
+    safeObj18261(s, "familyV1825");
+    safeObj18261(s, "educationV1825");
+
+    if (!s.relationships || typeof s.relationships !== "object" || Array.isArray(s.relationships)) s.relationships = {};
+    if (!s.school || typeof s.school !== "object" || Array.isArray(s.school)) s.school = { grade:75, level:"None", clubs:[] };
+    if (!Array.isArray(s.school.clubs)) s.school.clubs = [];
+    if (!s.school.subjectGrades || typeof s.school.subjectGrades !== "object" || Array.isArray(s.school.subjectGrades)) s.school.subjectGrades = {};
+    if (!s.activityHabits || typeof s.activityHabits !== "object" || Array.isArray(s.activityHabits)) s.activityHabits = { lastYear:{}, currentYear:{}, streaks:{} };
+    safeObj18261(s.activityHabits, "lastYear");
+    safeObj18261(s.activityHabits, "currentYear");
+    safeObj18261(s.activityHabits, "streaks");
+
+    ["log", "inventory", "assets", "rentals", "clubs", "achievements", "timeSnapshotsV1814"].forEach(function (k) { safeArr18261(s, k); });
+    ["cashFlowHistoryV1824", "taxTrueUpsV1824", "fundInvestorLedgerV1825", "legalCasesV1826", "healthClaimsV1826", "relocationHistoryV1826"].forEach(function (k) { safeArr18261(s.finance, k); });
+    if (!Array.isArray(s.educationV1825.degrees)) s.educationV1825.degrees = [];
+    if (s.peopleV1825.yearlySocialEnergy == null) s.peopleV1825.yearlySocialEnergy = 12;
+    if (!s.familyV1825.childcarePlan) s.familyV1825.childcarePlan = "family";
+    if (!s.saveHealthV1826 || typeof s.saveHealthV1826 !== "object" || Array.isArray(s.saveHealthV1826)) s.saveHealthV1826 = { backups:0, repairs:0, lastBackupAt:0 };
+
+    s.money = Number.isFinite(Number(s.money)) ? Number(s.money) : 0;
+    s.savings = Number.isFinite(Number(s.savings)) ? Number(s.savings) : 0;
+    s.debt = Math.max(0, Number.isFinite(Number(s.debt)) ? Number(s.debt) : 0);
+    s.finance.taxDebt = Math.max(0, Number.isFinite(Number(s.finance.taxDebt)) ? Number(s.finance.taxDebt) : 0);
+    s.finance.medicalDebt = Math.max(0, Number.isFinite(Number(s.finance.medicalDebt || s.medicalDebt)) ? Number(s.finance.medicalDebt || s.medicalDebt) : 0);
+    s.medicalDebt = s.finance.medicalDebt;
+    try { window.state = s; } catch(e) {}
+    return s;
+  }
+
+  window.syncLedgerStateV18261 = syncState18261;
+
+  function fallbackHub18261(hubId, error) {
+    var escaped = msg18261(error).replace(/[&<>"]/g, function (ch) { return ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[ch]; });
+    return '<section class="panel v18261-recovered"><div class="section-label">Recovered Hub</div><div class="row-sub">The ' + String(hubId || 'current') + ' hub hit a state-shape issue and was protected instead of crashing.</div><div class="row-sub">' + escaped + '</div></section>';
+  }
+
+  function wrapFunction18261(name, fallback) {
+    var old = null;
+    try { old = window[name]; } catch(e) {}
+    if (typeof old !== "function" || old.__ledgerV18261Wrapped) return;
+    var wrapped = function () {
+      syncState18261();
+      try {
+        return old.apply(this, arguments);
+      } catch (e) {
+        syncState18261();
+        try {
+          return old.apply(this, arguments);
+        } catch (second) {
+          if (fallback) return fallback.apply(this, [second].concat([].slice.call(arguments)));
+          toast18261("Recovered from Ledger state error in " + name + ": " + msg18261(second));
+          try { if (typeof render === "function") render(); } catch(renderError) {}
+          return null;
+        }
+      }
+    };
+    wrapped.__ledgerV18261Wrapped = true;
+    window[name] = wrapped;
+    try { eval(name + " = window[name]"); } catch(e) {}
+  }
+
+  wrapFunction18261("renderHubContent", function (e, hubId) { return fallbackHub18261(hubId, e); });
+  wrapFunction18261("renderLifeHub", function (e) { return fallbackHub18261("life", e); });
+  [
+    "render", "ageUp", "resolveLifeAndFinanceYear", "goHospital", "save", "loadFromSlot",
+    "payTaxDebtV1824", "payCustomTaxDebtV1824", "raiseCashFromAssetsV1824", "payDebtWithAssetsV1824", "useCreditLineV1824", "payCreditLineV1824", "reviewCreditV1824",
+    "relationAction", "dateAction", "findDate", "takeCareer", "setChildcarePlanV1825", "childActivityV1825", "startDegreeV1825", "pauseDegreeV1825", "setFundPayoutPolicyV1825", "applyFundInvestorShareV1825",
+    "hireAccountantV1826", "hireAttorneyV1826", "legalCaseActionV1826", "setTaxResidenceV1826", "setHealthPlanV1826", "createWaybackCheckpointV1826", "restoreWaybackIndexV1826", "deleteWaybackIndexV1826", "backupCurrentSaveV1826", "repairSaveSlotV1826", "activateStressFreeV1826", "deactivateStressFreeV1826", "updateTaxRegionSelectV1826"
+  ].forEach(function (name) { wrapFunction18261(name); });
+
+  try {
+    document.addEventListener("click", function () { syncState18261(); }, true);
+    document.addEventListener("input", function () { syncState18261(); }, true);
+  } catch(e) {}
+  try {
+    window.addEventListener("error", function (event) {
+      var m = msg18261(event && event.error || event && event.message);
+      if (/undefined.*length|reading ['\"]length['\"]|Cannot read properties of undefined/i.test(m)) {
+        syncState18261();
+        toast18261("Ledger recovered a missing-list state issue. Try the action again if the panel did not refresh.");
+      }
+    });
+  } catch(e) {}
+
+  syncState18261();
+})();
+
+
+
+/* END absorbed 03-patch-v18-26.js */
+
+
+/* BEGIN absorbed 04-patch-v18-27.js */
+
+/* LEDGER PATCH v18.27: Tax Office separation, Education degrees, Career interviews */
+(function () {
+  if (window.__ledgerV1827Loaded) return;
+  window.__ledgerV1827Loaded = true;
+
+  function esc1827(v) {
+    return String(v == null ? "" : v).replace(/[&<>"']/g, function (ch) {
+      return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch];
+    });
+  }
+  function num1827(v, fallback) {
+    var n = Number(v);
+    return Number.isFinite(n) ? n : (fallback || 0);
+  }
+  function clamp1827(v, min, max) {
+    min = min == null ? 0 : min;
+    max = max == null ? 100 : max;
+    return Math.max(min, Math.min(max, num1827(v)));
+  }
+  function money1827(v) {
+    try { if (typeof money === "function") return money(Math.round(num1827(v))); } catch(e) {}
+    v = Math.round(num1827(v));
+    var sign = v < 0 ? "-" : "";
+    v = Math.abs(v);
+    if (v >= 1e12) return sign + "$" + (v / 1e12).toFixed(1).replace(/\.0$/, "") + "T";
+    if (v >= 1e9) return sign + "$" + (v / 1e9).toFixed(1).replace(/\.0$/, "") + "B";
+    if (v >= 1e6) return sign + "$" + (v / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+    if (v >= 1e4) return sign + "$" + Math.round(v / 1000) + "K";
+    return sign + "$" + v.toLocaleString();
+  }
+  function pct1827(v) {
+    return (num1827(v) * 100).toFixed(1).replace(/\.0$/, "") + "%";
+  }
+  function signed1827(v) {
+    v = Math.round(num1827(v));
+    return (v >= 0 ? "+" : "-") + money1827(Math.abs(v));
+  }
+  function toast1827(msg) {
+    try { if (typeof addToast === "function") return addToast(msg); } catch(e) {}
+    try { if (typeof addLog === "function") return addLog(msg); } catch(e) {}
+  }
+  function log1827(msg, deltas) {
+    try { if (typeof addLog === "function") return addLog(msg, deltas || {}); } catch(e) {}
+  }
+  function saveRender1827() {
+    try { if (typeof save === "function") save(); } catch(e) {}
+    try { if (typeof render === "function") render(); } catch(e) {}
+  }
+  function ensure1827() {
+    try { if (typeof window.__ledgerEnsureStateSync18261 === "function") window.__ledgerEnsureStateSync18261(); } catch(e) {}
+    try { if (typeof ensureStateShape === "function") ensureStateShape(); } catch(e) {}
+    if (typeof state === "undefined" && window.state) { try { state = window.state; } catch(e) {} }
+    if (!window.state && typeof state !== "undefined") window.state = state;
+    if (!window.state) window.state = {};
+    try { if (typeof state === "undefined" || !state) state = window.state; } catch(e) {}
+    var s = window.state;
+    s.stats = s.stats || {};
+    s.flags = s.flags || {};
+    s.actionsTaken = s.actionsTaken || {};
+    s.inventory = Array.isArray(s.inventory) ? s.inventory : [];
+    s.finance = s.finance || {};
+    s.finance.incomeSources = s.finance.incomeSources || {};
+    s.finance.debts = s.finance.debts || {};
+    s.finance.taxCountry = s.finance.taxCountry || "us";
+    s.finance.taxRegion = s.finance.taxRegion || "pa";
+    s.educationV1825 = s.educationV1825 || {};
+    s.educationV1825.degrees = Array.isArray(s.educationV1825.degrees) ? s.educationV1825.degrees : [];
+    s.educationV1827 = s.educationV1827 || {};
+    s.careerV1827 = s.careerV1827 || {};
+    s.careerV1827.applications = Array.isArray(s.careerV1827.applications) ? s.careerV1827.applications : [];
+    s.careerV1827.offers = Array.isArray(s.careerV1827.offers) ? s.careerV1827.offers : [];
+    s.careerV1827.history = Array.isArray(s.careerV1827.history) ? s.careerV1827.history : [];
+    s.careerV1827.interviewPrep = Math.max(0, Math.round(num1827(s.careerV1827.interviewPrep)));
+    s.careerV1827.lastActionId = s.careerV1827.lastActionId || 0;
+    seedCurrentDegree1827(s);
+    return s;
+  }
+
+  var TAX_PROFILES1827 = [
+    { id:"us", name:"United States", base:.22, invest:.15, business:.05, move:3500, regions:[
+      ["pa","Pennsylvania",.0307,"Flat state income tax; sales tax still affects spending."],
+      ["de","Delaware",.038, "No sales tax model; moderate income tax."],
+      ["ny","New York",.062,"High state/city pressure with stronger career market flavor."],
+      ["ca","California",.085,"High tax, high opportunity, higher costs."],
+      ["tx","Texas",0,"No state income tax; sales/property pressure in the background."],
+      ["fl","Florida",0,"No state income tax, retirement-friendly model."],
+      ["wa","Washington",0,"No wage income tax model; higher sales pressure."],
+      ["il","Illinois",.0495,"Flat tax state model."],
+      ["ma","Massachusetts",.05,"High education and professional market."],
+      ["co","Colorado",.044,"Moderate flat income tax model."]
+    ], note:"Federal income tax is the main layer. State residence changes the second layer." },
+    { id:"canada", name:"Canada", base:.26, invest:.18, business:.07, move:9000, regions:[["on","Ontario",.08,"Large professional market."],["bc","British Columbia",.075,"High cost coastal market."],["ab","Alberta",.045,"Lower provincial pressure."]], note:"Income and provincial taxes are modeled together at a higher baseline." },
+    { id:"uk", name:"United Kingdom", base:.28, invest:.20, business:.065, move:10000, regions:[["eng","England",0,"Baseline UK profile."],["sct","Scotland",.025,"Slightly higher progressive pressure model."]], note:"Higher income tax profile; healthcare costs are less central." },
+    { id:"germany", name:"Germany", base:.32, invest:.22, business:.08, move:10500, regions:[["berlin","Berlin",0,"Urban professional market."],["bavaria","Bavaria",.01,"Higher earnings, slightly higher pressure."]], note:"High tax/high services model." },
+    { id:"france", name:"France", base:.31, invest:.22, business:.08, move:10500, regions:[["idf","Île-de-France",.015,"Paris region."],["south","South",0,"Lower pressure lifestyle model."]], note:"High services and higher income tax pressure." },
+    { id:"singapore", name:"Singapore", base:.14, invest:.05, business:.035, move:13000, regions:[["central","Central",0,"Low tax, high cost finance hub."]], note:"Low tax, high opportunity, high relocation cost." },
+    { id:"uae", name:"United Arab Emirates", base:.02, invest:0, business:.025, move:15000, regions:[["dubai","Dubai",0,"Near-zero income tax, luxury cost pressure."],["abudhabi","Abu Dhabi",0,"Near-zero income tax, stable expat model."]], note:"Very low tax model; moving and lifestyle costs matter." },
+    { id:"thailand", name:"Thailand", base:.16, invest:.08, business:.04, move:8500, regions:[["bangkok","Bangkok",0,"Urban cost and opportunity."],["phuket","Phuket",.005,"Island lifestyle cost pressure."],["chiangmai","Chiang Mai",-.01,"Lower-cost lifestyle model."]], note:"Moderate tax model with lower cost assumptions." },
+    { id:"vietnam", name:"Vietnam", base:.17, invest:.08, business:.04, move:8000, regions:[["hcmc","Ho Chi Minh City",0,"Large business market."],["danang","Da Nang",-.008,"Coastal lower-cost model."],["hanoi","Hanoi",0,"Government and professional hub."]], note:"Moderate tax model with lower cost assumptions." }
+  ];
+  function profile1827(id) {
+    return TAX_PROFILES1827.find(function (p) { return p.id === id; }) || TAX_PROFILES1827[0];
+  }
+  function region1827(countryId, regionId) {
+    var p = profile1827(countryId);
+    return (p.regions || []).find(function (r) { return r[0] === regionId; }) || (p.regions || [])[0] || ["default", "Default", 0, "Default region."];
+  }
+  function grossIncome1827() {
+    var f = (state && state.finance) || {};
+    var src = f.incomeSources || {};
+    return Math.max(0, Math.round(
+      num1827(state && state.job && state.job.salary) +
+      Math.max(0, num1827(f.lastEntrepreneurIncome || f.lastBusinessIncome)) +
+      Math.max(0, num1827(src.firmDistribution || src.fundCarryV1825 || src.dividends || src.realizedGains)) +
+      Math.max(0, num1827(f.lastInvestmentCashIncome || f.lastDividendIncome))
+    ));
+  }
+  function projectedTax1827(countryId, regionId, income) {
+    var p = profile1827(countryId || (state.finance && state.finance.taxCountry));
+    var r = region1827(p.id, regionId || (state.finance && state.finance.taxRegion));
+    income = Math.max(0, Math.round(num1827(income, grossIncome1827())));
+    var businessIncome = Math.max(0, num1827(state.finance && (state.finance.lastEntrepreneurIncome || state.finance.lastBusinessIncome)));
+    var investmentIncome = Math.max(0, num1827(state.finance && state.finance.incomeSources && (state.finance.incomeSources.dividends || state.finance.incomeSources.realizedGains || state.finance.incomeSources.fundCarryV1825)));
+    var wageTax = Math.round(income * (num1827(p.base) + num1827(r[2])));
+    var bizTax = Math.round(businessIncome * num1827(p.business));
+    var invTax = Math.round(investmentIncome * num1827(p.invest));
+    var accountantReduction = state.finance && state.finance.accountant && state.finance.accountant.reduction ? num1827(state.finance.accountant.reduction) : 0;
+    var gross = Math.max(0, wageTax + bizTax + invTax);
+    var savings = Math.round(gross * Math.min(.35, Math.max(0, accountantReduction)));
+    return { profile:p, region:r, income:income, wageTax:wageTax, businessTax:bizTax, investmentTax:invTax, savings:savings, total:Math.max(0, gross - savings), rate:income ? Math.max(0, (gross - savings) / income) : 0 };
+  }
+
+  var DEGREE_OPTIONS1827 = [
+    { id:"business", name:"Business Degree", years:4, desc:"Management, operations, marketing, finance, and entrepreneurship.", jobs:["analyst","marketing","office","finance_manager"] },
+    { id:"finance", name:"Finance Degree", years:4, desc:"Investing, banking, planning, and wealth management.", jobs:["analyst","finance_manager","wealth_advisor"] },
+    { id:"cs", name:"Computer Science Degree", years:4, desc:"Software, data systems, cybersecurity, and technical leadership.", jobs:["software","cybersecurity","quant_finance"] },
+    { id:"nursing", name:"Nursing Degree", years:4, desc:"Clinical care path that unlocks Registered Nurse and nursing ladder roles.", jobs:["nurse"] },
+    { id:"education", name:"Education Degree", years:4, desc:"Teaching, school leadership, and education administration.", jobs:["teacher"] },
+    { id:"law", name:"Law Degree", years:3, desc:"Legal practice path for attorney and high-level legal careers.", jobs:["attorney","paralegal"] },
+    { id:"medical", name:"Medical Degree", years:6, desc:"Long, expensive healthcare path for physician careers.", jobs:["physician","labtech","nurse"] },
+    { id:"biology", name:"Biology Degree", years:4, desc:"Lab, medicine, healthcare, and science careers.", jobs:["labtech","nurse","physician"] },
+    { id:"criminaljustice", name:"Criminal Justice Degree", years:4, desc:"Courts, investigation, paralegal, public safety, and legal operations.", jobs:["paralegal","attorney"] },
+    { id:"psych", name:"Psychology Degree", years:4, desc:"Counseling, people systems, leadership, and human services.", jobs:["counselor","wealth_advisor"] }
+  ];
+  var DEGREE_SCHOOLS1827 = [
+    { id:"community", name:"Community College Path", cost:6500, quality:.70, note:"Cheapest route; slower networking." },
+    { id:"state", name:"State University", cost:14500, quality:.86, note:"Balanced cost and job placement." },
+    { id:"private", name:"Private College", cost:33000, quality:1.03, note:"More expensive, better networking." },
+    { id:"elite", name:"Elite University", cost:62000, quality:1.18, note:"High cost, strongest prestige and interview boost." }
+  ];
+  function degreeOption1827(id) { return DEGREE_OPTIONS1827.find(function (d) { return d.id === id; }) || DEGREE_OPTIONS1827[0]; }
+  function degreeSchool1827(id) { return DEGREE_SCHOOLS1827.find(function (s) { return s.id === id; }) || DEGREE_SCHOOLS1827[1]; }
+  function seedCurrentDegree1827(s) {
+    if (!s || !s.educationV1825) return;
+    var list = s.educationV1825.degrees;
+    if (!Array.isArray(list)) list = s.educationV1825.degrees = [];
+    if ((s.flags && s.flags.hasDegree) || s.education === "College") {
+      var id = s.major || "general";
+      if (id && !list.some(function (d) { return d.majorId === id; })) {
+        var opt = degreeOption1827(id);
+        list.push({ majorId:id, majorName:opt && opt.id === id ? opt.name : String(id).charAt(0).toUpperCase() + String(id).slice(1), schoolId:s.college || "completed", schoolName:"Completed College", level:"Bachelor's", completedAge:s.age || 0, seededV1827:true });
+      }
+    }
+  }
+  function degreeIds1827() {
+    var s = ensure1827();
+    var ids = [];
+    (s.educationV1825.degrees || []).forEach(function (d) { if (d && d.majorId && ids.indexOf(d.majorId) < 0) ids.push(d.majorId); });
+    if (s.major && ((s.flags && s.flags.hasDegree) || s.education === "College") && ids.indexOf(s.major) < 0) ids.push(s.major);
+    Object.keys(s.flags || {}).forEach(function (k) {
+      if (k.indexOf("degree_") === 0) {
+        var id = k.replace("degree_", "");
+        if (ids.indexOf(id) < 0) ids.push(id);
+      }
+    });
+    return ids;
+  }
+  function hasDegree1827(id) { return degreeIds1827().indexOf(id) >= 0; }
+  function degreeNames1827(ids) {
+    ids = ids || degreeIds1827();
+    if (!ids.length) return "No completed degree on file";
+    return ids.map(function (id) { return (degreeOption1827(id) || {}).name || id; }).join(" · ");
+  }
+  window.startDegreeV1827 = function (majorId, schoolId) {
+    var s = ensure1827();
+    if (num1827(s.age) < 18 && !(s.flags && s.flags.earlyCollege)) return toast1827("Additional degrees unlock at 18 or early college.");
+    if (s.educationV1825.activeDegree) return toast1827("Finish or pause the active degree first.");
+    var major = degreeOption1827(majorId);
+    var school = degreeSchool1827(schoolId || (document.getElementById("v1827-degree-school") || {}).value || "state");
+    if (hasDegree1827(major.id)) return toast1827("You already completed that degree path.");
+    var cost = Math.round(num1827(school.cost));
+    if (num1827(s.money) < cost) return toast1827("First year needs " + money1827(cost) + ".");
+    s.money = Math.round(num1827(s.money) - cost);
+    s.educationV1825.activeDegree = { majorId:major.id, majorName:major.name, schoolId:school.id, schoolName:school.name, annualCost:cost, yearsCompleted:0, targetYears:major.years || 4, startedAge:s.age || 0, quality:school.quality || .85, sourceV1827:true };
+    s.educationV1827.lastStarted = major.id;
+    try { if (typeof applyDeltas === "function") applyDeltas({ smarts:2, discipline:1, stress:2 }); } catch(e) {}
+    log1827("Started " + major.name + " through " + school.name + ".", { money:-cost, smarts:2, discipline:1, stress:2 });
+    saveRender1827();
+  };
+  window.pauseDegreeV1827 = function () {
+    var s = ensure1827();
+    if (!s.educationV1825.activeDegree) return toast1827("No active degree to pause.");
+    s.educationV1825.pausedDegree = s.educationV1825.activeDegree;
+    s.educationV1825.activeDegree = null;
+    log1827("Paused the active degree path.");
+    saveRender1827();
+  };
+  window.resumeDegreeV1827 = function () {
+    var s = ensure1827();
+    if (s.educationV1825.activeDegree) return toast1827("A degree is already active.");
+    if (!s.educationV1825.pausedDegree) return toast1827("No paused degree saved.");
+    s.educationV1825.activeDegree = s.educationV1825.pausedDegree;
+    s.educationV1825.pausedDegree = null;
+    log1827("Resumed " + s.educationV1825.activeDegree.majorName + ".");
+    saveRender1827();
+  };
+
+  function getCatalog1827() {
+    try { if (Array.isArray(careerCatalog)) return careerCatalog; } catch(e) {}
+    return Array.isArray(window.careerCatalog) ? window.careerCatalog : [];
+  }
+  function ensureSupplementalJobs1827() {
+    var jobs = getCatalog1827();
+    if (!jobs || !jobs.push) return jobs || [];
+    if (jobs.__v1827Supplemental) return jobs;
+    function has(id) { return jobs.some(function (j) { return j.id === id; }); }
+    var add = [
+      { id:"attorney", title:"Associate Attorney", salary:105000, minAge:25, req:function (s) { return s.major === "law" || (s.flags && s.flags.degree_law); }, desc:"Law degree path with interviews, casework, and a legal ladder.", ladder:[{title:"Associate Attorney",salary:105000,minPerf:0},{title:"Senior Associate",salary:155000,minPerf:58},{title:"Partner Track Attorney",salary:230000,minPerf:72},{title:"Partner",salary:390000,minPerf:86}] },
+      { id:"physician", title:"Resident Physician", salary:78000, minAge:26, req:function (s) { return s.major === "medical" || (s.flags && s.flags.degree_medical); }, desc:"Medical degree path. Low early pay, high long-term ceiling.", ladder:[{title:"Resident Physician",salary:78000,minPerf:0},{title:"Attending Physician",salary:235000,minPerf:58},{title:"Specialist",salary:360000,minPerf:74},{title:"Department Chief",salary:520000,minPerf:88}] },
+      { id:"finance_manager", title:"Financial Analyst", salary:78000, minAge:22, req:function (s) { return ["finance","business","cs"].indexOf(s.major) >= 0 || (s.flags && (s.flags.degree_finance || s.flags.degree_business)); }, desc:"Finance degree or business path into analyst and management roles.", ladder:[{title:"Financial Analyst",salary:78000,minPerf:0},{title:"Senior Analyst",salary:108000,minPerf:55},{title:"Finance Manager",salary:148000,minPerf:70},{title:"Finance Director",salary:225000,minPerf:84}] },
+      { id:"cybersecurity", title:"Cybersecurity Analyst", salary:92000, minAge:22, req:function (s) { return s.major === "cs" || (s.flags && s.flags.degree_cs) || (s.inventory || []).indexOf("laptop") >= 0; }, desc:"Computer science or strong self-taught technical path.", ladder:[{title:"Cybersecurity Analyst",salary:92000,minPerf:0},{title:"Security Engineer",salary:135000,minPerf:58},{title:"Security Architect",salary:190000,minPerf:76},{title:"Security Director",salary:285000,minPerf:88}] },
+      { id:"wealth_advisor", title:"Wealth Advisor", salary:72000, minAge:21, req:function (s) { return ["finance","business","psych"].indexOf(s.major) >= 0 || num1827(s.stats && s.stats.confidence) >= 68; }, desc:"People skills plus money knowledge; pairs with finance and business degrees.", ladder:[{title:"Wealth Advisor",salary:72000,minPerf:0},{title:"Senior Advisor",salary:115000,minPerf:56},{title:"Private Client Advisor",salary:180000,minPerf:76},{title:"Regional Director",salary:300000,minPerf:88}] }
+    ];
+    add.forEach(function (job) { if (!has(job.id)) jobs.push(job); });
+    jobs.__v1827Supplemental = true;
+    return jobs;
+  }
+  function qualifiesBase1827(job) {
+    if (!job) return false;
+    if (num1827(state.age) < num1827(job.minAge)) return false;
+    try { if (typeof job.req === "function" && job.req(state)) return true; } catch(e) {}
+    return false;
+  }
+  function qualifiesWithDegrees1827(job) {
+    if (!job) return false;
+    var s = ensure1827();
+    if (num1827(s.age) < num1827(job.minAge)) return false;
+    if (qualifiesBase1827(job)) return true;
+    var ids = degreeIds1827();
+    var old = s.major;
+    for (var i = 0; i < ids.length; i++) {
+      try {
+        s.major = ids[i];
+        if (typeof job.req === "function" && job.req(s)) return true;
+      } catch(e) {}
+      finally { s.major = old; }
+    }
+    s.major = old;
+    return false;
+  }
+  function missingForJob1827(job) {
+    var bits = [];
+    if (num1827(state.age) < num1827(job.minAge)) bits.push("Age " + job.minAge + "+");
+    if (!qualifiesWithDegrees1827(job)) {
+      var degreeHints = DEGREE_OPTIONS1827.filter(function (d) { return (d.jobs || []).indexOf(job.id) >= 0; }).map(function (d) { return d.name.replace(" Degree", ""); });
+      if (degreeHints.length) bits.push("Degree: " + degreeHints.slice(0, 3).join(" / "));
+      else bits.push("Specific education, certificate, item, car, or stat requirement");
+    }
+    return bits.join(" · ") || "Qualified";
+  }
+  function applicationFor1827(jobId) {
+    var s = ensure1827();
+    return (s.careerV1827.applications || []).find(function (a) { return a.jobId === jobId && !a.closed; });
+  }
+  function offerFor1827(jobId) {
+    var s = ensure1827();
+    return (s.careerV1827.offers || []).find(function (o) { return o.jobId === jobId && !o.closed; });
+  }
+  function fitScore1827(job) {
+    ensure1827();
+    var ids = degreeIds1827();
+    var degreeFit = qualifiesWithDegrees1827(job) ? 25 : 0;
+    var mapped = DEGREE_OPTIONS1827.some(function (d) { return ids.indexOf(d.id) >= 0 && (d.jobs || []).indexOf(job.id) >= 0; });
+    if (mapped) degreeFit += 12;
+    var stats = state.stats || {};
+    var smarts = num1827(stats.smarts || state.smarts || state.iq / 2, 50);
+    var confidence = num1827(stats.confidence || state.confidence, 50);
+    var discipline = num1827(stats.discipline || state.discipline, 50);
+    var charisma = num1827(stats.charisma || stats.social || state.charisma || state.social, confidence);
+    var stressPenalty = Math.max(0, (num1827(state.stress || stats.stress) - 55) / 2);
+    var healthPenalty = Math.max(0, 50 - num1827(state.health || stats.health, 70)) / 3;
+    var legalPenalty = Math.max(0, num1827(state.finance && state.finance.taxLegalRisk) - 60) / 3;
+    var prep = Math.min(14, num1827(state.careerV1827.interviewPrep) * 2);
+    var score = 20 + degreeFit + smarts * .15 + confidence * .16 + discipline * .12 + charisma * .12 + prep - stressPenalty - healthPenalty - legalPenalty;
+    return Math.round(clamp1827(score, 0, 100));
+  }
+  window.applyToJobV1827 = function (jobId) {
+    var s = ensure1827();
+    var jobs = ensureSupplementalJobs1827();
+    var job = jobs.find(function (j) { return j.id === jobId; });
+    if (!job) return toast1827("Job not found.");
+    if (!qualifiesWithDegrees1827(job)) return toast1827("Missing: " + missingForJob1827(job));
+    if (s.job && s.job.jobId === job.id) return toast1827("You already have that job.");
+    if (offerFor1827(job.id)) return toast1827("You already have an offer waiting.");
+    var app = applicationFor1827(job.id);
+    if (app) return toast1827("Application is already active. Take the interview.");
+    var id = "app-" + Date.now() + "-" + (++s.careerV1827.lastActionId);
+    s.careerV1827.applications.unshift({ id:id, jobId:job.id, title:job.title, salary:job.salary, stage:"applied", rounds:0, score:fitScore1827(job), createdAge:s.age || 0, closed:false });
+    s.careerV1827.applications = s.careerV1827.applications.slice(0, 12);
+    log1827("Applied for " + job.title + ". Next step: interview.", { confidence:1, stress:1 });
+    try { if (typeof applyDeltas === "function") applyDeltas({ confidence:1, stress:1 }); } catch(e) {}
+    saveRender1827();
+  };
+  window.prepareInterviewV1827 = function () {
+    var s = ensure1827();
+    var cost = 250 + Math.round(num1827(s.careerV1827.interviewPrep) * 150);
+    if (num1827(s.money) < cost) return toast1827("Interview prep needs " + money1827(cost) + ".");
+    s.money = Math.round(num1827(s.money) - cost);
+    s.careerV1827.interviewPrep = Math.min(7, num1827(s.careerV1827.interviewPrep) + 1);
+    log1827("You practiced interview answers and cleaned up your résumé.", { money:-cost, confidence:2, discipline:1, stress:-1 });
+    try { if (typeof applyDeltas === "function") applyDeltas({ confidence:2, discipline:1, stress:-1 }); } catch(e) {}
+    saveRender1827();
+  };
+  window.interviewForJobV1827 = function (jobId) {
+    var s = ensure1827();
+    var jobs = ensureSupplementalJobs1827();
+    var job = jobs.find(function (j) { return j.id === jobId; });
+    var app = applicationFor1827(jobId);
+    if (!job || !app) return toast1827("Apply before interviewing.");
+    if (!qualifiesWithDegrees1827(job)) return toast1827("You no longer meet the minimum requirements.");
+    var base = fitScore1827(job);
+    var roll = Math.round(base + (Math.random() * 22 - 10) + num1827(app.rounds) * 4);
+    var threshold = job.salary >= 180000 ? 78 : job.salary >= 95000 ? 68 : 56;
+    app.rounds = num1827(app.rounds) + 1;
+    app.score = roll;
+    if (roll >= threshold + 12) {
+      app.closed = true; app.stage = "offer";
+      var strongSalary = Math.round(num1827(job.salary) * (1.08 + Math.random() * .08));
+      s.careerV1827.offers.unshift({ jobId:job.id, title:job.title, salary:strongSalary, baseSalary:job.salary, strength:"strong", createdAge:s.age || 0, closed:false });
+      log1827("Strong interview: " + job.title + " offered " + money1827(strongSalary) + "/yr.", { confidence:4, stress:-1 });
+      try { if (typeof applyDeltas === "function") applyDeltas({ confidence:4, stress:-1 }); } catch(e) {}
+    } else if (roll >= threshold) {
+      app.closed = true; app.stage = "offer";
+      var salary = Math.round(num1827(job.salary) * (.96 + Math.random() * .08));
+      s.careerV1827.offers.unshift({ jobId:job.id, title:job.title, salary:salary, baseSalary:job.salary, strength:"standard", createdAge:s.age || 0, closed:false });
+      log1827("Interview passed: " + job.title + " made an offer for " + money1827(salary) + "/yr.", { confidence:2, stress:-1 });
+      try { if (typeof applyDeltas === "function") applyDeltas({ confidence:2, stress:-1 }); } catch(e) {}
+    } else if (roll >= threshold - 10 && app.rounds < 2) {
+      app.stage = "second_interview";
+      log1827("The " + job.title + " interview led to a second interview. Prep can help.", { stress:2 });
+      try { if (typeof applyDeltas === "function") applyDeltas({ stress:2 }); } catch(e) {}
+    } else {
+      app.closed = true; app.stage = "rejected";
+      s.careerV1827.history.unshift({ jobId:job.id, title:job.title, outcome:"Rejected", score:roll, age:s.age || 0 });
+      log1827("Interview result: " + job.title + " passed this time. Build stats or prep and try again later.", { confidence:-1, stress:2 });
+      try { if (typeof applyDeltas === "function") applyDeltas({ confidence:-1, stress:2 }); } catch(e) {}
+    }
+    s.careerV1827.offers = s.careerV1827.offers.slice(0, 8);
+    saveRender1827();
+  };
+  function startJobDirect1827(job, salary) {
+    state.job = { jobId:job.id, title:job.title, salary:Math.round(num1827(salary || job.salary)), performance:50, stress:0, tier:0 };
+    log1827("Accepted the " + job.title + " offer.", { happiness:4, stress:3, confidence:2 });
+    try { if (typeof applyDeltas === "function") applyDeltas({ happiness:4, stress:3, confidence:2 }); } catch(e) {}
+  }
+  window.acceptJobOfferV1827 = function (jobId) {
+    var s = ensure1827();
+    var jobs = ensureSupplementalJobs1827();
+    var job = jobs.find(function (j) { return j.id === jobId; });
+    var offer = offerFor1827(jobId);
+    if (!job || !offer) return toast1827("No offer waiting for that job.");
+    offer.closed = true;
+    offer.accepted = true;
+    s.careerV1827.applications.forEach(function (a) { if (a.jobId === jobId) a.closed = true; });
+    s.careerV1827.history.unshift({ jobId:job.id, title:job.title, outcome:"Accepted", salary:offer.salary, age:s.age || 0 });
+    startJobDirect1827(job, offer.salary);
+    saveRender1827();
+  };
+  window.declineJobOfferV1827 = function (jobId) {
+    var s = ensure1827();
+    var offer = offerFor1827(jobId);
+    if (!offer) return toast1827("No offer waiting.");
+    offer.closed = true; offer.declined = true;
+    s.careerV1827.history.unshift({ jobId:jobId, title:offer.title, outcome:"Declined", salary:offer.salary, age:s.age || 0 });
+    log1827("Declined the " + offer.title + " offer.");
+    saveRender1827();
+  };
+
+  var previousTakeCareer1827 = window.takeCareer || (typeof takeCareer === "function" ? takeCareer : null);
+  window.takeCareer = function (jobId) {
+    ensure1827();
+    var offer = offerFor1827(jobId);
+    if (offer) return window.acceptJobOfferV1827(jobId);
+    return window.applyToJobV1827(jobId);
+  };
+  try { takeCareer = window.takeCareer; } catch(e) {}
+
+  window.setTaxResidenceV1827 = function (countryId, regionId) {
+    var s = ensure1827();
+    var p = profile1827(countryId || s.finance.taxCountry);
+    var r = region1827(p.id, regionId || (p.regions[0] && p.regions[0][0]));
+    var currentKey = (s.finance.taxCountry || "us") + ":" + (s.finance.taxRegion || "");
+    var nextKey = p.id + ":" + r[0];
+    var international = p.id !== (s.finance.taxCountry || "us");
+    var cost = nextKey === currentKey ? 0 : Math.round(num1827(p.move) + (international ? 5000 : 1200));
+    if (cost && num1827(s.money) < cost) return toast1827("Moving needs " + money1827(cost) + " cash.");
+    if (cost) s.money = Math.round(num1827(s.money) - cost);
+    s.finance.taxCountry = p.id;
+    s.finance.taxRegion = r[0];
+    s.finance.taxDashboard = p.name + " / " + r[1];
+    s.finance.relocationHistoryV1827 = Array.isArray(s.finance.relocationHistoryV1827) ? s.finance.relocationHistoryV1827 : [];
+    s.finance.relocationHistoryV1827.unshift({ age:s.age || 0, country:p.id, region:r[0], cost:cost, note:r[3] });
+    s.finance.relocationHistoryV1827 = s.finance.relocationHistoryV1827.slice(0, 10);
+    log1827("Moved residence to " + p.name + " / " + r[1] + (cost ? " for " + money1827(cost) : "") + ".", { money:-cost, stress:international ? 5 : 2 });
+    try { if (typeof applyDeltas === "function") applyDeltas({ stress:international ? 5 : 2 }); } catch(e) {}
+    saveRender1827();
+  };
+  window.updateTaxRegionSelectV1827 = function (countryId, selectId) {
+    var el = document.getElementById(selectId || "v1827-move-region");
+    if (!el) return;
+    var p = profile1827(countryId || "us");
+    el.innerHTML = (p.regions || []).map(function (r) { return '<option value="' + esc1827(r[0]) + '">' + esc1827(r[1]) + (r[2] ? " · " + pct1827(r[2]) : " · no extra") + '</option>'; }).join("");
+  };
+
+  function taxOfficeReport1827() {
+    ensure1827();
+    var current = projectedTax1827(state.finance.taxCountry, state.finance.taxRegion, grossIncome1827());
+    var f = state.finance || {};
+    var location = current.profile.name + " / " + current.region[1];
+    return '<section class="money-section v1827-tax-office"><div class="money-section-title">Tax Office <span>read-only residence report</span></div>' +
+      '<div class="v1827-note">This office explains the tax rules where the player currently lives. Moving belongs under <b>More → Move to Another Country</b>.</div>' +
+      '<div class="v1827-tax-cards"><div><span>Current residence</span><b>' + esc1827(location) + '</b><em>' + esc1827(current.region[3] || current.profile.note) + '</em></div><div><span>Taxable income model</span><b>' + money1827(current.income) + '</b><em>Job + business + realized investment income.</em></div><div><span>Estimated tax</span><b class="' + (current.total ? "bad" : "good") + '">' + money1827(current.total) + '</b><em>Effective rate about ' + pct1827(current.rate) + '.</em></div><div><span>Tax debt</span><b class="' + (num1827(f.taxDebt || f.debts.taxDebt) ? "bad" : "good") + '">' + money1827(f.taxDebt || f.debts.taxDebt || 0) + '</b><em>Handled by payoff/legal systems, not relocation.</em></div></div>' +
+      '<div class="v1827-breakdown"><div><b>Income tax</b><span>' + pct1827(current.profile.base + current.region[2]) + ' on modeled income → ' + money1827(current.wageTax) + '</span></div><div><b>Investment tax</b><span>' + pct1827(current.profile.invest) + ' on realized investment/dividend income → ' + money1827(current.investmentTax) + '</span></div><div><b>Business tax layer</b><span>' + pct1827(current.profile.business) + ' on business/fund income → ' + money1827(current.businessTax) + '</span></div><div><b>Accountant effect</b><span>Estimated savings → ' + money1827(current.savings) + '</span></div></div>' +
+      '<div class="v1827-pill-row"><span>' + esc1827(current.profile.note) + '</span><span>Region: ' + esc1827(current.region[3] || "standard") + '</span><span>Business income: ' + money1827(Math.max(0, num1827(f.lastEntrepreneurIncome || f.lastBusinessIncome))) + '</span></div></section>';
+  }
+  function moveResidenceDesk1827() {
+    ensure1827();
+    var income = grossIncome1827();
+    var current = projectedTax1827(state.finance.taxCountry, state.finance.taxRegion, income);
+    var countryOptions = TAX_PROFILES1827.map(function (p) { return '<option value="' + esc1827(p.id) + '" ' + (p.id === current.profile.id ? "selected" : "") + '>' + esc1827(p.name) + '</option>'; }).join("");
+    var regionOptions = (current.profile.regions || []).map(function (r) { return '<option value="' + esc1827(r[0]) + '" ' + (r[0] === current.region[0] ? "selected" : "") + '>' + esc1827(r[1]) + (r[2] ? " · " + pct1827(r[2]) : " · no extra") + '</option>'; }).join("");
+    var cards = TAX_PROFILES1827.map(function (p) {
+      var r = region1827(p.id, p.regions && p.regions[0] && p.regions[0][0]);
+      var model = projectedTax1827(p.id, r[0], income);
+      var diff = current.total - model.total;
+      var moveCost = Math.round(num1827(p.move) + (p.id === current.profile.id ? 1200 : 5000));
+      return '<div class="v1827-move-card ' + (p.id === current.profile.id ? "selected" : "") + '"><b>' + esc1827(p.name) + '</b><span>' + esc1827(p.note) + '</span><strong class="' + (diff > 0 ? "good" : diff < 0 ? "bad" : "") + '">' + (diff ? signed1827(diff) + ' tax difference' : 'Current baseline') + '</strong><em>Projected tax ' + money1827(model.total) + ' · move estimate ' + money1827(moveCost) + '</em></div>';
+    }).join("");
+    var history = (state.finance.relocationHistoryV1827 || state.finance.relocationHistoryV1826 || []).slice(0, 4).map(function (h) {
+      var p = profile1827(h.country); var r = region1827(p.id, h.region);
+      return '<div class="v1827-history-row"><b>Age ' + esc1827(h.age) + '</b><span>' + esc1827(p.name + ' / ' + r[1]) + ' · cost ' + money1827(h.cost || 0) + '</span></div>';
+    }).join("") || '<div class="v1827-note small">No relocation history yet.</div>';
+    return '<section class="money-section v1827-move-residence"><div class="money-section-title">Move to Another Country <span>More hub relocation</span></div><div class="v1827-note">This is the only place that changes where the player lives for tax purposes.</div><div class="v1827-controls"><select id="v1827-move-country" onchange="updateTaxRegionSelectV1827(this.value,\'v1827-move-region\')">' + countryOptions + '</select><select id="v1827-move-region">' + regionOptions + '</select><button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();setTaxResidenceV1827(document.getElementById(\'v1827-move-country\').value,document.getElementById(\'v1827-move-region\').value)" ' + (num1827(state.age) < 18 ? "disabled" : "") + '>Move Residence</button></div><div class="v1827-move-grid">' + cards + '</div><div class="v1827-subtitle">Relocation history</div>' + history + '</section>';
+  }
+  function educationDegreeCenter1827() {
+    ensure1827();
+    var active = state.educationV1825.activeDegree;
+    var paused = state.educationV1825.pausedDegree;
+    var ids = degreeIds1827();
+    var schoolOptions = DEGREE_SCHOOLS1827.map(function (s) { return '<option value="' + esc1827(s.id) + '">' + esc1827(s.name) + ' · ' + money1827(s.cost) + '/yr</option>'; }).join("");
+    var activeHtml = active ? '<div class="v1827-degree-active"><div><b>' + esc1827(active.majorName) + '</b><span>' + esc1827(active.schoolName) + ' · ' + Math.round((num1827(active.yearsCompleted) / Math.max(1, num1827(active.targetYears, 4))) * 100) + '% complete · ' + money1827(active.annualCost) + '/yr</span></div><button class="money-btn" onclick="pauseDegreeV1827()">Pause</button></div>' : (paused ? '<div class="v1827-degree-active"><div><b>Paused: ' + esc1827(paused.majorName) + '</b><span>Resume when ready. Only one degree can be active at a time.</span></div><button class="money-btn green" onclick="resumeDegreeV1827()">Resume</button></div>' : '<div class="v1827-note">No active extra degree. Pick a new degree here; jobs unlock in Career after the degree is earned.</div>');
+    var cards = DEGREE_OPTIONS1827.map(function (d) {
+      var owned = hasDegree1827(d.id);
+      var busy = !!state.educationV1825.activeDegree;
+      return '<div class="v1827-degree-card ' + (owned ? "owned" : "") + '"><b>' + esc1827(d.name) + '</b><p>' + esc1827(d.desc) + '</p><div class="v1827-pill-row"><span>' + esc1827(d.years || 4) + ' years</span><span>Unlocks: ' + esc1827((d.jobs || []).slice(0, 3).join(' / ')) + '</span></div><button class="money-btn ' + (owned ? "" : "green") + '" onclick="event.preventDefault();event.stopPropagation();startDegreeV1827(\'' + esc1827(d.id) + '\',document.getElementById(\'v1827-degree-school\').value)" ' + (owned || busy ? "disabled" : "") + '>' + (owned ? "Completed" : busy ? "Finish Active Degree" : "Start Degree") + '</button></div>';
+    }).join("");
+    return '<section class="panel v1827-degree-center"><div class="section-label">Education: Multiple Degrees</div>' + activeHtml + '<div class="v1827-degree-top"><div><b>Degrees on file</b><span>' + esc1827(degreeNames1827(ids)) + '</span></div><select id="v1827-degree-school">' + schoolOptions + '</select></div><div class="v1827-degree-grid">' + cards + '</div></section>';
+  }
+  function careerInterviewDesk1827() {
+    ensure1827();
+    var jobs = ensureSupplementalJobs1827();
+    var activeApps = state.careerV1827.applications.filter(function (a) { return !a.closed; });
+    var activeOffers = state.careerV1827.offers.filter(function (o) { return !o.closed; });
+    var pipeline = '';
+    if (!activeApps.length && !activeOffers.length) pipeline = '<div class="v1827-note small">No active applications. Qualified jobs below now require an application and interview before hiring.</div>';
+    pipeline += activeOffers.map(function (o) { return '<div class="v1827-pipeline-card offer"><div><b>Offer: ' + esc1827(o.title) + '</b><span>' + money1827(o.salary) + '/yr · ' + esc1827(o.strength || "standard") + ' offer</span></div><div class="v1827-actions"><button class="money-btn green" onclick="acceptJobOfferV1827(\'' + esc1827(o.jobId) + '\')">Accept</button><button class="money-btn red" onclick="declineJobOfferV1827(\'' + esc1827(o.jobId) + '\')">Decline</button></div></div>'; }).join("");
+    pipeline += activeApps.map(function (a) { return '<div class="v1827-pipeline-card"><div><b>' + esc1827(a.title) + '</b><span>' + esc1827(a.stage === "second_interview" ? "Second interview" : "Application submitted") + ' · fit ' + esc1827(a.score || 0) + '/100 · round ' + esc1827(a.rounds || 0) + '</span></div><div class="v1827-actions"><button class="money-btn gold" onclick="interviewForJobV1827(\'' + esc1827(a.jobId) + '\')">Interview</button></div></div>'; }).join("");
+    var list = jobs.slice().sort(function (a, b) { return num1827(a.minAge) - num1827(b.minAge) || num1827(b.salary) - num1827(a.salary); }).slice(0, 24);
+    var cards = list.map(function (job) {
+      var current = state.job && state.job.jobId === job.id;
+      var offer = offerFor1827(job.id);
+      var app = applicationFor1827(job.id);
+      var qualifies = qualifiesWithDegrees1827(job);
+      var cls = current ? "current" : offer ? "offer" : app ? "applied" : qualifies ? "qualified" : "locked";
+      var action = current ? '<button class="money-btn" disabled>Current</button>' : offer ? '<button class="money-btn green" onclick="acceptJobOfferV1827(\'' + esc1827(job.id) + '\')">Accept Offer</button>' : app ? '<button class="money-btn gold" onclick="interviewForJobV1827(\'' + esc1827(job.id) + '\')">Interview</button>' : qualifies ? '<button class="money-btn blue" onclick="applyToJobV1827(\'' + esc1827(job.id) + '\')">Apply</button>' : '<button class="money-btn" disabled>Locked</button>';
+      return '<div class="v1827-job-card ' + cls + '"><div class="v1827-job-head"><b>' + esc1827(job.title) + '</b><span>' + (current ? 'Current' : offer ? 'Offer' : app ? 'Interviewing' : qualifies ? 'Qualified' : 'Locked') + '</span></div><p>' + esc1827(job.desc || 'Career path.') + '</p><div class="v1827-pill-row"><span>' + money1827(job.salary) + '/yr base</span><span>Age ' + esc1827(job.minAge || 16) + '+</span><span>Fit ' + (qualifies ? fitScore1827(job) + '/100' : '—') + '</span></div><em>' + esc1827(qualifies ? 'Next: apply, interview, then accept an offer.' : missingForJob1827(job)) + '</em>' + action + '</div>';
+    }).join("");
+    return '<section class="panel v1827-career-interviews"><div class="section-label">Career Applications + Interviews</div><div class="v1827-career-hero"><div><b>Jobs now have a hiring process.</b><span>Degree unlocks make jobs eligible, then you apply, interview, and accept offers. No more instant click-to-job from a degree card.</span></div><button class="money-btn" onclick="prepareInterviewV1827()">Prep Interview</button></div><div class="v1827-pill-row"><span>Degrees: ' + esc1827(degreeNames1827()) + '</span><span>Prep level ' + Math.round(num1827(state.careerV1827.interviewPrep)) + '</span></div><div class="v1827-pipeline">' + pipeline + '</div><div class="v1827-job-grid">' + cards + '</div></section>';
+  }
+
+  function removeSections1827(html, classes) {
+    html = String(html || "");
+    classes.forEach(function (cls) {
+      var idx = html.indexOf(cls);
+      while (idx >= 0) {
+        var start = html.lastIndexOf("<section", idx);
+        var end = html.indexOf("</section>", idx);
+        if (start < 0 || end < 0) break;
+        html = html.slice(0, start) + html.slice(end + 10);
+        idx = html.indexOf(cls);
+      }
+    });
+    return html;
+  }
+  function insertAfterFirst1827(html, chunk) {
+    html = String(html || "");
+    var end = html.indexOf("</section>");
+    return end >= 0 ? html.slice(0, end + 10) + chunk + html.slice(end + 10) : chunk + html;
+  }
+  var prevRenderHubContent1827 = window.renderHubContent || (typeof renderHubContent === "function" ? renderHubContent : null);
+  if (prevRenderHubContent1827 && !window.__ledgerRenderHub1827Wrapped) {
+    window.__ledgerRenderHub1827Wrapped = true;
+    window.renderHubContent = function (hubId) {
+      ensure1827();
+      ensureSupplementalJobs1827();
+      var html = "";
+      try { html = prevRenderHubContent1827.apply(this, arguments) || ""; }
+      catch(e) { html = '<section class="panel"><div class="section-label">Recovered Render</div><div class="row-sub">' + esc1827(e && (e.message || e)) + '</div></section>'; }
+      html = removeSections1827(html, ["v1826-relocation", "v1827-tax-office", "v1827-move-residence", "v1827-degree-center", "v1827-career-interviews", "v1825-degree-desk", "v1825-career-degree"]);
+      if (hubId === "law" || hubId === "legal") html = taxOfficeReport1827() + html;
+      if (hubId === "more") html = moveResidenceDesk1827() + html;
+      if (hubId === "school" || hubId === "education") html = insertAfterFirst1827(html, educationDegreeCenter1827());
+      if (hubId === "career") html = insertAfterFirst1827(html, careerInterviewDesk1827());
+      return html;
+    };
+    try { renderHubContent = window.renderHubContent; } catch(e) {}
+  }
+
+  var style = document.createElement("style");
+  style.textContent = [
+    ".v1827-tax-office,.v1827-move-residence,.v1827-career-interviews,.v1827-degree-center{border-color:rgba(126,160,172,.42)!important;background:linear-gradient(135deg,rgba(22,38,42,.96),rgba(34,29,22,.97))!important;overflow:hidden!important}.v1827-tax-office{border-color:rgba(216,173,109,.45)!important;background:linear-gradient(135deg,rgba(49,38,22,.96),rgba(27,23,18,.98))!important}.v1827-move-residence{border-color:rgba(126,160,172,.52)!important}.v1827-degree-center{border-color:rgba(201,155,85,.46)!important}.v1827-career-interviews{border-color:rgba(143,175,108,.44)!important;background:linear-gradient(135deg,rgba(22,43,30,.96),rgba(29,25,20,.98))!important}",
+    ".v1827-note{border:1px dashed rgba(255,255,255,.13);border-radius:12px;background:rgba(0,0,0,.16);color:#d6c5aa;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.55;padding:10px;margin:8px 0}.v1827-note.small{margin:0}.v1827-note b{color:#f0ca7b}.v1827-subtitle{font-family:'JetBrains Mono',monospace;color:#f0ca7b;text-transform:uppercase;letter-spacing:.14em;font-size:10px;margin:13px 0 8px}",
+    ".v1827-tax-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:9px}.v1827-tax-cards>div,.v1827-breakdown>div,.v1827-move-card,.v1827-degree-card,.v1827-degree-active,.v1827-pipeline-card,.v1827-job-card,.v1827-degree-top,.v1827-history-row{border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(255,255,255,.045);padding:11px;min-width:0}.v1827-tax-cards span,.v1827-tax-cards em,.v1827-move-card span,.v1827-move-card em,.v1827-degree-card p,.v1827-degree-active span,.v1827-degree-top span,.v1827-pipeline-card span,.v1827-job-card p,.v1827-job-card em,.v1827-history-row span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.45;margin-top:4px;font-style:normal}.v1827-tax-cards span{font-size:9px;text-transform:uppercase;letter-spacing:.12em}.v1827-tax-cards b,.v1827-move-card b,.v1827-degree-card b,.v1827-degree-active b,.v1827-degree-top b,.v1827-pipeline-card b,.v1827-job-card b,.v1827-history-row b{display:block;color:#fff3df;font-size:15px;overflow-wrap:anywhere}.v1827-tax-cards b{font-family:'JetBrains Mono',monospace;font-size:18px;margin-top:5px}.v1827-tax-cards .good,.v1827-move-card .good{color:#b9dc8a}.v1827-tax-cards .bad,.v1827-move-card .bad{color:#e9927d}",
+    ".v1827-breakdown{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:9px}.v1827-breakdown b{display:block;color:#f0ca7b}.v1827-breakdown span{display:block;color:#d6c5aa;font-family:'JetBrains Mono',monospace;font-size:10px;margin-top:3px}.v1827-pill-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}.v1827-pill-row span{border:1px solid rgba(255,255,255,.10);border-radius:999px;background:rgba(255,255,255,.045);padding:5px 8px;color:#d6c5aa;font-family:'JetBrains Mono',monospace;font-size:9px;line-height:1.2}",
+    ".v1827-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;margin:10px 0}.v1827-controls select,.v1827-degree-top select{min-width:0;border:1px solid rgba(216,173,109,.32);border-radius:8px;background:#100d0a;color:#f6ead8;padding:10px;font-family:'JetBrains Mono',monospace;font-size:11px}.v1827-move-grid,.v1827-degree-grid,.v1827-job-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(225px,1fr));gap:9px;margin-top:10px}.v1827-move-card.selected,.v1827-degree-card.owned{border-color:rgba(185,220,138,.44);background:rgba(90,120,60,.16)}.v1827-move-card strong{display:block;font-family:'JetBrains Mono',monospace;margin-top:6px;color:#fff3df}",
+    ".v1827-degree-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(180px,260px);gap:10px;align-items:center;margin-top:9px}.v1827-degree-active{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}.v1827-degree-card .money-btn,.v1827-job-card .money-btn{margin-top:9px}.v1827-career-hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:start}.v1827-career-hero b{display:block;color:#fff3df;font-size:16px}.v1827-career-hero span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.45;margin-top:4px}.v1827-pipeline{display:grid;gap:8px;margin-top:10px}.v1827-pipeline-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}.v1827-pipeline-card.offer{border-color:rgba(185,220,138,.44);background:rgba(90,120,60,.15)}.v1827-actions{display:flex;flex-wrap:wrap;gap:7px}.v1827-job-head{display:flex;justify-content:space-between;gap:8px}.v1827-job-head span{font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:#f0ca7b}.v1827-job-card.locked{border-color:rgba(233,146,125,.28);opacity:.88}.v1827-job-card.qualified{border-color:rgba(126,160,172,.45)}.v1827-job-card.offer,.v1827-job-card.current{border-color:rgba(185,220,138,.48);background:rgba(90,120,60,.15)}.v1827-job-card.applied{border-color:rgba(240,202,123,.42)}",
+    "@media(max-width:820px){.v1827-tax-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.v1827-breakdown,.v1827-controls,.v1827-degree-top,.v1827-career-hero,.v1827-pipeline-card{grid-template-columns:1fr}}@media(max-width:520px){.v1827-tax-cards,.v1827-move-grid,.v1827-degree-grid,.v1827-job-grid{grid-template-columns:1fr}.v1827-actions .money-btn,.v1827-controls .money-btn{width:100%}}"
+  ].join("\n");
+  document.head.appendChild(style);
+})();
+
+
+
+/* END absorbed 04-patch-v18-27.js */
+
+
+/* BEGIN absorbed 05-patch-v18-28.js */
+
+/* LEDGER PATCH v18.28: firm-level tax separation + interview options */
+(function () {
+  if (window.__ledgerV1828Loaded) return;
+  window.__ledgerV1828Loaded = true;
+
+  function esc(v) {
+    return String(v == null ? "" : v).replace(/[&<>"']/g, function (ch) {
+      return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch];
+    });
+  }
+  function num(v, fallback) {
+    var n = Number(v);
+    return Number.isFinite(n) ? n : (fallback || 0);
+  }
+  function clamp(v, min, max) {
+    min = min == null ? 0 : min;
+    max = max == null ? 100 : max;
+    return Math.max(min, Math.min(max, num(v)));
+  }
+  function moneyFmt(v) {
+    try { if (typeof money === "function") return money(Math.round(num(v))); } catch(e) {}
+    var n = Math.round(num(v));
+    var sign = n < 0 ? "-" : "";
+    n = Math.abs(n);
+    if (n >= 1e12) return sign + "$" + (n / 1e12).toFixed(1).replace(/\.0$/, "") + "T";
+    if (n >= 1e9) return sign + "$" + (n / 1e9).toFixed(1).replace(/\.0$/, "") + "B";
+    if (n >= 1e6) return sign + "$" + (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+    if (n >= 1e4) return sign + "$" + Math.round(n / 1000) + "K";
+    return sign + "$" + n.toLocaleString();
+  }
+  function pct(v) { return (num(v) * 100).toFixed(1).replace(/\.0$/, "") + "%"; }
+  function signed(v) { v = Math.round(num(v)); return (v >= 0 ? "+" : "-") + moneyFmt(Math.abs(v)); }
+  function toast(msg) {
+    try { if (typeof addToast === "function") return addToast(msg); } catch(e) {}
+    try { if (typeof addLog === "function") return addLog(msg); } catch(e) {}
+  }
+  function log(msg, deltas) {
+    try { if (typeof addLog === "function") return addLog(msg, deltas || {}); } catch(e) {}
+  }
+  function saveRender() {
+    try { if (typeof save === "function") save(); } catch(e) {}
+    try { if (typeof render === "function") render(); } catch(e) {}
+  }
+  function ensure() {
+    try { if (typeof window.__ledgerEnsureStateSync18261 === "function") window.__ledgerEnsureStateSync18261(); } catch(e) {}
+    try { if (typeof ensureStateShape === "function") ensureStateShape(); } catch(e) {}
+    if (typeof state === "undefined" && window.state) { try { state = window.state; } catch(e) {} }
+    if (!window.state && typeof state !== "undefined") window.state = state;
+    if (!window.state) window.state = {};
+    try { if (typeof state === "undefined" || !state) state = window.state; } catch(e) {}
+    var s = window.state;
+    s.stats = s.stats || {};
+    s.flags = s.flags || {};
+    s.actionsTaken = s.actionsTaken || {};
+    s.inventory = Array.isArray(s.inventory) ? s.inventory : [];
+    s.finance = s.finance || {};
+    s.finance.debts = s.finance.debts || {};
+    s.finance.incomeSources = s.finance.incomeSources || {};
+    s.finance.personalFirm = s.finance.personalFirm || { hired:false, staff:{ advisor:1, analyst:1, risk:1, tax:1 } };
+    s.finance.personalFirm.staff = s.finance.personalFirm.staff || { advisor:1, analyst:1, risk:1, tax:1 };
+    s.finance.taxPolicyV1828 = s.finance.taxPolicyV1828 || {};
+    s.finance.taxPolicyV1828.processed = s.finance.taxPolicyV1828.processed || {};
+    s.finance.firmTaxEventsV1828 = Array.isArray(s.finance.firmTaxEventsV1828) ? s.finance.firmTaxEventsV1828 : [];
+    s.careerV1827 = s.careerV1827 || {};
+    s.careerV1827.applications = Array.isArray(s.careerV1827.applications) ? s.careerV1827.applications : [];
+    s.careerV1827.offers = Array.isArray(s.careerV1827.offers) ? s.careerV1827.offers : [];
+    s.careerV1827.history = Array.isArray(s.careerV1827.history) ? s.careerV1827.history : [];
+    s.careerV1828 = s.careerV1828 || {};
+    s.careerV1828.interviewHistory = Array.isArray(s.careerV1828.interviewHistory) ? s.careerV1828.interviewHistory : [];
+    return s;
+  }
+
+  var TAX_PROFILES = [
+    { id:"us", name:"United States", personal:.22, invest:.15, entity:.21, regions:[["pa","Pennsylvania",.0307],["de","Delaware",.038],["ny","New York",.062],["ca","California",.085],["tx","Texas",0],["fl","Florida",0],["wa","Washington",0],["il","Illinois",.0495],["ma","Massachusetts",.05],["co","Colorado",.044]] },
+    { id:"canada", name:"Canada", personal:.26, invest:.18, entity:.15, regions:[["on","Ontario",.08],["bc","British Columbia",.075],["ab","Alberta",.045]] },
+    { id:"uk", name:"United Kingdom", personal:.28, invest:.20, entity:.19, regions:[["eng","England",0],["sct","Scotland",.025]] },
+    { id:"germany", name:"Germany", personal:.32, invest:.22, entity:.16, regions:[["berlin","Berlin",0],["bavaria","Bavaria",.01]] },
+    { id:"france", name:"France", personal:.31, invest:.22, entity:.25, regions:[["idf","Île-de-France",.015],["south","South",0]] },
+    { id:"singapore", name:"Singapore", personal:.14, invest:.05, entity:.17, regions:[["central","Central",0]] },
+    { id:"uae", name:"United Arab Emirates", personal:.02, invest:0, entity:.09, regions:[["dubai","Dubai",0],["abudhabi","Abu Dhabi",0]] },
+    { id:"thailand", name:"Thailand", personal:.16, invest:.08, entity:.20, regions:[["bangkok","Bangkok",0],["phuket","Phuket",.005],["chiangmai","Chiang Mai",-.01]] },
+    { id:"vietnam", name:"Vietnam", personal:.17, invest:.08, entity:.20, regions:[["hcmc","Ho Chi Minh City",0],["danang","Da Nang",-.008],["hanoi","Hanoi",0]] }
+  ];
+  function profile(id) { return TAX_PROFILES.find(function (p) { return p.id === id; }) || TAX_PROFILES[0]; }
+  function region(p, id) { return (p.regions || []).find(function (r) { return r[0] === id; }) || (p.regions || [])[0] || ["default", "Default", 0]; }
+  function marginalRate(taxable) {
+    taxable = Math.max(0, num(taxable));
+    if (taxable >= 1000000) return .32;
+    if (taxable >= 250000) return .26;
+    if (taxable >= 100000) return .21;
+    if (taxable >= 25000) return .16;
+    if (taxable > 0) return .10;
+    return 0;
+  }
+  function accountantFactor() {
+    var f = ensure().finance || {};
+    var raw = String(f.accountant || f.accountantPlan || "none").toLowerCase();
+    if (/elite|tax_law|wealth|family|global/.test(raw)) return { label:"Elite tax counsel", reduction:.20, audit:-14 };
+    if (/cpa|advisor|pro/.test(raw)) return { label:"CPA Advisor", reduction:.12, audit:-8 };
+    if (/local|preparer|basic/.test(raw)) return { label:"Local tax preparer", reduction:.06, audit:-4 };
+    return { label:"No accountant", reduction:0, audit:4 };
+  }
+  function attorneyFactor() {
+    var f = ensure().finance || {};
+    var raw = String(f.attorney || f.attorneyPlan || f.legalPlan || "none").toLowerCase();
+    if (/elite|tax_law|wealth|global|firm/.test(raw)) return { label:"Tax attorney exemption", reduction:.18, audit:-12 };
+    if (/attorney|lawyer|legal|counsel|business/.test(raw)) return { label:"Business attorney review", reduction:.10, audit:-7 };
+    return { label:"No attorney exemption", reduction:0, audit:0 };
+  }
+  function entityRate() {
+    var s = ensure();
+    var p = profile((s.finance || {}).taxCountry || "us");
+    return Math.max(.01, num(p.entity, .21));
+  }
+  function isEntityBusinessActive() {
+    var f = ensure().finance || {};
+    var pf = f.personalFirm || {};
+    var business = Math.max(0, num(f.lastEntrepreneurIncome || f.lastBusinessIncome));
+    return !!(pf.hired || num(f.managedPortfolio) > 0 || num(pf.lastReturn) > 0 || business >= 500000);
+  }
+  function currentBusinessProfit() {
+    var f = ensure().finance || {};
+    var pf = f.personalFirm || {};
+    var business = Math.max(0, num(f.lastEntrepreneurIncome || f.lastBusinessIncome));
+    var firmReturn = Math.max(0, num(pf.lastReturn));
+    var explicit = Math.max(0, num(f.lastPersonalFirmProfit || f.firmProfitV1828));
+    return isEntityBusinessActive() ? Math.max(explicit, business, firmReturn) : 0;
+  }
+  function passThroughBusinessIncome() {
+    var f = ensure().finance || {};
+    var business = Math.max(0, num(f.lastEntrepreneurIncome || f.lastBusinessIncome));
+    return isEntityBusinessActive() ? 0 : business;
+  }
+  function cashDistributions() {
+    var f = ensure().finance || {};
+    var src = f.incomeSources || {};
+    return Math.max(0, num(f.lastFirmDistribution) + num(src.firmDistribution) + num(src.fundCarryV1825));
+  }
+  function realizedInvestmentIncome() {
+    var f = ensure().finance || {};
+    var src = f.incomeSources || {};
+    var stocks = f.stocksV18 || {};
+    return Math.max(0, num(src.dividends) + num(src.realizedGains) + num(stocks.lastDividends) + num(f.lastDividendIncome));
+  }
+  function personalTaxableModel() {
+    var s = ensure();
+    var salary = Math.max(0, num(s.job && s.job.salary));
+    var passThrough = passThroughBusinessIncome();
+    var distributions = cashDistributions();
+    var invest = realizedInvestmentIncome();
+    return { salary:salary, passThrough:passThrough, distributions:distributions, investment:invest, taxable:salary + passThrough + distributions + invest };
+  }
+  function firmAssetsAvailable() {
+    var f = ensure().finance || {};
+    return Math.max(0, num(f.managedPortfolio) + num((f.personalFirm || {}).cash) + num(f.businessCash) + num(f.firmCashV1828));
+  }
+  function pullFirmAssets(amount) {
+    var s = ensure();
+    var f = s.finance || {};
+    var remaining = Math.max(0, Math.round(num(amount)));
+    var used = [];
+    function take(obj, key, label) {
+      if (!remaining || !obj) return;
+      var val = Math.max(0, Math.round(num(obj[key])));
+      var amt = Math.min(val, remaining);
+      if (amt > 0) {
+        obj[key] = Math.max(0, val - amt);
+        remaining -= amt;
+        used.push(label + " " + moneyFmt(amt));
+      }
+    }
+    take(f, "firmCashV1828", "firm cash");
+    take(f.personalFirm || {}, "cash", "firm reserve");
+    take(f, "businessCash", "business cash");
+    take(f, "managedPortfolio", "managed portfolio");
+    return { paid:Math.round(num(amount) - remaining), remaining:remaining, used:used };
+  }
+  function firmEntityTaxFor(profit) {
+    var acct = accountantFactor();
+    var atty = attorneyFactor();
+    var exemption = Math.min(.45, acct.reduction + atty.reduction);
+    var raw = Math.round(Math.max(0, num(profit)) * entityRate());
+    return { raw:raw, exemption:exemption, savings:Math.round(raw * exemption), tax:Math.max(0, Math.round(raw * (1 - exemption))), accountant:acct, attorney:atty };
+  }
+  function setPersonalTaxDebt(value) {
+    var s = ensure();
+    var v = Math.max(0, Math.round(num(value)));
+    s.finance.taxDebt = v;
+    s.finance.debts = s.finance.debts || {};
+    s.finance.debts.taxDebt = v;
+    s.taxDebt = v;
+    if (s.tax && typeof s.tax === "object") s.tax.taxDebt = v;
+  }
+  function reclassifyRecord(record, index, silent) {
+    var s = ensure();
+    var f = s.finance || {};
+    if (!record || !num(record.business)) return false;
+    if (!isEntityBusinessActive()) return false;
+    var key = [record.age, index, Math.round(num(record.business)), Math.round(num(record.tax)), Math.round(num(record.investment))].join(":");
+    if (f.taxPolicyV1828.processed[key]) return false;
+    var oldTax = Math.max(0, Math.round(num(record.tax)));
+    var personalBase = Math.max(0, num(record.investment));
+    var reduction = Math.min(.35, Math.max(0, accountantFactor().reduction));
+    var correctedPersonal = Math.round(personalBase * marginalRate(personalBase) * (1 - reduction));
+    var overPersonal = Math.max(0, oldTax - correctedPersonal);
+    var debtBefore = Math.max(0, num(f.taxDebt || (f.debts || {}).taxDebt || s.taxDebt));
+    var unpaid = Math.max(0, num(record.unpaid));
+    var paid = Math.max(0, num(record.paid));
+    var debtReduction = Math.min(debtBefore, unpaid || overPersonal, overPersonal);
+    if (debtReduction > 0) setPersonalTaxDebt(debtBefore - debtReduction);
+    var refund = Math.min(paid, Math.max(0, overPersonal - debtReduction));
+    if (refund > 0) s.money = Math.round(num(s.money) + refund);
+
+    var entity = firmEntityTaxFor(record.business);
+    var pull = pullFirmAssets(entity.tax);
+    var unpaidEntity = Math.max(0, entity.tax - pull.paid);
+    f.businessEntityTaxDebtV1828 = Math.max(0, Math.round(num(f.businessEntityTaxDebtV1828) + unpaidEntity));
+    f.lastFirmEntityTaxV1828 = entity.tax;
+    f.lastPersonalTaxableV1828 = correctedPersonal;
+    f.taxPolicyV1828.processed[key] = true;
+    f.firmTaxEventsV1828.unshift({ age:s.age || record.age || 0, firmProfit:Math.round(num(record.business)), oldPersonalTax:oldTax, correctedPersonalTax:correctedPersonal, personalRefund:refund, personalDebtReduced:debtReduction, entityTax:entity.tax, entityPaid:pull.paid, entityDebt:unpaidEntity, sources:pull.used, accountant:entity.accountant.label, attorney:entity.attorney.label });
+    f.firmTaxEventsV1828 = f.firmTaxEventsV1828.slice(0, 12);
+    if (!silent) {
+      log("Reclassified firm profit taxes: personal bill reduced by " + moneyFmt(refund + debtReduction) + "; firm/entity tax handled separately.", { money:refund, taxDebt:-debtReduction });
+    }
+    return true;
+  }
+  function reconcileFirmTax(silent) {
+    var s = ensure();
+    var f = s.finance || {};
+    var arr = Array.isArray(f.taxTrueUpsV1824) ? f.taxTrueUpsV1824 : [];
+    var changed = false;
+    arr.forEach(function (rec, idx) {
+      try { if (reclassifyRecord(rec, idx, silent)) changed = true; } catch(e) { try { console.warn("v18.28 firm tax reclass failed", e); } catch(ignore) {} }
+    });
+    return changed;
+  }
+  window.reconcileFirmTaxV1828 = function () {
+    var changed = reconcileFirmTax(false);
+    if (!changed) toast("No unreconciled firm-profit tax found. Future years will separate firm and personal tax automatically.");
+    saveRender();
+  };
+  window.payFirmEntityTaxV1828 = function (rawAmount) {
+    var s = ensure();
+    var f = s.finance || {};
+    var debt = Math.max(0, Math.round(num(f.businessEntityTaxDebtV1828)));
+    if (!debt) return toast("No firm/entity tax debt due.");
+    var amount = rawAmount === "max" ? debt : Math.max(0, Math.round(num(rawAmount)));
+    amount = Math.min(amount, debt);
+    var pull = pullFirmAssets(amount);
+    if (!pull.paid) return toast("No firm assets available. Distribute nothing personally until the firm has cash.");
+    f.businessEntityTaxDebtV1828 = Math.max(0, debt - pull.paid);
+    log("Firm paid " + moneyFmt(pull.paid) + " entity tax from " + (pull.used.join(", ") || "firm assets") + ".", {});
+    saveRender();
+  };
+  window.applyFirmExemptionV1828 = function () {
+    var s = ensure();
+    var f = s.finance || {};
+    var debt = Math.max(0, Math.round(num(f.businessEntityTaxDebtV1828)));
+    if (!debt) return toast("No firm/entity tax debt to reduce.");
+    var acct = accountantFactor();
+    var atty = attorneyFactor();
+    var reduction = Math.min(.35, acct.reduction + atty.reduction);
+    if (!reduction) return toast("Hire an accountant or business/tax attorney first.");
+    var saved = Math.round(debt * reduction);
+    f.businessEntityTaxDebtV1828 = Math.max(0, debt - saved);
+    f.firmTaxEventsV1828.unshift({ age:s.age || 0, firmProfit:0, exemptionOnly:true, entityTax:0, entityPaid:0, entityDebt:f.businessEntityTaxDebtV1828, savings:saved, accountant:acct.label, attorney:atty.label });
+    log("Legal/accounting exemption reduced firm/entity tax by " + moneyFmt(saved) + ".", { taxDebt:-saved });
+    saveRender();
+  };
+
+  var prevResolve = window.resolveLifeAndFinanceYear || (typeof resolveLifeAndFinanceYear === "function" ? resolveLifeAndFinanceYear : null);
+  if (prevResolve && !window.__ledgerResolve1828Wrapped) {
+    window.__ledgerResolve1828Wrapped = true;
+    window.resolveLifeAndFinanceYear = function () {
+      var out = prevResolve.apply(this, arguments);
+      try { reconcileFirmTax(false); } catch(e) { try { console.warn("v18.28 firm tax yearly failed", e); } catch(ignore) {} }
+      return out;
+    };
+    try { resolveLifeAndFinanceYear = window.resolveLifeAndFinanceYear; } catch(e) {}
+  }
+
+  function taxOffice1828() {
+    var s = ensure();
+    reconcileFirmTax(true);
+    var f = s.finance || {};
+    var p = profile(f.taxCountry || "us");
+    var r = region(p, f.taxRegion || (p.regions[0] && p.regions[0][0]));
+    var personal = personalTaxableModel();
+    var firmProfit = currentBusinessProfit();
+    var entity = firmEntityTaxFor(firmProfit);
+    var personalRate = p.personal + num(r[2]);
+    var personalTax = Math.round((personal.salary + personal.passThrough + personal.distributions) * personalRate + personal.investment * p.invest);
+    var personalDebt = Math.max(0, num(f.taxDebt || (f.debts || {}).taxDebt || s.taxDebt));
+    var entityDebt = Math.max(0, num(f.businessEntityTaxDebtV1828));
+    var lastEvent = (f.firmTaxEventsV1828 || [])[0];
+    return `<section class="money-section v1828-tax-office">
+      <div class="money-section-title">Tax Office <span>personal vs firm/entity</span></div>
+      <div class="v1828-note">Firm profit is not personal income until it is distributed, paid as salary/bonus, or treated as pass-through income. The player is taxed personally on salary, dividends, realized gains, and distributions. The firm pays entity tax from firm assets.</div>
+      <div class="v1828-grid four">
+        <div class="v1828-card gold"><span>Where you live</span><b>${esc(p.name)} / ${esc(r[1])}</b><em>Personal income model: ${pct(personalRate)} wages + ${pct(p.invest)} realized investment.</em></div>
+        <div class="v1828-card ${personal.taxable ? "bad" : "good"}"><span>Personal taxable</span><b>${moneyFmt(personal.taxable)}</b><em>Salary ${moneyFmt(personal.salary)} · distributions ${moneyFmt(personal.distributions)} · investment ${moneyFmt(personal.investment)}.</em></div>
+        <div class="v1828-card ${firmProfit ? "good" : "gold"}"><span>Firm profit</span><b>${moneyFmt(firmProfit)}</b><em>Held inside the business/firm, not personally taxed until distribution.</em></div>
+        <div class="v1828-card ${entityDebt ? "bad" : "good"}"><span>Separate firm tax debt</span><b>${moneyFmt(entityDebt)}</b><em>Paid by firm assets, not checking.</em></div>
+      </div>
+      <div class="v1828-split">
+        <div><b>Personal tax estimate</b><span>${moneyFmt(personalTax)} projected from personal taxable events. Current personal tax debt: ${moneyFmt(personalDebt)}.</span></div>
+        <div><b>Firm/entity tax estimate</b><span>${pct(entityRate())} entity rate, ${pct(entity.exemption)} exemption help → ${moneyFmt(entity.tax)} estimated on current firm profit.</span></div>
+        <div><b>Lawyer/accountant effect</b><span>${esc(entity.accountant.label)} + ${esc(entity.attorney.label)}. These reduce entity exposure and audit/legal risk.</span></div>
+        <div><b>Last correction</b><span>${lastEvent ? `Reclassified ${moneyFmt(lastEvent.firmProfit || 0)} firm profit; personal relief ${moneyFmt((lastEvent.personalRefund || 0) + (lastEvent.personalDebtReduced || 0))}.` : "No firm-tax correction recorded yet."}</span></div>
+      </div>
+      <div class="v1828-actions"><button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();reconcileFirmTaxV1828()">Reclassify Current Tax Bill</button><button class="money-btn green" onclick="event.preventDefault();event.stopPropagation();applyFirmExemptionV1828()" ${entityDebt ? "" : "disabled"}>Use Legal Exemption</button><button class="money-btn red" onclick="event.preventDefault();event.stopPropagation();payFirmEntityTaxV1828('max')" ${entityDebt ? "" : "disabled"}>Firm Pay Max</button></div>
+    </section>`;
+  }
+  function firmTaxLedger1828() {
+    var s = ensure();
+    reconcileFirmTax(true);
+    var f = s.finance || {};
+    var personal = personalTaxableModel();
+    var firmProfit = currentBusinessProfit();
+    var entity = firmEntityTaxFor(firmProfit);
+    var entityDebt = Math.max(0, num(f.businessEntityTaxDebtV1828));
+    return `<section class="money-section v1828-firm-tax-ledger">
+      <div class="money-section-title">Firm Tax Ledger <span>no more personal over-taxing</span></div>
+      <div class="v1828-grid four"><div class="v1828-card good"><span>Firm profit</span><b>${moneyFmt(firmProfit)}</b><em>Company money.</em></div><div class="v1828-card gold"><span>Distributed to you</span><b>${moneyFmt(personal.distributions)}</b><em>This becomes personal taxable cash.</em></div><div class="v1828-card bad"><span>Entity tax estimate</span><b>${moneyFmt(entity.tax)}</b><em>Paid by firm assets.</em></div><div class="v1828-card ${entityDebt ? "bad" : "good"}"><span>Entity debt</span><b>${moneyFmt(entityDebt)}</b><em>Separate from personal tax debt.</em></div></div>
+      <div class="v1828-actions"><button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();reconcileFirmTaxV1828()">Fix/Reclassify</button><button class="money-btn red" onclick="event.preventDefault();event.stopPropagation();payFirmEntityTaxV1828(1000000)" ${entityDebt ? "" : "disabled"}>Firm Pay $1M</button><button class="money-btn red" onclick="event.preventDefault();event.stopPropagation();payFirmEntityTaxV1828('max')" ${entityDebt ? "" : "disabled"}>Firm Pay Max</button></div>
+    </section>`;
+  }
+
+  var DEGREE_JOB_MAP = {
+    business:["analyst","marketing","office","finance_manager"], finance:["analyst","finance_manager","wealth_advisor","quant_finance"], cs:["software","cybersecurity","quant_finance"], nursing:["nurse"], education:["teacher"], law:["attorney","paralegal"], medical:["doctor"], biology:["labtech","nurse","doctor"], criminaljustice:["paralegal"], psychology:["counselor"]
+  };
+  var EXTRA_JOBS = [
+    { id:"finance_manager", title:"Finance Manager", salary:118000, minAge:24, degrees:["business","finance"], desc:"Corporate budgets, forecasts, and executive reporting." },
+    { id:"wealth_advisor", title:"Wealth Advisor", salary:98000, minAge:23, degrees:["finance","business"], desc:"Client portfolios and long-term financial planning." },
+    { id:"cybersecurity", title:"Cybersecurity Analyst", salary:104000, minAge:22, degrees:["cs"], desc:"Protect systems, investigate threats, and harden networks." },
+    { id:"attorney", title:"Associate Attorney", salary:105000, minAge:25, degrees:["law"], desc:"Legal career path with casework, clients, and high pressure." },
+    { id:"doctor", title:"Resident Physician", salary:72000, minAge:26, degrees:["medical"], desc:"Medical career path with long training and high ceiling." },
+    { id:"quant_finance", title:"Quant Finance Analyst", salary:145000, minAge:23, degrees:["finance","cs"], desc:"Math, markets, models, and high interview standards." }
+  ];
+  function degreeIds() {
+    var s = ensure();
+    var ids = [];
+    if (s.major) ids.push(String(s.major).toLowerCase());
+    Object.keys(s.flags || {}).forEach(function (key) {
+      if (key.indexOf("degree_") === 0 && s.flags[key]) ids.push(key.replace("degree_", ""));
+    });
+    try { (s.educationV1825.degrees || []).forEach(function (d) { if (d && d.id && (d.completed || d.yearsDone >= d.years)) ids.push(String(d.id).toLowerCase()); }); } catch(e) {}
+    return Array.from(new Set(ids.map(function (x) { return x === "computer science" ? "cs" : x; })));
+  }
+  function allJobs() {
+    var jobs = [];
+    try { if (typeof careerCatalog !== "undefined" && Array.isArray(careerCatalog)) jobs = jobs.concat(careerCatalog); } catch(e) {}
+    try { if (Array.isArray(window.careerCatalog)) jobs = jobs.concat(window.careerCatalog); } catch(e) {}
+    EXTRA_JOBS.forEach(function (j) { if (!jobs.some(function (x) { return x.id === j.id; })) jobs.push(j); });
+    return jobs;
+  }
+  function jobById(id) { return allJobs().find(function (j) { return j.id === id; }) || null; }
+  function requiredDegrees(job) {
+    var out = [];
+    Object.keys(DEGREE_JOB_MAP).forEach(function (deg) { if ((DEGREE_JOB_MAP[deg] || []).indexOf(job.id) >= 0) out.push(deg); });
+    if (Array.isArray(job.degrees)) out = out.concat(job.degrees);
+    return Array.from(new Set(out));
+  }
+  function qualifies(job) {
+    var s = ensure();
+    if (!job) return false;
+    if (num(s.age) < num(job.minAge)) return false;
+    var reqDeg = requiredDegrees(job);
+    var ids = degreeIds();
+    if (reqDeg.length && !reqDeg.some(function (d) { return ids.indexOf(d) >= 0; })) return false;
+    if (!reqDeg.length && job.req) { try { return !!job.req(s); } catch(e) { return false; } }
+    return true;
+  }
+  function missing(job) {
+    var bits = [];
+    if (num(ensure().age) < num(job.minAge)) bits.push("Age " + num(job.minAge) + "+");
+    var reqDeg = requiredDegrees(job);
+    var ids = degreeIds();
+    if (reqDeg.length && !reqDeg.some(function (d) { return ids.indexOf(d) >= 0; })) bits.push("Degree: " + reqDeg.map(function (d) { return d === "cs" ? "Computer Science" : d.charAt(0).toUpperCase() + d.slice(1); }).join(" / "));
+    if (!bits.length && job.req) bits.push("Career-specific requirement");
+    return bits.join(" · ") || "Qualified";
+  }
+  function activeApp(jobId) {
+    return (ensure().careerV1827.applications || []).find(function (a) { return a.jobId === jobId && !a.closed; });
+  }
+  function activeOffer(jobId) {
+    return (ensure().careerV1827.offers || []).find(function (o) { return o.jobId === jobId && !o.closed; });
+  }
+  function fitScore(job) {
+    var s = ensure();
+    var stats = s.stats || {};
+    var smarts = num(stats.smarts || s.smarts || s.iq / 2, 50);
+    var confidence = num(stats.confidence || s.confidence, 50);
+    var discipline = num(stats.discipline || s.discipline, 50);
+    var charisma = num(stats.charisma || stats.social || s.charisma || s.social, confidence);
+    var degreeFit = qualifies(job) ? 25 : 0;
+    var stressPenalty = Math.max(0, num(s.stress || stats.stress) - 55) / 2;
+    var healthPenalty = Math.max(0, 50 - num(s.health || stats.health, 70)) / 3;
+    return Math.round(clamp(20 + degreeFit + smarts*.15 + confidence*.17 + discipline*.12 + charisma*.14 - stressPenalty - healthPenalty, 0, 100));
+  }
+  window.applyToJobV1828 = function (jobId) {
+    var s = ensure();
+    var job = jobById(jobId);
+    if (!job) return toast("Job not found.");
+    if (!qualifies(job)) return toast("Missing: " + missing(job));
+    if (s.job && s.job.jobId === job.id) return toast("You already have that job.");
+    if (activeOffer(job.id)) return toast("You already have an offer waiting.");
+    if (activeApp(job.id)) return toast("Application is already active. Prep or start the interview.");
+    var app = { id:"app28-" + Date.now(), jobId:job.id, title:job.title, salary:job.salary, stage:"applied", rounds:0, score:fitScore(job), prep:{ research:0, resume:0, practice:0, network:0, mock:0, rest:0 }, prepPoints:0, referral:false, createdAge:s.age || 0, closed:false };
+    s.careerV1827.applications.unshift(app);
+    s.careerV1827.applications = s.careerV1827.applications.slice(0, 14);
+    log("Applied for " + job.title + ". Choose prep actions before the interview.", { confidence:1, stress:1 });
+    saveRender();
+  };
+  function applyDelta(deltas) { try { if (typeof applyDeltas === "function") applyDeltas(deltas); } catch(e) {} }
+  window.prepApplicationV1828 = function (jobId, type) {
+    var s = ensure();
+    var app = activeApp(jobId);
+    if (!app) return toast("Apply first, then prep.");
+    app.prep = app.prep || { research:0, resume:0, practice:0, network:0, mock:0, rest:0 };
+    var rules = {
+      research:{ label:"researched the company", cost:0, points:7, max:3, deltas:{ smarts:1, discipline:1, stress:1 } },
+      resume:{ label:"updated résumé/portfolio", cost:150, points:8, max:2, deltas:{ confidence:2, discipline:1 } },
+      practice:{ label:"practiced STAR interview answers", cost:0, points:8, max:4, deltas:{ confidence:2, stress:-1 } },
+      network:{ label:"asked for a referral", cost:100, points:10, max:2, deltas:{ popularity:1, confidence:1, stress:1 } },
+      mock:{ label:"did a mock interview", cost:300, points:13, max:2, deltas:{ confidence:3, discipline:2, stress:-1 } },
+      rest:{ label:"rested before the interview", cost:0, points:4, max:2, deltas:{ stress:-4, energy:3, mentalHealth:2 } }
+    };
+    var rule = rules[type];
+    if (!rule) return toast("Unknown prep action.");
+    if (num(app.prep[type]) >= rule.max) return toast("That prep option is maxed for this application.");
+    if (rule.cost && num(s.money) < rule.cost) return toast("Need " + moneyFmt(rule.cost) + " for that prep.");
+    if (rule.cost) s.money = Math.round(num(s.money) - rule.cost);
+    app.prep[type] = num(app.prep[type]) + 1;
+    app.prepPoints = num(app.prepPoints) + rule.points;
+    if (type === "network" && Math.random() < .35 + Math.min(.25, num(app.prep.network) * .1)) app.referral = true;
+    log("Interview prep: you " + rule.label + " for " + app.title + ".", Object.assign({}, rule.deltas, rule.cost ? { money:-rule.cost } : {}));
+    applyDelta(rule.deltas);
+    saveRender();
+  };
+  window.startInterviewV1828 = function (jobId) {
+    var app = activeApp(jobId);
+    if (!app) return toast("Apply before interviewing.");
+    app.stage = "question";
+    app.question = ["Tell us about a time you solved a hard problem.", "Why do you want this role?", "How would you handle a stressful day on the job?", "What makes you ready for this work?"][Math.floor(Math.random()*4)];
+    log("Interview started for " + app.title + ". Choose how to answer.", { stress:1 });
+    saveRender();
+  };
+  function answerBonus(type, app) {
+    var s = ensure();
+    var st = s.stats || {};
+    if (type === "experience") return num(st.discipline || s.discipline, 50) * .16 + num(app.prep && app.prep.resume) * 5;
+    if (type === "technical") return num(st.smarts || s.smarts || s.iq/2, 50) * .18 + num(app.prep && app.prep.research) * 5;
+    if (type === "people") return num(st.charisma || st.confidence || s.confidence, 50) * .18 + (app.referral ? 10 : 0);
+    if (type === "questions") return num(st.confidence || s.confidence, 50) * .12 + num(app.prep && app.prep.research) * 6 + num(app.prep && app.prep.practice) * 3;
+    return 0;
+  }
+  window.answerInterviewV1828 = function (jobId, type) {
+    var s = ensure();
+    var app = activeApp(jobId);
+    var job = jobById(jobId) || { id:jobId, title:app && app.title, salary:app && app.salary };
+    if (!app) return toast("No active interview found.");
+    if (app.stage !== "question") return toast("Start the interview first.");
+    var threshold = num(job.salary || app.salary) >= 180000 ? 82 : num(job.salary || app.salary) >= 95000 ? 70 : 58;
+    var prep = Math.min(28, num(app.prepPoints) * .55);
+    var score = Math.round(num(app.score || fitScore(job), 50) + prep + answerBonus(type, app) + (Math.random()*18 - 8) + num(app.rounds)*4);
+    app.rounds = num(app.rounds) + 1;
+    app.lastAnswer = type;
+    app.lastInterviewScore = score;
+    if (score >= threshold + 14) {
+      app.closed = true; app.stage = "offer";
+      var strongSalary = Math.round(num(job.salary || app.salary) * (1.08 + Math.random() * .10));
+      s.careerV1827.offers.unshift({ jobId:job.id, title:job.title || app.title, salary:strongSalary, baseSalary:job.salary || app.salary, strength:"strong", createdAge:s.age || 0, closed:false });
+      log("Excellent interview: " + (job.title || app.title) + " offered " + moneyFmt(strongSalary) + "/yr.", { confidence:4, stress:-2 });
+      applyDelta({ confidence:4, stress:-2 });
+    } else if (score >= threshold) {
+      app.closed = true; app.stage = "offer";
+      var salary = Math.round(num(job.salary || app.salary) * (.96 + Math.random() * .10));
+      s.careerV1827.offers.unshift({ jobId:job.id, title:job.title || app.title, salary:salary, baseSalary:job.salary || app.salary, strength:"standard", createdAge:s.age || 0, closed:false });
+      log("Interview passed: " + (job.title || app.title) + " made an offer for " + moneyFmt(salary) + "/yr.", { confidence:2, stress:-1 });
+      applyDelta({ confidence:2, stress:-1 });
+    } else if (score >= threshold - 12 && app.rounds < 2) {
+      app.stage = "second_interview";
+      app.question = "Second interview: explain why you are the safest hire.";
+      log("You reached a second interview for " + app.title + ". Prep again or answer the next round.", { stress:2 });
+      applyDelta({ stress:2 });
+    } else {
+      app.closed = true; app.stage = "rejected";
+      s.careerV1827.history.unshift({ jobId:job.id, title:job.title || app.title, outcome:"Rejected", score:score, age:s.age || 0 });
+      log("Interview result: " + app.title + " passed this time. Use prep actions and try again.", { confidence:-1, stress:2 });
+      applyDelta({ confidence:-1, stress:2 });
+    }
+    s.careerV1828.interviewHistory.unshift({ age:s.age || 0, title:app.title, answer:type, score:score, threshold:threshold, outcome:app.stage });
+    s.careerV1828.interviewHistory = s.careerV1828.interviewHistory.slice(0, 10);
+    saveRender();
+  };
+  window.interviewForJobV1827 = window.startInterviewV1828;
+  window.applyToJobV1827 = window.applyToJobV1828;
+  try { interviewForJobV1827 = window.interviewForJobV1827; applyToJobV1827 = window.applyToJobV1827; } catch(e) {}
+  window.acceptJobOfferV1828 = function (jobId) {
+    var s = ensure();
+    var offer = activeOffer(jobId);
+    var job = jobById(jobId) || { id:jobId, title:offer && offer.title, salary:offer && offer.salary };
+    if (!offer) return toast("No offer waiting for that job.");
+    offer.closed = true; offer.accepted = true;
+    s.careerV1827.applications.forEach(function (a) { if (a.jobId === jobId) a.closed = true; });
+    s.job = { jobId:job.id, title:job.title || offer.title, salary:Math.round(num(offer.salary || job.salary)), performance:50, stress:0, tier:0 };
+    s.careerV1827.history.unshift({ jobId:job.id, title:job.title || offer.title, outcome:"Accepted", salary:offer.salary, age:s.age || 0 });
+    log("Accepted the " + (job.title || offer.title) + " offer.", { happiness:4, stress:3, confidence:2 });
+    applyDelta({ happiness:4, stress:3, confidence:2 });
+    saveRender();
+  };
+  window.acceptJobOfferV1827 = window.acceptJobOfferV1828;
+  try { acceptJobOfferV1827 = window.acceptJobOfferV1827; } catch(e) {}
+
+  function prepButtons(app) {
+    var rows = [
+      ["research", "Research", "Free"], ["resume", "Résumé", "$150"], ["practice", "Practice", "Free"], ["network", "Referral", "$100"], ["mock", "Mock", "$300"], ["rest", "Rest", "Free"]
+    ];
+    return rows.map(function (r) {
+      var count = num(app.prep && app.prep[r[0]]);
+      return `<button class="money-btn" onclick="event.preventDefault();event.stopPropagation();prepApplicationV1828('${esc(app.jobId)}','${r[0]}')">${r[1]} <small>${count}</small></button>`;
+    }).join("");
+  }
+  function answerButtons(app) {
+    if (app.stage !== "question" && app.stage !== "second_interview") return `<button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();startInterviewV1828('${esc(app.jobId)}')">Start Interview</button>`;
+    return `<div class="v1828-question"><b>${esc(app.question || "Interview question")}</b><span>Pick your answer style. Prep actions improve the score.</span></div><div class="v1828-actions"><button class="money-btn green" onclick="event.preventDefault();event.stopPropagation();answerInterviewV1828('${esc(app.jobId)}','experience')">Use Experience</button><button class="money-btn blue" onclick="event.preventDefault();event.stopPropagation();answerInterviewV1828('${esc(app.jobId)}','technical')">Show Technical Skill</button><button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();answerInterviewV1828('${esc(app.jobId)}','people')">Connect With Panel</button><button class="money-btn" onclick="event.preventDefault();event.stopPropagation();answerInterviewV1828('${esc(app.jobId)}','questions')">Ask Smart Questions</button></div>`;
+  }
+  function renderCareer1828() {
+    var s = ensure();
+    var jobs = allJobs().slice().sort(function (a,b) { return num(a.minAge) - num(b.minAge) || num(b.salary) - num(a.salary); }).slice(0, 24);
+    var active = (s.careerV1827.applications || []).filter(function (a) { return !a.closed; });
+    var offers = (s.careerV1827.offers || []).filter(function (o) { return !o.closed; });
+    var pipeline = "";
+    if (offers.length) pipeline += offers.map(function (o) { return `<div class="v1828-pipeline-card offer"><div><b>${esc(o.title)}</b><span>${esc(o.strength || "standard")} offer · ${moneyFmt(o.salary)}/yr</span></div><div class="v1828-actions"><button class="money-btn green" onclick="event.preventDefault();event.stopPropagation();acceptJobOfferV1828('${esc(o.jobId)}')">Accept</button><button class="money-btn" onclick="event.preventDefault();event.stopPropagation();declineJobOfferV1827 && declineJobOfferV1827('${esc(o.jobId)}')">Decline</button></div></div>`; }).join("");
+    if (active.length) pipeline += active.map(function (a) { a.prep = a.prep || {}; return `<div class="v1828-pipeline-card"><div class="v1828-pipeline-top"><div><b>${esc(a.title)}</b><span>${esc(a.stage === "second_interview" ? "Second interview" : a.stage === "question" ? "Interview question" : "Application active")} · fit ${Math.round(num(a.score))}/100 · prep ${Math.round(num(a.prepPoints))}</span></div><strong>${a.referral ? "Referral" : "No referral"}</strong></div><div class="v1828-prep-row">${prepButtons(a)}</div>${answerButtons(a)}</div>`; }).join("");
+    if (!pipeline) pipeline = `<div class="v1828-note small">No active applications. Qualified jobs below now require: apply → prep → interview answers → offer → accept.</div>`;
+    var jobCards = jobs.map(function (job) {
+      var q = qualifies(job);
+      var app = activeApp(job.id);
+      var offer = activeOffer(job.id);
+      var current = s.job && s.job.jobId === job.id;
+      var action = current ? `<button class="money-btn" disabled>Current</button>` : offer ? `<button class="money-btn green" onclick="event.preventDefault();event.stopPropagation();acceptJobOfferV1828('${esc(job.id)}')">Accept Offer</button>` : app ? `<button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();startInterviewV1828('${esc(job.id)}')">Interview</button>` : q ? `<button class="money-btn blue" onclick="event.preventDefault();event.stopPropagation();applyToJobV1828('${esc(job.id)}')">Apply</button>` : `<button class="money-btn" disabled>Locked</button>`;
+      var cls = current ? "current" : offer ? "offer" : app ? "interview" : q ? "qualified" : "locked";
+      return `<div class="v1828-job-card ${cls}"><div class="v1828-job-head"><b>${esc(job.title || job.name || job.id)}</b><span>${current ? "Current" : offer ? "Offer" : app ? "Interviewing" : q ? "Qualified" : "Locked"}</span></div><p>${esc(job.desc || "Career path.")}</p><div class="v1828-pill-row"><span>${moneyFmt(job.salary || 0)}/yr base</span><span>Age ${num(job.minAge) || 16}+</span><span>${q ? "Fit " + fitScore(job) + "/100" : missing(job)}</span></div>${action}</div>`;
+    }).join("");
+    return `<section class="panel v1828-career-system"><div class="section-label">Career Applications + Interviews</div><div class="v1828-career-hero"><div><b>Jobs now have real hiring steps.</b><span>Degrees make you qualified, but you still apply, prepare, answer interview questions, and accept offers.</span></div></div><div class="v1828-pill-row"><span>Degrees: ${esc(degreeIds().join(", ") || "none")}</span><span>Applications: ${active.length}</span><span>Offers: ${offers.length}</span></div><div class="v1828-pipeline">${pipeline}</div><div class="v1828-job-grid">${jobCards}</div></section>`;
+  }
+
+  function removeSections(html, markers) {
+    var out = String(html || "");
+    markers.forEach(function (marker) {
+      var idx = out.indexOf(marker);
+      var guard = 0;
+      while (idx >= 0 && guard++ < 30) {
+        var start = out.lastIndexOf("<section", idx);
+        if (start < 0) start = out.lastIndexOf("<div", idx);
+        var secEnd = out.indexOf("</section>", idx);
+        var divEnd = out.indexOf("</div>", idx);
+        var end = secEnd >= 0 ? secEnd + 10 : (divEnd >= 0 ? divEnd + 6 : -1);
+        if (start < 0 || end < 0 || end <= start) break;
+        out = out.slice(0, start) + out.slice(end);
+        idx = out.indexOf(marker);
+      }
+    });
+    return out;
+  }
+  function insertAfterFirstSection(html, chunk) {
+    var end = String(html || "").indexOf("</section>");
+    return end >= 0 ? html.slice(0, end + 10) + chunk + html.slice(end + 10) : chunk + html;
+  }
+
+  var prevRender = window.renderHubContent || (typeof renderHubContent === "function" ? renderHubContent : null);
+  if (prevRender && !window.__ledgerRender1828Wrapped) {
+    window.__ledgerRender1828Wrapped = true;
+    window.renderHubContent = function (hubId) {
+      ensure();
+      var html = "";
+      try { html = prevRender.apply(this, arguments) || ""; } catch(e) { html = ""; }
+      html = removeSections(html, ["v1824-business-tax", "v1827-tax-office", "v1828-tax-office", "v1828-firm-tax-ledger", "v1827-career-interviews", "v1824-career-reqs", "v1828-career-system"]);
+      if (hubId === "law" || hubId === "legal") return taxOffice1828() + html;
+      if (hubId === "money" || hubId === "finance") return insertAfterFirstSection(html, firmTaxLedger1828());
+      if (hubId === "career") return renderCareer1828() + html;
+      return html;
+    };
+    try { renderHubContent = window.renderHubContent; } catch(e) {}
+  }
+
+  function injectStyles() {
+    if (document.getElementById("ledger-v1828-style")) return;
+    var style = document.createElement("style");
+    style.id = "ledger-v1828-style";
+    style.textContent = [
+      ".v1828-tax-office,.v1828-firm-tax-ledger,.v1828-career-system{border-color:rgba(126,160,172,.46)!important;background:linear-gradient(135deg,rgba(18,35,37,.96),rgba(29,25,20,.98))!important;overflow:hidden!important}",
+      ".v1828-tax-office{border-color:rgba(216,173,109,.5)!important;background:linear-gradient(135deg,rgba(48,37,20,.97),rgba(24,21,18,.98))!important}.v1828-firm-tax-ledger{border-color:rgba(143,175,108,.45)!important}.v1828-career-system{border-color:rgba(126,160,172,.52)!important}",
+      ".v1828-note{font-family:'JetBrains Mono',monospace;color:#cdbb9c;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.09);border-radius:12px;padding:10px 12px;font-size:10px;line-height:1.55;margin:9px 0}.v1828-note.small{color:#aa9a82}",
+      ".v1828-grid{display:grid;gap:8px;margin:10px 0}.v1828-grid.four{grid-template-columns:repeat(4,minmax(0,1fr))}.v1828-card,.v1828-split>div,.v1828-pipeline-card,.v1828-job-card,.v1828-question{border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(255,255,255,.045);padding:11px;min-width:0}.v1828-card span,.v1828-card em,.v1828-split span,.v1828-pipeline-card span,.v1828-job-card p,.v1828-question span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.45;margin-top:4px;font-style:normal}.v1828-card span{text-transform:uppercase;letter-spacing:.12em;font-size:9px}.v1828-card b,.v1828-split b,.v1828-pipeline-card b,.v1828-job-card b,.v1828-question b{display:block;color:#fff3df;font-size:15px;overflow-wrap:anywhere}.v1828-card b{font-family:'JetBrains Mono',monospace;font-size:18px;margin-top:5px}.v1828-card.good b,.v1828-pipeline-card.offer b{color:#b9dc8a}.v1828-card.bad b{color:#e9927d}.v1828-card.gold b{color:#d8ad6d}",
+      ".v1828-split{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:9px 0}.v1828-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.v1828-actions .money-btn,.v1828-prep-row .money-btn{font-size:9px;padding:8px 10px}.v1828-prep-row{display:flex;gap:6px;flex-wrap:wrap;margin:9px 0}.v1828-prep-row small{opacity:.7;margin-left:3px}",
+      ".v1828-career-hero{border:1px solid rgba(126,160,172,.25);border-radius:14px;background:linear-gradient(135deg,rgba(126,160,172,.12),rgba(201,155,85,.07));padding:14px;margin:8px 0 10px}.v1828-career-hero b{display:block;font-size:18px}.v1828-career-hero span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.5;margin-top:5px}.v1828-pill-row{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.v1828-pill-row span{font-family:'JetBrains Mono',monospace;font-size:9px;border:1px solid rgba(255,255,255,.10);border-radius:999px;padding:4px 8px;color:#d8ad6d;background:rgba(255,255,255,.04)}",
+      ".v1828-pipeline{display:grid;gap:8px;margin:10px 0}.v1828-pipeline-top,.v1828-job-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.v1828-pipeline-top strong,.v1828-job-head span{font-family:'JetBrains Mono',monospace;color:#d8ad6d;font-size:9px;text-transform:uppercase;letter-spacing:.08em}.v1828-job-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.v1828-job-card.locked{opacity:.58}.v1828-job-card.qualified{border-color:rgba(126,160,172,.45)}.v1828-job-card.offer{border-color:rgba(143,175,108,.55)}.v1828-job-card.current{border-color:rgba(216,173,109,.65)}.v1828-job-card .money-btn{margin-top:8px;width:100%}",
+      "@media(max-width:820px){.v1828-grid.four,.v1828-split,.v1828-job-grid{grid-template-columns:1fr 1fr}}@media(max-width:520px){.v1828-grid.four,.v1828-split,.v1828-job-grid{grid-template-columns:1fr}.v1828-actions .money-btn,.v1828-prep-row .money-btn{width:100%}}"
+    ].join("\n");
+    document.head.appendChild(style);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", injectStyles); else injectStyles();
+})();
+
+
+
+/* END absorbed 05-patch-v18-28.js */
+
+
+/* BEGIN absorbed 06-patch-v18-29.js */
+
+/* LEDGER PATCH v18.29: manager firms, mandates, dividends, clear investment office controls */
+(function () {
+  if (window.__ledgerPatch1829Managers) return;
+  window.__ledgerPatch1829Managers = true;
+
+  function n(value, fallback) {
+    var out = Number(value);
+    return Number.isFinite(out) ? out : (fallback == null ? 0 : fallback);
+  }
+  function clamp(value, lo, hi) { return Math.max(lo, Math.min(hi, n(value))); }
+  function esc(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+  function money(value) {
+    var v = Math.round(n(value));
+    var sign = v < 0 ? "-" : "";
+    v = Math.abs(v);
+    if (v >= 1e12) return sign + "$" + (v / 1e12).toFixed(1).replace(/\.0$/, "") + "T";
+    if (v >= 1e9) return sign + "$" + (v / 1e9).toFixed(1).replace(/\.0$/, "") + "B";
+    if (v >= 1e6) return sign + "$" + (v / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+    if (v >= 1e4) return sign + "$" + Math.round(v / 1000).toLocaleString() + "K";
+    return sign + "$" + v.toLocaleString();
+  }
+  function pct(value) { return (n(value) * 100).toFixed(1).replace(/\.0$/, "") + "%"; }
+  function signedPct(value) { return (n(value) >= 0 ? "+" : "") + pct(value); }
+  function toast(msg) {
+    try { if (typeof addToast === "function") return addToast(msg); } catch (e) {}
+    try { if (typeof addLog === "function") return addLog(msg, {}); } catch (e) {}
+    try { console.log(msg); } catch (e) {}
+  }
+  function log(msg, deltas) {
+    try { if (typeof addLog === "function") return addLog(msg, deltas || {}); } catch (e) {}
+    try { console.log(msg, deltas || {}); } catch (e) {}
+  }
+  function saveRender() {
+    try { if (typeof save === "function") save(); } catch (e) {}
+    try { if (typeof render === "function") render(); } catch (e) {}
+  }
+  function ensure() {
+    try { if (typeof window.__ledgerEnsureStateSync18261 === "function") window.__ledgerEnsureStateSync18261(); } catch (e) {}
+    try { if (typeof ensureStateShape === "function") ensureStateShape(); } catch (e) {}
+    try { if ((typeof state === "undefined" || !state) && window.state) state = window.state; } catch (e) {}
+    if (!window.state && typeof state !== "undefined") window.state = state;
+    if (!window.state) window.state = {};
+    try { if (typeof state === "undefined" || !state) state = window.state; } catch (e) {}
+    var s = window.state;
+    s.finance = s.finance || {};
+    s.stats = s.stats || {};
+    s.finance.incomeSources = s.finance.incomeSources || {};
+    s.finance.externalManager = s.finance.externalManager || { id: null, capital: 0, lastReturn: 0, lastFee: 0 };
+    s.finance.managerV1829 = s.finance.managerV1829 || {};
+    var m = s.finance.managerV1829;
+    m.mandate = m.mandate || "balanced";
+    m.history = Array.isArray(m.history) ? m.history : [];
+    m.pendingDistribution = Math.max(0, n(m.pendingDistribution));
+    m.totalDividends = Math.max(0, n(m.totalDividends));
+    m.totalFees = Math.max(0, n(m.totalFees));
+    m.totalNetReturn = n(m.totalNetReturn);
+    m.lastProcessedAge = n(m.lastProcessedAge, -1);
+    if (s.money == null) s.money = 0;
+    if (s.savings == null) s.savings = 0;
+    if (s.finance.superSaver == null) s.finance.superSaver = 0;
+    if (s.finance.brokerage == null) s.finance.brokerage = 0;
+    return s;
+  }
+
+  var FIRMS = [
+    { id: "vanguard", name: "Vanguard Index Office", min: 1000, upfront: 25, fee: .0015, target: .064, risk: .10, income: .012, taxEff: .16, ability: "Ultra-low fees, broad index exposure, steady retirement-style growth.", unlock: "Starter friendly" },
+    { id: "blackrock", name: "BlackRock Global Allocation", min: 25000, upfront: 500, fee: .004, target: .077, risk: .14, income: .018, taxEff: .12, ability: "Mega-firm diversification, lower drawdowns, smoother performance during bad markets.", unlock: "$25K managed" },
+    { id: "fidelity", name: "Fidelity Active Growth", min: 10000, upfront: 250, fee: .0065, target: .091, risk: .21, income: .010, taxEff: .08, ability: "Growth stock tilt with useful research and slightly higher upside.", unlock: "$10K managed" },
+    { id: "berkshire", name: "Berkshire Value Desk", min: 50000, upfront: 1000, fee: .003, target: .084, risk: .16, income: .006, taxEff: .20, ability: "Value compounding, patient capital, and a drawdown guard when markets panic.", unlock: "$50K managed" },
+    { id: "bridgewater", name: "Bridgewater Macro Hedge", min: 250000, upfront: 5000, fee: .012, target: .082, risk: .11, income: .015, taxEff: .05, ability: "Macro hedge. It can protect capital when market mood is weak or volatile.", unlock: "$250K managed" },
+    { id: "renaissance", name: "Renaissance Quant Sleeve", min: 1000000, upfront: 25000, fee: .018, target: .118, risk: .20, income: .002, taxEff: .03, ability: "Quant alpha. High fees, but strong upside for very large accounts.", unlock: "$1M managed" },
+    { id: "sequoia", name: "Sequoia Venture Track", min: 5000000, upfront: 50000, fee: .02, target: .155, risk: .38, income: 0, taxEff: .02, ability: "Venture boom/bust. Can explode upward, but drawdowns are ugly.", unlock: "$5M managed" }
+  ];
+  var MANDATES = {
+    preservation: { name: "Preservation", returnAdj: -.018, riskAdj: -.45, incomeAdj: .006, taxAdj: .08, desc: "Protect capital first, lower upside, more cash-like behavior." },
+    balanced: { name: "Balanced", returnAdj: 0, riskAdj: 0, incomeAdj: 0, taxAdj: 0, desc: "Normal blended strategy with moderate risk and some distributions." },
+    growth: { name: "Growth", returnAdj: .024, riskAdj: .35, incomeAdj: -.008, taxAdj: -.03, desc: "Reinvest aggressively. Higher swings, lower yearly income." },
+    income: { name: "Income", returnAdj: -.006, riskAdj: -.08, incomeAdj: .024, taxAdj: -.02, desc: "Prioritize dividends/distributions into checking." },
+    taxsmart: { name: "Tax Smart", returnAdj: -.004, riskAdj: -.12, incomeAdj: -.003, taxAdj: .18, desc: "Lower taxable payouts and fees through tax-aware management." }
+  };
+  function firmById(id) { return FIRMS.find(function (f) { return f.id === id; }) || FIRMS[0]; }
+  function mandateById(id) { return MANDATES[id] || MANDATES.balanced; }
+  function manager() { return ensure().finance.externalManager; }
+  function mgrState() { return ensure().finance.managerV1829; }
+  function currentFirm() { return manager().id ? firmById(manager().id) : null; }
+  function liquidCash() {
+    var s = ensure();
+    return Math.max(0, n(s.money) + n(s.savings) + n(s.finance.superSaver));
+  }
+  function pullCash(amount) {
+    var s = ensure();
+    var rem = Math.max(0, Math.round(n(amount)));
+    rem = Math.min(rem, liquidCash());
+    var paid = rem;
+    var take = Math.min(Math.max(0, n(s.money)), rem); s.money = Math.round(n(s.money) - take); rem -= take;
+    take = Math.min(Math.max(0, n(s.savings)), rem); s.savings = Math.round(n(s.savings) - take); rem -= take;
+    take = Math.min(Math.max(0, n(s.finance.superSaver)), rem); s.finance.superSaver = Math.round(n(s.finance.superSaver) - take); rem -= take;
+    return paid - rem;
+  }
+  function addChecking(amount) { var s = ensure(); s.money = Math.round(n(s.money) + Math.max(0, n(amount))); }
+  function getCustom(id, max) {
+    var el = document.getElementById(id);
+    var raw = el ? String(el.value || "") : "";
+    var out = Math.round(Number(raw.replace(/[^0-9.]/g, "")) || 0);
+    if (max != null) out = Math.min(out, Math.max(0, n(max)));
+    return Math.max(0, out);
+  }
+  function getAmount(raw, max) {
+    if (raw === "all") return Math.max(0, n(max));
+    if (raw === "half") return Math.round(Math.max(0, n(max)) / 2);
+    if (raw === "custom") return getCustom("v1829-manager-custom", max);
+    return Math.max(0, Math.min(Math.round(n(raw)), Math.max(0, n(max))));
+  }
+  function firmUnlocked(firm) {
+    var cap = n(manager().capital);
+    return cap >= n(firm.min) || liquidCash() >= n(firm.min) || n(ensure().money) >= n(firm.upfront);
+  }
+
+  window.hireManagerV1829 = function (firmId) {
+    var s = ensure();
+    var firm = firmById(firmId);
+    if (!firm) return toast("Unknown management firm.");
+    if (n(s.age) < 18) return toast("You need to be an adult to sign with an outside manager.");
+    if (n(s.money) < firm.upfront) return toast("Need " + money(firm.upfront) + " checking for the onboarding fee.");
+    s.money = Math.round(n(s.money) - firm.upfront);
+    manager().id = firm.id;
+    manager().name = firm.name;
+    mgrState().mandate = mgrState().mandate || "balanced";
+    log("Hired " + firm.name + ". Set a mandate and allocate capital when ready.", { money: -firm.upfront, confidence: 1 });
+    saveRender();
+  };
+  window.setManagerMandateV1829 = function (id) {
+    ensure();
+    if (!MANDATES[id]) return toast("Unknown mandate.");
+    mgrState().mandate = id;
+    log("Outside manager mandate changed to " + MANDATES[id].name + ".", {});
+    saveRender();
+  };
+  window.allocateToManagerV1829 = function (rawAmount) {
+    ensure();
+    var firm = currentFirm();
+    if (!firm) return toast("Hire a management firm first.");
+    var amt = getAmount(rawAmount, liquidCash());
+    if (!amt) return toast("No cash available to allocate.");
+    var pulled = pullCash(amt);
+    if (!pulled) return toast("No cash available to allocate.");
+    manager().capital = Math.round(n(manager().capital) + pulled);
+    log("Allocated " + money(pulled) + " to " + firm.name + ".", { money: -pulled });
+    saveRender();
+  };
+  window.withdrawFromManagerV1829 = function (rawAmount) {
+    ensure();
+    var mgr = manager();
+    var amt = getAmount(rawAmount, n(mgr.capital));
+    if (!amt) return toast("No managed money to withdraw.");
+    mgr.capital = Math.max(0, Math.round(n(mgr.capital) - amt));
+    addChecking(amt);
+    log("Withdrew " + money(amt) + " from outside management to checking.", { money: amt });
+    saveRender();
+  };
+  window.claimManagerDistributionV1829 = function () {
+    var m = mgrState();
+    var amt = Math.max(0, Math.round(n(m.pendingDistribution)));
+    if (!amt) return toast("No pending manager distribution.");
+    m.pendingDistribution = 0;
+    addChecking(amt);
+    ensure().finance.incomeSources.managerDistributionV1829 = Math.max(0, n(ensure().finance.incomeSources.managerDistributionV1829) + amt);
+    log("Claimed " + money(amt) + " in outside-manager distributions to checking.", { money: amt });
+    saveRender();
+  };
+  window.reinvestManagerDistributionV1829 = function () {
+    var m = mgrState();
+    var amt = Math.max(0, Math.round(n(m.pendingDistribution)));
+    if (!amt) return toast("No pending manager distribution.");
+    m.pendingDistribution = 0;
+    manager().capital = Math.round(n(manager().capital) + amt);
+    log("Reinvested " + money(amt) + " of manager distributions.", {});
+    saveRender();
+  };
+  window.stressTestManagerV1829 = function () {
+    ensure();
+    var firm = currentFirm();
+    if (!firm || n(manager().capital) <= 0) return toast("Hire a firm and allocate capital first.");
+    var mandate = mandateById(mgrState().mandate);
+    var risk = Math.max(.02, firm.risk * (1 + mandate.riskAdj));
+    var bear = -Math.round(n(manager().capital) * risk * .72);
+    var normal = Math.round(n(manager().capital) * (firm.target + mandate.returnAdj - firm.fee) * .60);
+    mgrState().lastStressTest = { firm: firm.name, mandate: mandate.name, bear: bear, normal: normal, age: ensure().age || 0 };
+    log("Ran a manager stress test: bear case " + money(bear) + ", normal case " + money(normal) + ".", {});
+    saveRender();
+  };
+
+  function managerYearV1829() {
+    var s = ensure();
+    var m = mgrState();
+    var mgr = manager();
+    var age = n(s.age);
+    if (!mgr.id || n(mgr.capital) <= 0) return;
+    if (m.lastProcessedAge === age) return;
+    m.lastProcessedAge = age;
+    var firm = firmById(mgr.id);
+    var mandate = mandateById(m.mandate);
+    var marketReturn = n((s.market || {}).lastReturn);
+    var mood = String((s.market || {}).mood || "normal").toLowerCase();
+    var risk = Math.max(.02, firm.risk * (1 + mandate.riskAdj));
+    var alpha = firm.target + mandate.returnAdj;
+    if (firm.id === "blackrock" && (mood.indexOf("bad") >= 0 || marketReturn < -.08)) alpha += .018;
+    if (firm.id === "bridgewater" && marketReturn < 0) alpha += Math.min(.05, Math.abs(marketReturn) * .55);
+    if (firm.id === "berkshire" && marketReturn < -.12) risk *= .72;
+    if (firm.id === "renaissance") alpha += clamp(n((s.stats || {}).smarts || s.smarts, 50) - 65, -10, 25) / 1000;
+    if (firm.id === "sequoia" && Math.random() < .08) alpha += .45;
+    var randomSwing = (Math.random() * 2 - 1) * risk;
+    var grossRate = alpha + marketReturn * .28 + randomSwing;
+    var gross = Math.round(n(mgr.capital) * grossRate);
+    var fee = Math.max(0, Math.round(n(mgr.capital) * firm.fee));
+    var distributionRate = Math.max(0, firm.income + mandate.incomeAdj);
+    var distribution = Math.max(0, Math.round(Math.max(0, n(mgr.capital) + gross - fee) * distributionRate));
+    var taxEfficiency = clamp(firm.taxEff + mandate.taxAdj, 0, .55);
+    var taxableDistribution = Math.round(distribution * (1 - taxEfficiency));
+    var net = gross - fee - distribution;
+    mgr.capital = Math.max(0, Math.round(n(mgr.capital) + net));
+    mgr.lastReturn = gross - fee;
+    mgr.lastFee = fee;
+    m.pendingDistribution = Math.max(0, Math.round(n(m.pendingDistribution) + distribution));
+    m.totalDividends += distribution;
+    m.totalFees += fee;
+    m.totalNetReturn += gross - fee;
+    m.lastGross = gross;
+    m.lastFee = fee;
+    m.lastDistribution = distribution;
+    m.lastTaxableDistribution = taxableDistribution;
+    m.lastNet = gross - fee;
+    m.history.unshift({ age: age, firm: firm.name, mandate: mandate.name, startCapital: Math.round(n(mgr.capital) - net), gross: gross, fee: fee, distribution: distribution, taxableDistribution: taxableDistribution, net: gross - fee, endCapital: Math.round(n(mgr.capital)), returnRate: grossRate });
+    m.history = m.history.slice(0, 12);
+    s.finance.incomeSources.pendingManagerDistributionV1829 = m.pendingDistribution;
+    s.finance.incomeSources.taxableManagerDistributionV1829 = Math.max(0, n(s.finance.incomeSources.taxableManagerDistributionV1829) + taxableDistribution);
+    log(firm.name + " returned " + signedPct(grossRate) + " before fees; distribution pending " + money(distribution) + ".", { brokerage: gross - fee });
+  }
+
+  var previousAgeUp = window.ageUp || (typeof ageUp === "function" ? ageUp : null);
+  if (previousAgeUp && !window.__ledgerAgeUp1829Wrapped) {
+    window.__ledgerAgeUp1829Wrapped = true;
+    window.ageUp = function () {
+      var result = previousAgeUp.apply(this, arguments);
+      try { managerYearV1829(); } catch (e) { console.error("v18.29 manager yearly failed", e); }
+      try { if (typeof save === "function") save(); } catch (e) {}
+      return result;
+    };
+    try { ageUp = window.ageUp; } catch (e) {}
+  }
+  window.processManagerYearV1829 = function () { managerYearV1829(); saveRender(); };
+
+  function managerStatusLabel() {
+    var firm = currentFirm();
+    var mandate = mandateById(mgrState().mandate);
+    if (!firm) return "No firm hired";
+    return firm.name + " · " + mandate.name;
+  }
+  function firmCards() {
+    var s = ensure();
+    return FIRMS.map(function (firm) {
+      var selected = currentFirm() && currentFirm().id === firm.id;
+      var unlocked = firmUnlocked(firm);
+      return '<div class="v1829-firm-card ' + (selected ? 'selected ' : '') + (!unlocked ? 'locked' : '') + '">' +
+        '<div class="v1829-firm-top"><div><b>' + esc(firm.name) + '</b><span>' + esc(firm.ability) + '</span></div><strong>' + esc(firm.unlock) + '</strong></div>' +
+        '<div class="v1829-chip-row"><span>Target ' + pct(firm.target) + '</span><span>Risk ' + pct(firm.risk) + '</span><span>Fee ' + pct(firm.fee) + '</span><span>Income ' + pct(firm.income) + '</span><span>Tax efficiency ' + pct(firm.taxEff) + '</span></div>' +
+        '<button class="money-btn ' + (selected ? '' : 'green') + '" onclick="event.preventDefault();event.stopPropagation();hireManagerV1829(\'' + esc(firm.id) + '\')" ' + (selected || n(s.age) < 18 || n(s.money) < firm.upfront ? 'disabled' : '') + '>' + (selected ? 'Current Firm' : 'Hire ' + money(firm.upfront)) + '</button>' +
+      '</div>';
+    }).join('');
+  }
+  function mandateCards() {
+    var current = mgrState().mandate;
+    return Object.keys(MANDATES).map(function (id) {
+      var mandate = MANDATES[id];
+      return '<button class="v1829-mandate-card ' + (current === id ? 'active' : '') + '" onclick="event.preventDefault();event.stopPropagation();setManagerMandateV1829(\'' + esc(id) + '\')"><b>' + esc(mandate.name) + '</b><span>' + esc(mandate.desc) + '</span></button>';
+    }).join('');
+  }
+  function historyRows() {
+    var rows = (mgrState().history || []).slice(0, 7);
+    if (!rows.length) return '<div class="v1829-note">No yearly manager history yet. Age up after hiring and allocating capital.</div>';
+    return rows.map(function (r) {
+      return '<div class="v1829-history-row"><span>Age ' + esc(r.age) + ' · ' + esc(r.firm) + '</span><b class="' + (n(r.net) >= 0 ? 'good' : 'bad') + '">' + money(r.net) + '</b><em>Gross ' + money(r.gross) + ' · fee ' + money(r.fee) + ' · distribution ' + money(r.distribution) + ' · capital ' + money(r.endCapital) + '</em></div>';
+    }).join('');
+  }
+  function managerDeskHtml() {
+    var s = ensure();
+    var mgr = manager();
+    var m = mgrState();
+    var firm = currentFirm();
+    var mandate = mandateById(m.mandate);
+    var test = m.lastStressTest || null;
+    return '<section class="panel v1829-manager-desk"><div class="section-label">Outside Management Firms v18.29</div>' +
+      '<div class="v1829-hero"><div><b>Management firms now have abilities, fees, mandates, distributions, and withdrawal controls.</b><span>Hire a firm, pick a mandate, allocate capital, and decide whether to claim or reinvest distributions.</span></div></div>' +
+      '<div class="v1829-grid four"><div class="v1829-stat"><span>Status</span><b>' + esc(managerStatusLabel()) + '</b></div><div class="v1829-stat"><span>Managed capital</span><b>' + money(mgr.capital) + '</b></div><div class="v1829-stat"><span>Pending distribution</span><b class="good">' + money(m.pendingDistribution) + '</b></div><div class="v1829-stat"><span>Last net after fee</span><b class="' + (n(m.lastNet) >= 0 ? 'good' : 'bad') + '">' + money(m.lastNet) + '</b></div></div>' +
+      '<div class="v1829-note">Current mandate: <b>' + esc(mandate.name) + '</b>. ' + esc(mandate.desc) + (firm ? ' Firm ability: ' + esc(firm.ability) : ' Hire a firm to activate yearly management effects.') + '</div>' +
+      '<div class="v1829-action-row"><button class="money-btn green" onclick="event.preventDefault();event.stopPropagation();allocateToManagerV1829(10000)" ' + (!firm || liquidCash() < 10000 ? 'disabled' : '') + '>Allocate $10K</button><button class="money-btn green" onclick="event.preventDefault();event.stopPropagation();allocateToManagerV1829(100000)" ' + (!firm || liquidCash() < 100000 ? 'disabled' : '') + '>Allocate $100K</button><button class="money-btn green" onclick="event.preventDefault();event.stopPropagation();allocateToManagerV1829(\'all\')" ' + (!firm || liquidCash() <= 0 ? 'disabled' : '') + '>Allocate Liquid</button><button class="money-btn" onclick="event.preventDefault();event.stopPropagation();withdrawFromManagerV1829(10000)" ' + (n(mgr.capital) < 10000 ? 'disabled' : '') + '>Withdraw $10K</button><button class="money-btn" onclick="event.preventDefault();event.stopPropagation();withdrawFromManagerV1829(\'all\')" ' + (n(mgr.capital) <= 0 ? 'disabled' : '') + '>Withdraw All</button></div>' +
+      '<div class="v1829-custom-row"><input id="v1829-manager-custom" inputmode="numeric" placeholder="Custom allocation / withdrawal $"><button class="money-btn green" onclick="event.preventDefault();event.stopPropagation();allocateToManagerV1829(\'custom\')" ' + (!firm || liquidCash() <= 0 ? 'disabled' : '') + '>Allocate Custom</button><button class="money-btn" onclick="event.preventDefault();event.stopPropagation();withdrawFromManagerV1829(\'custom\')" ' + (n(mgr.capital) <= 0 ? 'disabled' : '') + '>Withdraw Custom</button></div>' +
+      '<div class="v1829-action-row"><button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();claimManagerDistributionV1829()" ' + (n(m.pendingDistribution) <= 0 ? 'disabled' : '') + '>Claim Distribution</button><button class="money-btn blue" onclick="event.preventDefault();event.stopPropagation();reinvestManagerDistributionV1829()" ' + (n(m.pendingDistribution) <= 0 ? 'disabled' : '') + '>Reinvest Distribution</button><button class="money-btn blue" onclick="event.preventDefault();event.stopPropagation();stressTestManagerV1829()" ' + (!firm || n(mgr.capital) <= 0 ? 'disabled' : '') + '>Stress Test</button></div>' +
+      (test ? '<div class="v1829-note">Last stress test: bear case <b class="bad">' + money(test.bear) + '</b>, normal case <b class="good">' + money(test.normal) + '</b>.</div>' : '') +
+      '<div class="v1829-subtitle">Mandates</div><div class="v1829-mandate-grid">' + mandateCards() + '</div>' +
+      '<div class="v1829-subtitle">Firms</div><div class="v1829-firm-grid">' + firmCards() + '</div>' +
+      '<div class="v1829-subtitle">Performance History</div><div class="v1829-history">' + historyRows() + '</div>' +
+    '</section>';
+  }
+  window.renderManagerDeskV1829 = managerDeskHtml;
+
+  function removeOldManagerCards(html) {
+    var out = String(html || "");
+    ["Outside Management Firms v18.29", "🏢 Outside Management Firms"].forEach(function (marker) {
+      var guard = 0;
+      var idx = out.indexOf(marker);
+      while (idx >= 0 && guard++ < 20) {
+        var start = out.lastIndexOf("<section", idx);
+        var end = out.indexOf("</section>", idx);
+        if (start < 0 || end < 0 || end <= start) break;
+        out = out.slice(0, start) + out.slice(end + 10);
+        idx = out.indexOf(marker);
+      }
+    });
+    return out;
+  }
+  function insertAfterFirstSection(html, chunk) {
+    var source = String(html || "");
+    var end = source.indexOf("</section>");
+    return end >= 0 ? source.slice(0, end + 10) + chunk + source.slice(end + 10) : chunk + source;
+  }
+
+  var previousRender = window.renderHubContent || (typeof renderHubContent === "function" ? renderHubContent : null);
+  if (previousRender && !window.__ledgerRender1829Wrapped) {
+    window.__ledgerRender1829Wrapped = true;
+    window.renderHubContent = function (hubId) {
+      ensure();
+      var html = "";
+      try { html = previousRender.apply(this, arguments) || ""; } catch (e) { html = ""; }
+      if (hubId === "brokerage" || hubId === "finance" || hubId === "money") {
+        html = removeOldManagerCards(html);
+        return insertAfterFirstSection(html, managerDeskHtml());
+      }
+      return html;
+    };
+    try { renderHubContent = window.renderHubContent; } catch (e) {}
+  }
+
+  function injectStyles() {
+    if (document.getElementById("ledger-v1829-style")) return;
+    var style = document.createElement("style");
+    style.id = "ledger-v1829-style";
+    style.textContent = [
+      ".v1829-manager-desk{border-color:rgba(126,160,172,.52)!important;background:linear-gradient(135deg,rgba(16,30,33,.98),rgba(29,25,20,.98))!important;overflow:hidden!important}",
+      ".v1829-hero{border:1px solid rgba(126,160,172,.28);border-radius:16px;padding:14px;margin:8px 0 12px;background:linear-gradient(135deg,rgba(126,160,172,.14),rgba(201,155,85,.07))}.v1829-hero b{display:block;font-size:18px;color:#fff3df}.v1829-hero span{display:block;font-family:'JetBrains Mono',monospace;font-size:10px;color:#b9a98e;line-height:1.5;margin-top:5px}",
+      ".v1829-grid{display:grid;gap:8px;margin:10px 0}.v1829-grid.four{grid-template-columns:repeat(4,minmax(0,1fr))}.v1829-stat,.v1829-firm-card,.v1829-mandate-card,.v1829-history-row{border:1px solid rgba(255,255,255,.10);border-radius:13px;background:rgba(255,255,255,.045);padding:11px;min-width:0}.v1829-stat span{display:block;font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:#aa9a82}.v1829-stat b{display:block;margin-top:5px;color:#fff3df;font-size:16px;overflow-wrap:anywhere}.v1829-stat b.good,.v1829-history-row b.good{color:#b9dc8a}.v1829-stat b.bad,.v1829-history-row b.bad{color:#e9927d}",
+      ".v1829-note{font-family:'JetBrains Mono',monospace;font-size:10px;color:#cdbb9c;line-height:1.55;border:1px solid rgba(255,255,255,.09);border-radius:12px;background:rgba(255,255,255,.04);padding:10px 12px;margin:9px 0}.v1829-note b{color:#d8ad6d}.v1829-note b.good{color:#b9dc8a}.v1829-note b.bad{color:#e9927d}.v1829-subtitle{font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.14em;color:#d8ad6d;font-size:10px;margin:14px 0 8px}",
+      ".v1829-action-row{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0}.v1829-action-row .money-btn{font-size:9px;padding:8px 10px}.v1829-custom-row{display:grid;grid-template-columns:minmax(120px,1fr) auto auto;gap:7px;margin:8px 0}.v1829-custom-row input{min-width:0}",
+      ".v1829-mandate-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.v1829-mandate-card{cursor:pointer;color:#f6ead8;text-align:left}.v1829-mandate-card.active{border-color:rgba(216,173,109,.72);background:rgba(216,173,109,.12)}.v1829-mandate-card b,.v1829-firm-card b{display:block;color:#fff3df;font-size:14px}.v1829-mandate-card span,.v1829-firm-card span,.v1829-history-row em{display:block;color:#aa9a82;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.45;margin-top:4px;font-style:normal}",
+      ".v1829-firm-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.v1829-firm-card.selected{border-color:rgba(143,175,108,.62);background:rgba(143,175,108,.08)}.v1829-firm-card.locked{opacity:.65}.v1829-firm-top{display:flex;gap:10px;justify-content:space-between;align-items:flex-start}.v1829-firm-top strong{font-family:'JetBrains Mono',monospace;color:#d8ad6d;font-size:9px;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}.v1829-chip-row{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.v1829-chip-row span{border:1px solid rgba(255,255,255,.10);border-radius:999px;background:rgba(255,255,255,.04);padding:4px 7px;color:#d8ad6d;font-family:'JetBrains Mono',monospace;font-size:9px}.v1829-firm-card .money-btn{width:100%;margin-top:8px}",
+      ".v1829-history{display:grid;gap:7px}.v1829-history-row{display:grid;grid-template-columns:1fr auto;gap:7px;align-items:start}.v1829-history-row span{font-family:'JetBrains Mono',monospace;color:#d8ad6d;font-size:10px}.v1829-history-row em{grid-column:1/-1;margin-top:0}",
+      "@media(max-width:980px){.v1829-grid.four{grid-template-columns:repeat(2,minmax(0,1fr))}.v1829-mandate-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:640px){.v1829-grid.four,.v1829-firm-grid,.v1829-mandate-grid,.v1829-custom-row{grid-template-columns:1fr}.v1829-action-row .money-btn{width:100%}.v1829-firm-top{display:block}.v1829-firm-top strong{display:inline-block;margin-top:6px}}"
+    ].join("\n");
+    document.head.appendChild(style);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", injectStyles); else injectStyles();
+})();
+
+
+
+/* END absorbed 06-patch-v18-29.js */
+
+
+/* BEGIN absorbed 07-patch-v18-30.js */
+
+/* LEDGER PATCH v18.30: business entity structures, retained earnings, owner distributions, clearer launch requirements */
+(function () {
+  if (window.__ledgerPatch1830BusinessEntities) return;
+  window.__ledgerPatch1830BusinessEntities = true;
+
+  function num(value, fallback) {
+    var n = Number(value);
+    return Number.isFinite(n) ? n : (fallback == null ? 0 : fallback);
+  }
+  function clamp(value, lo, hi) { return Math.max(lo, Math.min(hi, num(value))); }
+  function esc(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+  function money(value) {
+    var v = Math.round(num(value));
+    var sign = v < 0 ? "-" : "";
+    v = Math.abs(v);
+    if (v >= 1e12) return sign + "$" + (v / 1e12).toFixed(1).replace(/\.0$/, "") + "T";
+    if (v >= 1e9) return sign + "$" + (v / 1e9).toFixed(1).replace(/\.0$/, "") + "B";
+    if (v >= 1e6) return sign + "$" + (v / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+    if (v >= 1e4) return sign + "$" + Math.round(v / 1000).toLocaleString() + "K";
+    return sign + "$" + v.toLocaleString();
+  }
+  function pct(value) { return (num(value) * 100).toFixed(1).replace(/\.0$/, "") + "%"; }
+  function toast(message) {
+    try { if (typeof addToast === "function") return addToast(message); } catch (e) {}
+    try { if (typeof addLog === "function") return addLog(message, {}); } catch (e) {}
+    try { console.log(message); } catch (e) {}
+  }
+  function log(message, deltas) {
+    try { if (typeof addLog === "function") return addLog(message, deltas || {}); } catch (e) {}
+    try { console.log(message, deltas || {}); } catch (e) {}
+  }
+  function apply(deltas) {
+    try { if (typeof applyDeltas === "function") return applyDeltas(deltas || {}); } catch (e) {}
+    try { if (typeof applyDelta === "function") return applyDelta(deltas || {}); } catch (e) {}
+    var s = ensure();
+    Object.keys(deltas || {}).forEach(function (key) {
+      if (["money", "cash", "checking"].includes(key)) s.money = Math.round(num(s.money) + num(deltas[key]));
+      else if (s.stats && key in s.stats) s.stats[key] = clamp(num(s.stats[key]) + num(deltas[key]), 0, 100);
+      else s[key] = num(s[key]) + num(deltas[key]);
+    });
+  }
+  function saveRender() {
+    try { if (typeof save === "function") save(); } catch (e) {}
+    try { if (typeof render === "function") render(); } catch (e) {}
+  }
+  function ensure() {
+    try { if (typeof window.__ledgerEnsureStateSync18261 === "function") window.__ledgerEnsureStateSync18261(); } catch (e) {}
+    try { if (typeof ensureStateShape === "function") ensureStateShape(); } catch (e) {}
+    try { if ((typeof state === "undefined" || !state) && window.state) state = window.state; } catch (e) {}
+    if (!window.state && typeof state !== "undefined") window.state = state;
+    if (!window.state) window.state = {};
+    try { if (typeof state === "undefined" || !state) state = window.state; } catch (e) {}
+    var s = window.state;
+    s.stats = s.stats || {};
+    s.flags = s.flags || {};
+    s.actionsTaken = s.actionsTaken || {};
+    s.finance = s.finance || {};
+    s.finance.businesses = Array.isArray(s.finance.businesses) ? s.finance.businesses : [];
+    s.finance.debts = s.finance.debts || {};
+    s.finance.incomeSources = s.finance.incomeSources || {};
+    s.finance.businessTaxV1830 = s.finance.businessTaxV1830 || {};
+    var bt = s.finance.businessTaxV1830;
+    bt.history = Array.isArray(bt.history) ? bt.history : [];
+    bt.processedAges = bt.processedAges || {};
+    bt.personalRefunds = Math.max(0, num(bt.personalRefunds));
+    bt.entityTaxes = Math.max(0, num(bt.entityTaxes));
+    bt.distributions = Math.max(0, num(bt.distributions));
+    bt.salaries = Math.max(0, num(bt.salaries));
+    s.finance.businesses.forEach(function (b) { ensureBusiness(b); });
+    return s;
+  }
+
+  var STRUCTURES = {
+    soleprop: {
+      name: "Sole Prop", cost: 0, minValue: 0, tax: "pass-through",
+      retain: 0, entityRate: 0, shield: 0, compliance: 0,
+      desc: "Simple side hustle. Profit goes straight to checking and personal tax. No real liability shield."
+    },
+    partnership: {
+      name: "Partnership", cost: 900, minValue: 5000, tax: "pass-through split",
+      retain: .10, entityRate: .02, shield: .10, compliance: 650,
+      desc: "Shared ownership. Some money can stay inside the business, but most profit is still personal/pass-through."
+    },
+    llc: {
+      name: "LLC", cost: 1200, minValue: 10000, tax: "flexible entity",
+      retain: .65, entityRate: .07, shield: .35, compliance: 1200,
+      desc: "Default growth structure. Most profit stays in the company. Only draws/distributions hit the owner personally."
+    },
+    scorp: {
+      name: "S-Corp", cost: 3500, minValue: 50000, tax: "salary + distribution",
+      retain: .52, entityRate: .05, shield: .45, compliance: 3000,
+      desc: "Owner takes reasonable salary/distributions. Better for profitable service companies."
+    },
+    ccorp: {
+      name: "C-Corp", cost: 8500, minValue: 150000, tax: "corporate tax first",
+      retain: .88, entityRate: .21, shield: .65, compliance: 8000,
+      desc: "Firm pays corporate tax. Owner is personally taxed only on salary/dividends/distributions."
+    },
+    holding: {
+      name: "Holding Company", cost: 25000, minValue: 1000000, tax: "tax-efficient holding",
+      retain: .94, entityRate: .14, shield: .80, compliance: 18000,
+      desc: "Advanced structure for large assets, subsidiaries, and tax planning. High setup cost, high protection."
+    }
+  };
+
+  var OPS = {
+    manager: { name: "Operator", cost: 65000, boost: "risk", desc: "Reduces failure risk and makes the company less dependent on your yearly click." },
+    bookkeeper: { name: "Bookkeeper", cost: 18000, boost: "tax", desc: "Improves clean books and reduces entity-tax leakage." },
+    sales: { name: "Sales Lead", cost: 42000, boost: "growth", desc: "Improves revenue growth and breakout chances." },
+    counsel: { name: "Business Counsel", cost: 30000, boost: "shield", desc: "Improves legal protection, contracts, and exemption odds." },
+    insurance: { name: "Insurance", cost: 12000, boost: "loss", desc: "Reduces one bad year from wrecking personal cash." }
+  };
+
+  function structure(id) { return STRUCTURES[id] || STRUCTURES.soleprop; }
+  function businesses() { return ensure().finance.businesses || []; }
+  function businessById(id) { return businesses().find(function (b) { return String(b.id) === String(id); }) || null; }
+  function businessCatalog() {
+    try { if (typeof entrepreneurshipCatalog !== "undefined" && Array.isArray(entrepreneurshipCatalog)) return entrepreneurshipCatalog; } catch(e) {}
+    try { if (Array.isArray(window.entrepreneurshipCatalog)) return window.entrepreneurshipCatalog; } catch(e) {}
+    return [];
+  }
+  function catalogFor(id) { return businessCatalog().find(function (v) { return String(v.id) === String(id); }) || null; }
+  function ensureBusiness(b) {
+    if (!b) return b;
+    var v = catalogFor(b.id) || {};
+    if (!b.name) b.name = v.name || b.id || "Business";
+    if (!b.category) b.category = v.category || "Business";
+    if (b.value == null) b.value = 0;
+    if (b.reputation == null) b.reputation = 10;
+    if (b.lastIncome == null) b.lastIncome = 0;
+    if (!b.entityType) b.entityType = num(b.value) >= 150000 ? "llc" : "soleprop";
+    if (b.retainedEarnings == null) b.retainedEarnings = Math.max(0, num(b.businessCash));
+    if (b.ownerDrawAvailable == null) b.ownerDrawAvailable = 0;
+    if (b.entityTaxDebt == null) b.entityTaxDebt = 0;
+    if (b.complianceDue == null) b.complianceDue = 0;
+    b.ops = b.ops || {};
+    b.historyV1830 = Array.isArray(b.historyV1830) ? b.historyV1830 : [];
+    return b;
+  }
+  function totalBusinessCash() {
+    return businesses().reduce(function (sum, b) { ensureBusiness(b); return sum + Math.max(0, num(b.retainedEarnings)); }, 0);
+  }
+  function totalEntityDebt() {
+    return businesses().reduce(function (sum, b) { ensureBusiness(b); return sum + Math.max(0, num(b.entityTaxDebt)); }, 0);
+  }
+  function getCustomAmount(id, max) {
+    var el = document.getElementById(id);
+    var raw = el ? String(el.value || "") : "";
+    var value = Math.round(Number(raw.replace(/[^0-9.]/g, "")) || 0);
+    return Math.max(0, Math.min(value, Math.max(0, num(max))));
+  }
+  function amountFrom(raw, max, inputId) {
+    if (raw === "all") return Math.max(0, num(max));
+    if (raw === "half") return Math.round(Math.max(0, num(max)) / 2);
+    if (raw === "custom") return getCustomAmount(inputId, max);
+    return Math.max(0, Math.min(Math.round(num(raw)), Math.max(0, num(max))));
+  }
+  function hasAdvisorHelp() {
+    var s = ensure();
+    var raw = String(s.finance.accountant || s.finance.accountantPlan || s.finance.attorney || s.finance.legalPlan || "").toLowerCase();
+    return /cpa|advisor|attorney|lawyer|legal|elite|tax|wealth|business/.test(raw);
+  }
+  function taxDiscount(b) {
+    var discount = 0;
+    if (b.ops && b.ops.bookkeeper) discount += .08;
+    if (b.ops && b.ops.counsel) discount += .06;
+    if (hasAdvisorHelp()) discount += .08;
+    if (String(b.entityType) === "holding") discount += .05;
+    return Math.min(.28, discount);
+  }
+  function protectionScore(b) {
+    var st = structure(b.entityType);
+    var score = st.shield;
+    if (b.ops && b.ops.insurance) score += .10;
+    if (b.ops && b.ops.counsel) score += .12;
+    return clamp(score, 0, .95);
+  }
+  function currentBusinessModeLabel(b) {
+    var st = structure(b.entityType);
+    if (b.entityType === "soleprop") return "Personal/pass-through";
+    if (b.entityType === "partnership") return "Partner split + partial reserve";
+    if (b.entityType === "llc") return "Company reserve + owner draw";
+    if (b.entityType === "scorp") return "Salary/distribution model";
+    if (b.entityType === "ccorp") return "Corporate tax, owner taxed on payouts";
+    return st.name + " model";
+  }
+
+  window.setBusinessEntityV1830 = function (businessId, entityType) {
+    var s = ensure();
+    var b = businessById(businessId);
+    var st = structure(entityType);
+    if (!b || !STRUCTURES[entityType]) return toast("Unknown business or entity type.");
+    if (b.entityType === entityType) return toast(b.name + " already uses " + st.name + ".");
+    if (num(b.value) < st.minValue) return toast(st.name + " needs business value of " + money(st.minValue) + ".");
+    if (num(s.money) < st.cost) return toast("Setup cost is " + money(st.cost) + " checking.");
+    s.money = Math.round(num(s.money) - st.cost);
+    b.entityType = entityType;
+    b.complianceDue = Math.max(num(b.complianceDue), Math.round(st.compliance));
+    b.historyV1830.unshift({ age: num(s.age), action: "Entity changed", entity: st.name, cost: st.cost });
+    log("Set up " + b.name + " as " + st.name + ". Future profit follows " + st.tax + ".", { money: -st.cost, stress: entityType === "holding" || entityType === "ccorp" ? 3 : 1 });
+    apply({ stress: entityType === "holding" || entityType === "ccorp" ? 3 : 1 });
+    saveRender();
+  };
+
+  window.hireBusinessOpsV1830 = function (businessId, role) {
+    var s = ensure();
+    var b = businessById(businessId);
+    var op = OPS[role];
+    if (!b || !op) return toast("Unknown business operation.");
+    if (b.ops && b.ops[role]) return toast(op.name + " already active for " + b.name + ".");
+    // v18.36: pay from company retained earnings first, then top up from personal
+    // checking — same as asset upgrades. Lets you max the team with your own money
+    // instead of being blocked when the company itself is cash-light.
+    var available = Math.max(0, num(b.retainedEarnings));
+    var fromBiz = Math.min(op.cost, available);
+    var remaining = op.cost - fromBiz;
+    if (remaining > Math.max(0, num(s.money))) return toast("Need " + money(op.cost) + " from company or personal cash.");
+    b.retainedEarnings = Math.max(0, Math.round(available - fromBiz));
+    s.money = Math.max(0, Math.round(num(s.money) - remaining));
+    b.ops[role] = true;
+    b.value = Math.round(num(b.value) * 1.015 + op.cost * .15);
+    b.historyV1830.unshift({ age: num(s.age), action: "Hired " + op.name, cost: op.cost });
+    log(b.name + " hired " + op.name + (remaining > 0 ? " (topped up from personal cash)." : " using company money."), { money: -remaining, confidence: 1 });
+    saveRender();
+  };
+
+  window.distributeBusinessCashV1830 = function (businessId, rawAmount) {
+    var s = ensure();
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    ensureBusiness(b);
+    var inputId = "v1830-dist-" + String(businessId).replace(/[^a-zA-Z0-9_-]/g, "");
+    var amount = amountFrom(rawAmount, b.retainedEarnings, inputId);
+    if (!amount) return toast("No retained earnings available to distribute.");
+    b.retainedEarnings = Math.max(0, Math.round(num(b.retainedEarnings) - amount));
+    b.ownerDrawAvailable = Math.max(0, Math.round(num(b.ownerDrawAvailable) + amount));
+    s.money = Math.round(num(s.money) + amount);
+    s.finance.incomeSources.businessDistributionsV1830 = Math.max(0, num(s.finance.incomeSources.businessDistributionsV1830) + amount);
+    s.finance.lastFirmDistribution = Math.max(0, num(s.finance.lastFirmDistribution) + amount);
+    s.finance.businessTaxV1830.distributions += amount;
+    b.historyV1830.unshift({ age: num(s.age), action: "Owner distribution", amount: amount });
+    log("Distributed " + money(amount) + " from " + b.name + " to checking. This is now personal taxable cash.", { money: amount });
+    saveRender();
+  };
+
+  window.payOwnerSalaryV1830 = function (businessId, rawAmount) {
+    var s = ensure();
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    ensureBusiness(b);
+    var inputId = "v1830-salary-" + String(businessId).replace(/[^a-zA-Z0-9_-]/g, "");
+    var cap = Math.min(num(b.retainedEarnings), Math.max(5000, num(b.value) * .15));
+    var amount = amountFrom(rawAmount, cap, inputId);
+    if (!amount) return toast("No firm cash available for owner salary.");
+    b.retainedEarnings = Math.max(0, Math.round(num(b.retainedEarnings) - amount));
+    s.money = Math.round(num(s.money) + amount);
+    s.finance.incomeSources.ownerSalaryV1830 = Math.max(0, num(s.finance.incomeSources.ownerSalaryV1830) + amount);
+    s.finance.businessTaxV1830.salaries += amount;
+    b.historyV1830.unshift({ age: num(s.age), action: "Owner salary", amount: amount });
+    log("Paid yourself " + money(amount) + " salary from " + b.name + ". Salary is personal taxable income.", { money: amount, stress: -1 });
+    apply({ stress: -1 });
+    saveRender();
+  };
+
+  window.reinvestBusinessCashV1830 = function (businessId, rawAmount) {
+    var s = ensure();
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    ensureBusiness(b);
+    var inputId = "v1830-reinvest-" + String(businessId).replace(/[^a-zA-Z0-9_-]/g, "");
+    var amount = amountFrom(rawAmount, b.retainedEarnings, inputId);
+    if (!amount) return toast("No retained earnings to reinvest.");
+    b.retainedEarnings = Math.max(0, Math.round(num(b.retainedEarnings) - amount));
+    b.value = Math.round(num(b.value) + amount * 1.25);
+    b.reputation = clamp(num(b.reputation) + Math.max(1, Math.round(amount / Math.max(25000, num(b.value) / 8))), 0, 100);
+    b.historyV1830.unshift({ age: num(s.age), action: "Reinvested", amount: amount });
+    log("Reinvested " + money(amount) + " into " + b.name + ". Value and reputation improved.", { confidence: 1 });
+    saveRender();
+  };
+
+  window.payBusinessEntityTaxV1830 = function (businessId, rawAmount) {
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    ensureBusiness(b);
+    var inputId = "v1830-tax-" + String(businessId).replace(/[^a-zA-Z0-9_-]/g, "");
+    var debt = Math.max(0, num(b.entityTaxDebt));
+    var amount = amountFrom(rawAmount, Math.min(debt, b.retainedEarnings), inputId);
+    if (!amount) return toast("No business cash available for entity tax.");
+    b.retainedEarnings = Math.max(0, Math.round(num(b.retainedEarnings) - amount));
+    b.entityTaxDebt = Math.max(0, Math.round(debt - amount));
+    ensure().finance.businessTaxV1830.entityTaxes += amount;
+    b.historyV1830.unshift({ age: num(ensure().age), action: "Paid entity tax", amount: amount });
+    log(b.name + " paid " + money(amount) + " entity tax from company cash.", {});
+    saveRender();
+  };
+
+  window.payBusinessComplianceV1830 = function (businessId) {
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    ensureBusiness(b);
+    var due = Math.max(0, Math.round(num(b.complianceDue)));
+    if (!due) return toast("No compliance bill due.");
+    var paid = Math.min(due, Math.max(0, num(b.retainedEarnings)));
+    if (!paid) return toast("Need company cash to pay compliance.");
+    b.retainedEarnings = Math.max(0, Math.round(num(b.retainedEarnings) - paid));
+    b.complianceDue = Math.max(0, due - paid);
+    b.historyV1830.unshift({ age: num(ensure().age), action: "Paid compliance", amount: paid });
+    log(b.name + " paid " + money(paid) + " in compliance/admin costs from business cash.", {});
+    saveRender();
+  };
+
+  function reconcileBusinessYearV1830(silent) {
+    var s = ensure();
+    var ageKey = String(num(s.age));
+    var bt = s.finance.businessTaxV1830;
+    if (bt.processedAges[ageKey]) return false;
+    var list = businesses();
+    var totalPositive = 0;
+    var entityPositive = 0;
+    var passThroughPositive = 0;
+    var redistributed = 0;
+    var entityTax = 0;
+    var refundedPersonalTax = 0;
+    var logs = [];
+
+    list.forEach(function (b) {
+      ensureBusiness(b);
+      var income = Math.round(num(b.lastIncome));
+      if (!income) return;
+      var st = structure(b.entityType);
+      if (income > 0) totalPositive += income;
+      if (income <= 0) {
+        if (b.entityType !== "soleprop") {
+          var loss = Math.abs(income);
+          var used = Math.min(loss, Math.max(0, num(b.retainedEarnings)));
+          if (used) b.retainedEarnings = Math.max(0, Math.round(num(b.retainedEarnings) - used));
+          b.historyV1830.unshift({ age:num(s.age), action:"Operating loss", amount:income });
+        }
+        return;
+      }
+      if (b.entityType === "soleprop" || b.entityType === "partnership") {
+        var keepPartnership = Math.round(income * st.retain);
+        if (keepPartnership > 0) {
+          s.money = Math.round(num(s.money) - keepPartnership);
+          b.retainedEarnings = Math.max(0, Math.round(num(b.retainedEarnings) + keepPartnership));
+          redistributed += keepPartnership;
+        }
+        passThroughPositive += income - keepPartnership;
+        b.historyV1830.unshift({ age:num(s.age), action:"Pass-through year", income:income, retained:keepPartnership });
+        return;
+      }
+      entityPositive += income;
+      var retain = Math.round(income * st.retain);
+      var ownerAutoDraw = Math.max(0, income - retain);
+      s.money = Math.round(num(s.money) - retain);
+      b.retainedEarnings = Math.max(0, Math.round(num(b.retainedEarnings) + retain));
+      if (ownerAutoDraw > 0) {
+        s.finance.incomeSources.businessDistributionsV1830 = Math.max(0, num(s.finance.incomeSources.businessDistributionsV1830) + ownerAutoDraw);
+        s.finance.lastFirmDistribution = Math.max(0, num(s.finance.lastFirmDistribution) + ownerAutoDraw);
+      }
+      var taxBase = Math.max(0, retain);
+      var taxRate = Math.max(0, st.entityRate * (1 - taxDiscount(b)));
+      var tax = Math.round(taxBase * taxRate);
+      if (tax > 0) {
+        var paid = Math.min(tax, Math.max(0, num(b.retainedEarnings)));
+        b.retainedEarnings = Math.max(0, Math.round(num(b.retainedEarnings) - paid));
+        b.entityTaxDebt = Math.max(0, Math.round(num(b.entityTaxDebt) + (tax - paid)));
+        entityTax += tax;
+      }
+      var compliance = Math.round(st.compliance * (b.ops && b.ops.bookkeeper ? .72 : 1));
+      if (compliance > 0) b.complianceDue = Math.max(0, Math.round(num(b.complianceDue) + compliance));
+      b.historyV1830.unshift({ age:num(s.age), action:"Entity year", income:income, retained:retain, ownerDraw:ownerAutoDraw, entityTax:tax });
+      logs.push(b.name + " retained " + money(retain) + " and auto-drew " + money(ownerAutoDraw));
+    });
+
+    var businessTaxes = Math.max(0, num(s.finance.lastYearBusinessTaxes));
+    if (businessTaxes > 0 && totalPositive > 0 && entityPositive > 0) {
+      var entityShare = entityPositive / totalPositive;
+      refundedPersonalTax = Math.round(businessTaxes * entityShare);
+      if (refundedPersonalTax > 0) {
+        s.money = Math.round(num(s.money) + refundedPersonalTax);
+        s.finance.lastYearBusinessTaxes = Math.max(0, Math.round(businessTaxes - refundedPersonalTax));
+        s.finance.lastYearTaxes = Math.max(0, Math.round(num(s.finance.lastYearTaxes) - refundedPersonalTax));
+        bt.personalRefunds += refundedPersonalTax;
+      }
+    }
+
+    bt.processedAges[ageKey] = true;
+    bt.history.unshift({ age:num(s.age), totalPositive:totalPositive, entityPositive:entityPositive, passThroughPositive:passThroughPositive, movedToBusinessCash:redistributed, entityTax:entityTax, personalRefund:refundedPersonalTax, cash:totalBusinessCash(), debt:totalEntityDebt() });
+    bt.history = bt.history.slice(0, 16);
+    if (!silent && (entityPositive || redistributed || refundedPersonalTax || entityTax)) {
+      log("Business entity cleanup: " + money(entityPositive) + " treated as company profit, " + money(refundedPersonalTax) + " personal-tax reclassified, " + money(entityTax) + " entity tax booked.", { money: refundedPersonalTax });
+      if (logs[0]) log(logs.slice(0, 2).join(" · "), {});
+    }
+    return true;
+  }
+
+  window.reconcileBusinessEntitiesV1830 = function () {
+    var changed = reconcileBusinessYearV1830(false);
+    if (!changed) toast("No new business income to reclassify this year.");
+    saveRender();
+  };
+
+  var previousResolve = window.resolveLifeAndFinanceYear || (typeof resolveLifeAndFinanceYear === "function" ? resolveLifeAndFinanceYear : null);
+  if (previousResolve && !window.__ledgerResolve1830Wrapped) {
+    window.__ledgerResolve1830Wrapped = true;
+    window.resolveLifeAndFinanceYear = function () {
+      var out = previousResolve.apply(this, arguments);
+      try { reconcileBusinessYearV1830(false); } catch (e) { try { console.warn("v18.30 business entity reconcile failed", e); } catch(ignore) {} }
+      return out;
+    };
+    try { resolveLifeAndFinanceYear = window.resolveLifeAndFinanceYear; } catch (e) {}
+  }
+
+  function structureOptionsHtml(b) {
+    return Object.keys(STRUCTURES).map(function (id) {
+      var st = STRUCTURES[id];
+      var active = b.entityType === id;
+      var locked = num(b.value) < st.minValue;
+      return `<button class="v1830-entity-option ${active ? "active" : ""}" onclick="event.preventDefault();event.stopPropagation();setBusinessEntityV1830('${esc(b.id)}','${esc(id)}')" ${active || locked ? (active ? "disabled" : "disabled") : ""}>
+        <b>${esc(st.name)}</b><span>${esc(st.tax)}</span><em>${locked ? "Needs " + money(st.minValue) + " value" : "Setup " + money(st.cost)}</em>
+      </button>`;
+    }).join("");
+  }
+  function opsHtml(b) {
+    return Object.keys(OPS).map(function (id) {
+      var op = OPS[id];
+      var active = b.ops && b.ops[id];
+      return `<button class="v1830-op ${active ? "active" : ""}" onclick="event.preventDefault();event.stopPropagation();hireBusinessOpsV1830('${esc(b.id)}','${esc(id)}')" ${active ? "disabled" : ""}>
+        <b>${esc(op.name)}</b><span>${active ? "Active" : money(op.cost)}</span><em>${esc(op.desc)}</em>
+      </button>`;
+    }).join("");
+  }
+  function businessCardHtml(b) {
+    ensureBusiness(b);
+    var st = structure(b.entityType);
+    var safeId = String(b.id).replace(/[^a-zA-Z0-9_-]/g, "");
+    var debt = Math.max(0, num(b.entityTaxDebt));
+    var compliance = Math.max(0, num(b.complianceDue));
+    var recent = (b.historyV1830 || []).slice(0, 3).map(function (h) {
+      return `<span>${esc(h.action || "Event")} ${h.amount != null ? money(h.amount) : h.income != null ? money(h.income) : ""}</span>`;
+    }).join("");
+    return `<div class="v1830-business-card">
+      <div class="v1830-business-head"><div><b>${esc(b.name)}</b><span>${esc(b.category || "Business")} · ${esc(currentBusinessModeLabel(b))}</span></div><strong>${esc(st.name)}</strong></div>
+      <div class="v1830-grid four">
+        <div class="v1830-metric"><span>Value</span><b>${money(b.value)}</b></div>
+        <div class="v1830-metric good"><span>Company cash</span><b>${money(b.retainedEarnings)}</b></div>
+        <div class="v1830-metric ${debt ? "bad" : "good"}"><span>Entity tax debt</span><b>${money(debt)}</b></div>
+        <div class="v1830-metric ${compliance ? "warn" : "good"}"><span>Compliance due</span><b>${money(compliance)}</b></div>
+      </div>
+      <div class="v1830-note"><b>Tax treatment:</b> ${esc(st.desc)} Protection score ${pct(protectionScore(b))}. Tax discount from bookkeeper/counsel/advisors: ${pct(taxDiscount(b))}.</div>
+      <div class="v1830-subtitle">Entity setup</div><div class="v1830-entity-grid">${structureOptionsHtml(b)}</div>
+      <div class="v1830-subtitle">Owner money controls</div>
+      <div class="v1830-actions">
+        <button class="money-btn green" onclick="event.preventDefault();event.stopPropagation();distributeBusinessCashV1830('${esc(b.id)}','all')" ${num(b.retainedEarnings) ? "" : "disabled"}>Distribute All</button>
+        <button class="money-btn blue" onclick="event.preventDefault();event.stopPropagation();payOwnerSalaryV1830('${esc(b.id)}',25000)" ${num(b.retainedEarnings) ? "" : "disabled"}>Pay $25K Salary</button>
+        <button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();reinvestBusinessCashV1830('${esc(b.id)}','half')" ${num(b.retainedEarnings) ? "" : "disabled"}>Reinvest Half</button>
+        <button class="money-btn red" onclick="event.preventDefault();event.stopPropagation();payBusinessEntityTaxV1830('${esc(b.id)}','all')" ${debt && num(b.retainedEarnings) ? "" : "disabled"}>Pay Entity Tax</button>
+        <button class="money-btn" onclick="event.preventDefault();event.stopPropagation();payBusinessComplianceV1830('${esc(b.id)}')" ${compliance && num(b.retainedEarnings) ? "" : "disabled"}>Pay Compliance</button>
+      </div>
+      <div class="v1830-custom-row"><input id="v1830-dist-${esc(safeId)}" type="number" min="0" placeholder="Custom distribution" /><button class="money-btn green" onclick="event.preventDefault();event.stopPropagation();distributeBusinessCashV1830('${esc(b.id)}','custom')">Distribute</button></div>
+      <div class="v1830-custom-row"><input id="v1830-reinvest-${esc(safeId)}" type="number" min="0" placeholder="Custom reinvest" /><button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();reinvestBusinessCashV1830('${esc(b.id)}','custom')">Reinvest</button></div>
+      <div class="v1830-subtitle">Operations</div><div class="v1830-op-grid">${opsHtml(b)}</div>
+      ${recent ? `<div class="v1830-history">${recent}</div>` : ""}
+    </div>`;
+  }
+  function launchBoardHtml() {
+    var s = ensure();
+    var owned = businesses();
+    var catalog = businessCatalog().slice(0, 18);
+    if (!catalog.length) return "";
+    var cards = catalog.map(function (v) {
+      var exists = owned.some(function (b) { return String(b.id) === String(v.id); });
+      var missing = [];
+      if (num(s.age) < num(v.minAge)) missing.push("Age " + num(v.minAge) + "+");
+      if (num(s.money) < num(v.startup)) missing.push(money(num(v.startup)) + " startup cash");
+      if (exists) missing.push("Already owned");
+      var ready = !missing.length;
+      return `<div class="v1830-launch ${ready ? "ready" : "locked"}"><div><b>${esc(v.name)}</b><span>${esc(v.category || "Business")} · ${money(v.yearlyMin || 0)} to ${money(v.yearlyMax || 0)}/yr</span></div><em>${ready ? "Ready to launch" : missing.join(" · ")}</em><button class="money-btn ${ready ? "green" : ""}" onclick="event.preventDefault();event.stopPropagation();startVenture && startVenture('${esc(v.id)}')" ${ready ? "" : "disabled"}>Start</button></div>`;
+    }).join("");
+    return `<div class="v1830-launch-board"><div class="v1830-subtitle">Launch Board: real requirements</div><div class="v1830-launch-grid">${cards}</div></div>`;
+  }
+  function renderBusinessCommandV1830() {
+    var s = ensure();
+    var list = businesses();
+    var bt = s.finance.businessTaxV1830 || {};
+    var history = (bt.history || [])[0];
+    return `<section class="panel money-section v1830-business-command">
+      <div class="money-section-title">Business Ownership Command <span>entity, tax, cash controls</span></div>
+      <div class="v1830-note">Businesses now have legal/tax structures. Sole props pass through to you. LLC/S-Corp/C-Corp/Holding Company can retain profit inside the business, pay entity tax from company cash, and only tax you personally when you take salary or distributions.</div>
+      <div class="v1830-grid four">
+        <div class="v1830-metric"><span>Businesses</span><b>${list.length}</b></div>
+        <div class="v1830-metric good"><span>Company cash</span><b>${money(totalBusinessCash())}</b></div>
+        <div class="v1830-metric ${totalEntityDebt() ? "bad" : "good"}"><span>Entity tax debt</span><b>${money(totalEntityDebt())}</b></div>
+        <div class="v1830-metric gold"><span>Reclassified</span><b>${money(bt.personalRefunds || 0)}</b></div>
+      </div>
+      ${history ? `<div class="v1830-note small">Last yearly cleanup: ${money(history.entityPositive || 0)} company profit · ${money(history.personalRefund || 0)} personal-tax reclassified · ${money(history.entityTax || 0)} entity tax.</div>` : ""}
+      <div class="v1830-actions"><button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();reconcileBusinessEntitiesV1830()">Reclassify This Year</button></div>
+      ${list.length ? `<div class="v1830-business-list">${list.map(businessCardHtml).join("")}</div>` : `<div class="v1830-empty">No business owned yet. Use the launch board below when you meet age and cash requirements.</div>`}
+      ${launchBoardHtml()}
+    </section>`;
+  }
+
+  function removeBusinessDuplicates(html) {
+    var out = String(html || "");
+    ["v1830-business-command"].forEach(function (marker) {
+      var idx = out.indexOf(marker), guard = 0;
+      while (idx >= 0 && guard++ < 15) {
+        var start = out.lastIndexOf("<section", idx);
+        var end = out.indexOf("</section>", idx);
+        if (start < 0 || end < 0) break;
+        out = out.slice(0, start) + out.slice(end + 10);
+        idx = out.indexOf(marker);
+      }
+    });
+    return out;
+  }
+  var previousRender = window.renderHubContent || (typeof renderHubContent === "function" ? renderHubContent : null);
+  if (previousRender && !window.__ledgerRender1830Wrapped) {
+    window.__ledgerRender1830Wrapped = true;
+    window.renderHubContent = function (hubId) {
+      ensure();
+      var html = "";
+      try { html = previousRender.apply(this, arguments) || ""; } catch (e) { html = ""; }
+      html = removeBusinessDuplicates(html);
+      if (hubId === "business") return renderBusinessCommandV1830() + html;
+      if (hubId === "finance" || hubId === "money") {
+        var summary = `<section class="money-section v1830-business-summary"><div class="money-section-title">Business Entity Snapshot <span>company vs personal</span></div><div class="v1830-grid four"><div class="v1830-metric"><span>Business value</span><b>${money(businesses().reduce(function(sum,b){return sum+Math.max(0,num(b.value));},0))}</b></div><div class="v1830-metric good"><span>Company cash</span><b>${money(totalBusinessCash())}</b></div><div class="v1830-metric bad"><span>Entity debt</span><b>${money(totalEntityDebt())}</b></div><div class="v1830-metric gold"><span>Owner payouts</span><b>${money(num(ensure().finance.incomeSources.businessDistributionsV1830)+num(ensure().finance.incomeSources.ownerSalaryV1830))}</b></div></div></section>`;
+        return summary + html;
+      }
+      return html;
+    };
+    try { renderHubContent = window.renderHubContent; } catch (e) {}
+  }
+
+  function injectStyles() {
+    if (document.getElementById("ledger-v1830-style")) return;
+    var style = document.createElement("style");
+    style.id = "ledger-v1830-style";
+    style.textContent = [
+      ".v1830-business-command,.v1830-business-summary{border-color:rgba(143,175,108,.46)!important;background:linear-gradient(135deg,rgba(18,36,24,.96),rgba(29,25,20,.98))!important;overflow:hidden!important}",
+      ".v1830-note{font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.55;color:#b9a98e;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.035);border-radius:10px;padding:10px;margin:8px 0}.v1830-note b{color:#d8ad6d}.v1830-note.small{font-size:9px}",
+      ".v1830-grid{display:grid;gap:8px;margin:10px 0}.v1830-grid.four{grid-template-columns:repeat(4,minmax(0,1fr))}.v1830-metric{border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.045);border-radius:10px;padding:10px;min-width:0}.v1830-metric span{display:block;color:#aa9a82;font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.08em}.v1830-metric b{display:block;font-family:'JetBrains Mono',monospace;font-size:16px;margin-top:4px;color:#f2e7d6;overflow-wrap:anywhere}.v1830-metric.good b{color:#8faf6c}.v1830-metric.bad b{color:#cc7661}.v1830-metric.warn b,.v1830-metric.gold b{color:#d8ad6d}",
+      ".v1830-business-list{display:grid;gap:11px;margin-top:12px}.v1830-business-card{border:1px solid rgba(255,255,255,.10);background:rgba(20,17,13,.46);border-radius:14px;padding:12px}.v1830-business-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px}.v1830-business-head b{font-size:17px}.v1830-business-head span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;margin-top:3px}.v1830-business-head strong{font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#14110d;background:#8faf6c;border-radius:999px;padding:5px 8px;white-space:nowrap}",
+      ".v1830-subtitle{font-family:'JetBrains Mono',monospace;color:#d8ad6d;font-size:10px;text-transform:uppercase;letter-spacing:.14em;margin:12px 0 7px}.v1830-entity-grid,.v1830-op-grid,.v1830-launch-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.v1830-entity-option,.v1830-op,.v1830-launch{border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.04);color:#f2e7d6;border-radius:10px;padding:10px;text-align:left}.v1830-entity-option.active,.v1830-op.active,.v1830-launch.ready{border-color:rgba(143,175,108,.55);background:rgba(143,175,108,.10)}.v1830-entity-option b,.v1830-op b,.v1830-launch b{display:block;font-size:13px}.v1830-entity-option span,.v1830-op span,.v1830-launch span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:9px;margin-top:3px}.v1830-entity-option em,.v1830-op em,.v1830-launch em{display:block;color:#d8ad6d;font-family:'JetBrains Mono',monospace;font-size:9px;font-style:normal;margin-top:5px;line-height:1.35}.v1830-entity-option:disabled,.v1830-op:disabled,.v1830-launch.locked{opacity:.62;cursor:not-allowed}",
+      ".v1830-actions{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}.v1830-actions .money-btn{flex:1 1 120px}.v1830-custom-row{display:grid;grid-template-columns:1fr auto;gap:7px;margin-top:7px}.v1830-custom-row input{min-width:0}.v1830-history{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.v1830-history span{border:1px solid rgba(255,255,255,.10);border-radius:999px;padding:4px 8px;color:#aa9a82;font-family:'JetBrains Mono',monospace;font-size:9px}.v1830-empty{border:1px dashed rgba(255,255,255,.14);border-radius:10px;padding:14px;color:#aa9a82;font-size:13px;line-height:1.45}.v1830-launch{display:grid;grid-template-columns:1fr auto;gap:7px;align-items:center}.v1830-launch button{grid-column:1/-1}",
+      "@media(max-width:760px){.v1830-grid.four{grid-template-columns:repeat(2,minmax(0,1fr))}.v1830-entity-grid,.v1830-op-grid,.v1830-launch-grid{grid-template-columns:1fr}}@media(max-width:430px){.v1830-grid.four{grid-template-columns:1fr}.v1830-custom-row{grid-template-columns:1fr}.v1830-actions .money-btn{width:100%;flex-basis:100%}}"
+    ].join("\n");
+    document.head.appendChild(style);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", injectStyles); else injectStyles();
+})();
+
+
+
+/* END absorbed 07-patch-v18-30.js */
+
+
+/* BEGIN absorbed 08-patch-v18-31.js */
+
+/* LEDGER PATCH v18.31: Family Trust / Estate Planning / Dynasty Settlement */
+(() => {
+  const PATCH_ID = "v18.31";
+  if (window.__ledgerPatch1831) return;
+  window.__ledgerPatch1831 = true;
+
+  function rootState() {
+    try { if (typeof state !== "undefined" && state) return state; } catch (e) {}
+    return window.state || null;
+  }
+  function assignState(next) {
+    try { state = next; } catch (e) {}
+    window.state = next;
+    return next;
+  }
+  function n(value, fallback = 0) {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : fallback;
+  }
+  function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+  function esc(value) {
+    return String(value ?? "").replace(/[&<>'"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[ch]));
+  }
+  function money(value) {
+    const v = n(value);
+    const sign = v < 0 ? "-" : "";
+    const abs = Math.abs(v);
+    if (abs >= 1e12) return sign + "$" + (abs / 1e12).toFixed(1) + "T";
+    if (abs >= 1e9) return sign + "$" + (abs / 1e9).toFixed(1) + "B";
+    if (abs >= 1e6) return sign + "$" + (abs / 1e6).toFixed(1) + "M";
+    if (abs >= 1e3) return sign + "$" + Math.round(abs).toLocaleString();
+    return sign + "$" + Math.round(abs).toLocaleString();
+  }
+  function pct(value) { return Math.round(n(value) * 100) + "%"; }
+  function toast(text) {
+    try { if (typeof addToast === "function") return addToast(text); } catch (e) {}
+    try { alert(text); } catch (e) {}
+  }
+  function log(text, deltas) {
+    try { if (typeof addLog === "function") return addLog(text, deltas || {}); } catch (e) {}
+    const s = rootState();
+    if (s) {
+      if (!Array.isArray(s.log)) s.log = [];
+      s.log.push({ text, deltas: deltas || {}, age: s.age });
+    }
+  }
+  function saveRender() {
+    try { if (typeof save === "function") save(); } catch (e) {}
+    try { if (typeof render === "function") render(); } catch (e) {}
+  }
+  function setHub(id) {
+    try { if (typeof setTabV16 === "function") return setTabV16(id); } catch (e) {}
+    try { if (typeof setTab === "function") return setTab(id); } catch (e) {}
+  }
+  function ensure() {
+    let s = rootState();
+    if (!s) return null;
+    if (!s.finance || typeof s.finance !== "object") s.finance = {};
+    if (!s.finance.incomeSources || typeof s.finance.incomeSources !== "object") s.finance.incomeSources = {};
+    if (!s.finance.debts || typeof s.finance.debts !== "object") s.finance.debts = {};
+    if (!Array.isArray(s.finance.businesses)) s.finance.businesses = [];
+    if (!Array.isArray(s.rentals)) s.rentals = [];
+    if (!s.relationships || typeof s.relationships !== "object") s.relationships = {};
+    if (!s.estateV1831 || typeof s.estateV1831 !== "object") s.estateV1831 = {};
+    const e = s.estateV1831;
+    if (!e.version) e.version = PATCH_ID;
+    if (e.hasWill == null) e.hasWill = false;
+    if (!e.trustType) e.trustType = "none";
+    if (!e.trustee) e.trustee = "self";
+    if (!e.beneficiaryMode) e.beneficiaryMode = "children_equal";
+    if (!e.distributionAge) e.distributionAge = 25;
+    if (!e.guardian) e.guardian = "trusted_family";
+    if (!e.assets || typeof e.assets !== "object") e.assets = {};
+    e.assets.trustCash = Math.max(0, Math.round(n(e.assets.trustCash)));
+    e.assets.home = !!e.assets.home;
+    e.assets.rentals = !!e.assets.rentals;
+    e.assets.businessPercent = clamp(n(e.assets.businessPercent), 0, 1);
+    e.assets.brokeragePercent = clamp(n(e.assets.brokeragePercent), 0, 1);
+    e.assets.managerPercent = clamp(n(e.assets.managerPercent), 0, 1);
+    e.assets.retirementBeneficiary = !!e.assets.retirementBeneficiary;
+    if (!e.clauses || typeof e.clauses !== "object") e.clauses = {};
+    ["spendthrift", "guardianship", "healthDirective", "powerOfAttorney", "businessSuccession", "charityRemainder"].forEach(k => { e.clauses[k] = !!e.clauses[k]; });
+    e.familyOffice = !!e.familyOffice;
+    e.maintenanceDue = Math.max(0, Math.round(n(e.maintenanceDue)));
+    if (!Array.isArray(e.history)) e.history = [];
+    return s;
+  }
+
+  const TRUST_TYPES = {
+    none: { name:"No Trust", setup:0, maint:0, probate:.10, estateTaxCut:0, protection:0, desc:"No trust. Assets face the highest probate delay and weakest estate plan." },
+    revocable: { name:"Revocable Living Trust", setup:3500, maint:300, probate:.018, estateTaxCut:.10, protection:.18, desc:"Flexible living trust. You keep control, avoid most probate delay, and can change beneficiaries." },
+    irrevocable: { name:"Irrevocable Family Trust", setup:15000, maint:1200, probate:.006, estateTaxCut:.32, protection:.46, desc:"Stronger asset and estate planning. Less flexible, but better protection for very wealthy lives." },
+    dynasty: { name:"Dynasty Trust", setup:85000, maint:7500, probate:.003, estateTaxCut:.55, protection:.72, desc:"Ultra-high-net-worth structure for multi-generation family wealth, businesses, and investment assets." }
+  };
+  const BENEFICIARIES = {
+    children_equal: "Children equally",
+    spouse_then_children: "Spouse first, then children",
+    family_line: "Family line / descendants",
+    charity_10: "Family + 10% charity",
+    business_heir: "Business successor first"
+  };
+  const TRUSTEES = {
+    self: "Self while alive",
+    spouse: "Spouse / partner",
+    adult_child: "Adult child",
+    sibling: "Sibling / trusted relative",
+    professional: "Professional trustee",
+    bank: "Bank trust department"
+  };
+
+  function homeValue(s) {
+    try {
+      if (typeof homes !== "undefined" && Array.isArray(homes)) {
+        const h = homes.find(x => x.id === s.home);
+        return Math.max(0, n(h && h.price));
+      }
+    } catch (e) {}
+    return 0;
+  }
+  function rentalValue(s) {
+    try {
+      if (typeof rentals !== "undefined" && Array.isArray(rentals)) {
+        return (s.rentals || []).reduce((sum, id) => {
+          const r = rentals.find(x => x.id === id);
+          return sum + Math.max(0, n(r && r.price));
+        }, 0);
+      }
+    } catch (e) {}
+    return 0;
+  }
+  function businessValue(s) {
+    return (s.finance && Array.isArray(s.finance.businesses) ? s.finance.businesses : []).reduce((sum, b) => {
+      return sum + Math.max(0, n(b.value)) + Math.max(0, n(b.retainedEarnings));
+    }, 0);
+  }
+  function brokerageValue(s) {
+    const f = s.finance || {};
+    return Math.max(0, n(f.brokerage)) + Math.max(0, n(f.stockValue)) + Math.max(0, n(f.managedPortfolio));
+  }
+  function managerValue(s) {
+    const f = s.finance || {};
+    return Math.max(0, n(f.externalManager && f.externalManager.capital)) + Math.max(0, n(f.managerFirmsV1829 && f.managerFirmsV1829.capital));
+  }
+  function retirementValue(s) { return Math.max(0, n(s.ira)) + Math.max(0, n(s.retirement401k)); }
+  function baseNetWorth(s) {
+    try { if (typeof legacyNetWorth === "function") return Math.max(0, n(legacyNetWorth(s))); } catch (e) {}
+    const f = s.finance || {};
+    return Math.max(0, n(s.money) + n(s.savings) + n(f.superSaver) + n(s.ira) + n(s.retirement401k) + brokerageValue(s) + managerValue(s) + businessValue(s) + homeValue(s) + rentalValue(s) - n(s.debt) - n(f.creditCardDebt) - n(f.assetBackedLoan) - n(f.taxDebt));
+  }
+  function childrenList(s) {
+    const relKids = Object.values(s.relationships || {}).filter(r => r && r.role === "Child");
+    const arrKids = Array.isArray(s.children) ? s.children.map(c => typeof c === "string" ? { name:c, role:"Child" } : c).filter(Boolean) : [];
+    const byName = {};
+    relKids.concat(arrKids).forEach(k => { if (k && (k.name || k.id)) byName[k.name || k.id] = k; });
+    return Object.values(byName);
+  }
+  function assignedTrustValue(s) {
+    const e = ensure().estateV1831;
+    const a = e.assets;
+    return Math.round(
+      Math.max(0, n(a.trustCash)) +
+      (a.home ? homeValue(s) : 0) +
+      (a.rentals ? rentalValue(s) : 0) +
+      businessValue(s) * n(a.businessPercent) +
+      brokerageValue(s) * n(a.brokeragePercent) +
+      managerValue(s) * n(a.managerPercent) +
+      (a.retirementBeneficiary ? retirementValue(s) : 0)
+    );
+  }
+  function protectionScore(s) {
+    const e = ensure().estateV1831;
+    const t = TRUST_TYPES[e.trustType] || TRUST_TYPES.none;
+    let score = 0;
+    if (e.hasWill) score += 12;
+    score += t.protection * 55;
+    if (e.clauses.spendthrift) score += 8;
+    if (e.clauses.guardianship) score += 7;
+    if (e.clauses.healthDirective) score += 5;
+    if (e.clauses.powerOfAttorney) score += 5;
+    if (e.clauses.businessSuccession) score += 8;
+    if (e.familyOffice) score += 14;
+    const gross = Math.max(1, baseNetWorth(s) + n(e.assets.trustCash));
+    score += clamp(assignedTrustValue(s) / gross, 0, 1) * 18;
+    return Math.round(clamp(score, 0, 100));
+  }
+  function estateSettlement(s = ensure()) {
+    if (!s) return null;
+    const e = ensure().estateV1831;
+    const t = TRUST_TYPES[e.trustType] || TRUST_TYPES.none;
+    // The Legal hub's family trust (familyTrustV1839) is a SEPARATE system from the estate-plan
+    // trust above. Honor it here too: its corpus is protected, and it cuts probate/estate tax —
+    // otherwise a player who built a Dynasty Family Trust in Legal still shows "No Trust" and gets
+    // taxed on the whole estate.
+    const lt = (s.finance && s.finance.familyTrustV1839) || {};
+    const legalActive = !!lt.created;
+    const legalProtection = legalActive ? clamp(n(lt.protection), 0, .85) : 0;
+    let legalProtectedValue = 0;
+    if (legalActive) {
+      try { legalProtectedValue = typeof window.legalProtectedAssetsV1839 === "function" ? n(window.legalProtectedAssetsV1839()) : n(lt.corpus); }
+      catch (err) { legalProtectedValue = n(lt.corpus); }
+    }
+    // Business-hub family trust (shares titled to a trust) is yet another path — count it too.
+    let businessTrustValue = 0;
+    try { businessTrustValue = typeof window.businessTrustValueV1840 === "function" ? n(window.businessTrustValueV1840()) : 0; } catch (err) { businessTrustValue = 0; }
+    const gross = Math.max(0, Math.round(baseNetWorth(s) + n(e.assets.trustCash)));
+    const protectedValue = Math.min(gross, Math.max(0, assignedTrustValue(s)) + Math.max(0, legalProtectedValue));
+    // Any real trust/estate structure that's actually shielding wealth — used for the honest label.
+    const anyTrust = legalActive || e.trustType !== "none" || businessTrustValue > 0 || n(e.assets.trustCash) > 0 || protectedValue > 0;
+    const unprotected = Math.max(0, gross - protectedValue);
+    // A created legal trust avoids most probate even without an estate-plan trust.
+    const baseProbate = legalActive ? Math.min(t.probate, .012) : t.probate;
+    const probateRate = e.hasWill ? Math.min(baseProbate, .055) : baseProbate;
+    const probateLoss = Math.round(unprotected * probateRate);
+    const exemption = e.familyOffice ? 10000000 : 5000000;
+    const estateTaxBase = Math.max(0, unprotected - exemption); // trust-protected assets aren't in the taxable estate
+    const effEstateTaxCut = Math.max(n(t.estateTaxCut), legalProtection * .8);
+    const estateTaxRate = .20 * (1 - clamp(effEstateTaxCut + (e.familyOffice ? .18 : 0) + (e.clauses.charityRemainder ? .08 : 0), 0, .85));
+    const estateTax = Math.round(estateTaxBase * estateTaxRate);
+    const maintenance = Math.max(0, n(e.maintenanceDue));
+    const netTransfer = Math.max(0, gross - probateLoss - estateTax - maintenance);
+    const kids = childrenList(s).length;
+    const childShare = kids > 0 ? Math.round(netTransfer / kids) : 0;
+    const dynastyScore = Math.round(netTransfer / 25000 + protectionScore(s) * 8 + kids * 120 + (e.familyOffice ? 500 : 0));
+    // Plan label: estate-plan trust name > legal family-trust name > any-protection "Family Trust" > "No Trust".
+    // Guard with TRUST_TYPES lookup: an unset trustType is `undefined` (NOT "none"), which previously
+    // slipped past `!== "none"` and printed "No Trust" even with a real Legal trust active.
+    // Re-read trustType fresh here: a Legal family trust can sync into estateV1831.trustType
+    // DURING this function (after `t` was captured up top), so use the current value for the label.
+    const curTrust = TRUST_TYPES[e.trustType] || TRUST_TYPES.none;
+    const hasEstateTrust = !!(e.trustType && e.trustType !== "none" && TRUST_TYPES[e.trustType]);
+    const planName = hasEstateTrust ? curTrust.name
+      : legalActive ? (lt.planName || trustPlanNameV1839(lt) || "Family Trust")
+      : (businessTrustValue > 0 || n(e.assets.trustCash) > 0 || protectedValue > 0) ? "Family Trust"
+      : "No Trust";
+    return { gross, protectedValue, unprotected, probateRate, probateLoss, estateTaxBase, estateTaxRate, estateTax, maintenance, netTransfer, kids, childShare, protection:protectionScore(s), dynastyScore, legalActive, anyTrust, planName, businessTrustValue };
+  }
+  // Best-effort readable name for a familyTrustV1839 plan id.
+  function trustPlanNameV1839(lt) {
+    var map = { starter: "Starter Family Trust", growth: "Family Trust", legacy: "Legacy Family Trust", dynasty: "Dynasty Family Trust", office: "Family Office Trust" };
+    return map[String(lt && lt.plan)] || (lt && lt.plan ? "Family Trust" : "");
+  }
+  function addHistory(action, amount) {
+    const s = ensure(); if (!s) return;
+    const e = s.estateV1831;
+    e.history.unshift({ age:n(s.age), action, amount:Math.round(n(amount)), at:Date.now() });
+    e.history = e.history.slice(0, 20);
+  }
+  function payCost(amount, label) {
+    const s = ensure(); if (!s) return false;
+    amount = Math.max(0, Math.round(n(amount)));
+    if (n(s.money) < amount) { toast("Need " + money(amount) + " in checking for " + label + "."); return false; }
+    s.money = Math.round(n(s.money) - amount);
+    return true;
+  }
+
+  window.createWillV1831 = function () {
+    const s = ensure(); if (!s) return;
+    if (s.estateV1831.hasWill) return toast("You already have a will.");
+    const cost = 800;
+    if (!payCost(cost, "a will")) return;
+    s.estateV1831.hasWill = true;
+    addHistory("Created will", cost);
+    log("You created a basic will. Probate risk is lower and heirs are named.", { money:-cost, stress:-1 });
+    saveRender();
+  };
+  window.createTrustV1831 = function (type) {
+    const s = ensure(); if (!s) return;
+    const plan = TRUST_TYPES[type] || TRUST_TYPES.revocable;
+    if (s.estateV1831.trustType === type) return toast("That trust is already active.");
+    if (type === "dynasty" && baseNetWorth(s) < 1000000) return toast("Dynasty trust requires at least $1M net worth in this gameplay model.");
+    if (!payCost(plan.setup, plan.name)) return;
+    s.estateV1831.trustType = type;
+    s.estateV1831.hasWill = true;
+    addHistory("Created " + plan.name, plan.setup);
+    log("Set up a " + plan.name + ". Assets can now be titled into the family trust.", { money:-plan.setup, stress:type === "dynasty" ? -5 : -2 });
+    saveRender();
+  };
+  window.setTrusteeV1831 = function (value) {
+    const s = ensure(); if (!s) return;
+    s.estateV1831.trustee = TRUSTEES[value] ? value : "self";
+    addHistory("Changed trustee", 0);
+    saveRender();
+  };
+  window.setBeneficiaryModeV1831 = function (value) {
+    const s = ensure(); if (!s) return;
+    s.estateV1831.beneficiaryMode = BENEFICIARIES[value] ? value : "children_equal";
+    addHistory("Changed beneficiaries", 0);
+    saveRender();
+  };
+  window.setDistributionAgeV1831 = function (value) {
+    const s = ensure(); if (!s) return;
+    s.estateV1831.distributionAge = clamp(Math.round(n(value, 25)), 18, 45);
+    addHistory("Changed distribution age", 0);
+    saveRender();
+  };
+  window.toggleTrustClauseV1831 = function (key) {
+    const s = ensure(); if (!s) return;
+    if (!Object.prototype.hasOwnProperty.call(s.estateV1831.clauses, key)) return;
+    const enabling = !s.estateV1831.clauses[key];
+    const costs = { spendthrift:1200, guardianship:700, healthDirective:350, powerOfAttorney:350, businessSuccession:2500, charityRemainder:3500 };
+    const cost = enabling ? Math.round(n(costs[key])) : 0;
+    if (enabling && !payCost(cost, "estate clause")) return;
+    s.estateV1831.clauses[key] = enabling;
+    addHistory((enabling ? "Added " : "Removed ") + key, cost);
+    log((enabling ? "Added" : "Removed") + " estate planning clause: " + key.replace(/([A-Z])/g, " $1") + ".", { money:-cost });
+    saveRender();
+  };
+  window.hireFamilyOfficeV1831 = function () {
+    const s = ensure(); if (!s) return;
+    if (s.estateV1831.familyOffice) return toast("Family office is already active.");
+    if (baseNetWorth(s) < 2000000) return toast("Family office requires at least $2M net worth in this gameplay model.");
+    const cost = 100000;
+    if (!payCost(cost, "family office setup")) return;
+    s.estateV1831.familyOffice = true;
+    addHistory("Hired family office", cost);
+    log("You hired a family office to coordinate trusts, business succession, taxes, and multi-generation wealth.", { money:-cost, stress:-6 });
+    saveRender();
+  };
+  window.fundTrustCashV1831 = function (source, rawAmount) {
+    const s = ensure(); if (!s) return;
+    const e = s.estateV1831;
+    if (e.trustType === "none") return toast("Create a trust first.");
+    let available = 0;
+    if (source === "savings") available = Math.max(0, n(s.savings));
+    else available = Math.max(0, n(s.money));
+    let amount = rawAmount === "all" ? available : Math.round(n(rawAmount));
+    if (source === "custom") {
+      const el = document.getElementById("v1831-custom-fund");
+      amount = Math.round(n(el && el.value));
+      source = "checking";
+      available = Math.max(0, n(s.money));
+    }
+    amount = Math.max(0, Math.min(amount, available));
+    if (!amount) return toast("No cash available to fund.");
+    if (source === "savings") s.savings = Math.max(0, Math.round(n(s.savings) - amount));
+    else s.money = Math.max(0, Math.round(n(s.money) - amount));
+    e.assets.trustCash = Math.max(0, Math.round(n(e.assets.trustCash) + amount));
+    addHistory("Funded trust cash", amount);
+    log("Moved " + money(amount) + " into the family trust.", { money:-amount, karma:1 });
+    saveRender();
+  };
+  window.withdrawTrustCashV1831 = function (rawAmount) {
+    const s = ensure(); if (!s) return;
+    const e = s.estateV1831;
+    if (e.trustType !== "revocable") return toast("Only revocable trust cash can be pulled back easily.");
+    let amount = rawAmount === "all" ? n(e.assets.trustCash) : Math.round(n(rawAmount));
+    if (rawAmount === "custom") {
+      const el = document.getElementById("v1831-custom-withdraw");
+      amount = Math.round(n(el && el.value));
+    }
+    amount = Math.max(0, Math.min(amount, n(e.assets.trustCash)));
+    if (!amount) return toast("No trust cash available.");
+    e.assets.trustCash = Math.max(0, Math.round(n(e.assets.trustCash) - amount));
+    s.money = Math.round(n(s.money) + amount);
+    addHistory("Withdrew trust cash", amount);
+    log("Pulled " + money(amount) + " back from the revocable trust.", { money:amount, stress:1 });
+    saveRender();
+  };
+  window.toggleTrustAssetV1831 = function (asset) {
+    const s = ensure(); if (!s) return;
+    const e = s.estateV1831;
+    if (e.trustType === "none") return toast("Create a trust first.");
+    if (asset === "home" || asset === "rentals" || asset === "retirementBeneficiary") {
+      e.assets[asset] = !e.assets[asset];
+      const cost = e.assets[asset] ? (asset === "home" ? 900 : asset === "rentals" ? 1500 : 250) : 0;
+      if (cost && !payCost(cost, "asset retitling")) { e.assets[asset] = false; return; }
+      addHistory((e.assets[asset] ? "Assigned " : "Unassigned ") + asset, cost);
+      log((e.assets[asset] ? "Assigned " : "Removed ") + asset.replace(/([A-Z])/g, " $1") + " in the estate plan.", { money:-cost });
+      saveRender();
+    }
+  };
+  window.setTrustPercentV1831 = function (asset, rawPct) {
+    const s = ensure(); if (!s) return;
+    const e = s.estateV1831;
+    if (e.trustType === "none") return toast("Create a trust first.");
+    const key = asset + "Percent";
+    if (!["businessPercent", "brokeragePercent", "managerPercent"].includes(key)) return;
+    const pctValue = clamp(n(rawPct), 0, 1);
+    const previous = n(e.assets[key]);
+    if (pctValue > previous) {
+      const cost = Math.round((pctValue - previous) * (asset === "business" ? 4000 : 1500));
+      if (cost && !payCost(cost, "retitling " + asset)) return;
+      addHistory("Assigned " + Math.round(pctValue * 100) + "% " + asset, cost);
+      log("Assigned " + Math.round(pctValue * 100) + "% of " + asset + " interests to the estate plan.", { money:-cost });
+    }
+    e.assets[key] = pctValue;
+    saveRender();
+  };
+  window.payEstateMaintenanceV1831 = function () {
+    const s = ensure(); if (!s) return;
+    const due = Math.max(0, Math.round(n(s.estateV1831.maintenanceDue)));
+    if (!due) return toast("No estate maintenance due.");
+    const paid = Math.min(due, Math.max(0, n(s.money)));
+    if (!paid) return toast("Need checking cash to pay maintenance.");
+    s.money = Math.round(n(s.money) - paid);
+    s.estateV1831.maintenanceDue = Math.max(0, due - paid);
+    addHistory("Paid estate maintenance", paid);
+    log("Paid " + money(paid) + " in estate/trust maintenance.", { money:-paid });
+    saveRender();
+  };
+
+  function yearlyEstateMaintenance(s = ensure()) {
+    if (!s) return false;
+    const e = s.estateV1831;
+    const t = TRUST_TYPES[e.trustType] || TRUST_TYPES.none;
+    const ageKey = String(n(s.age));
+    if (e.lastMaintenanceAge === ageKey) return false;
+    e.lastMaintenanceAge = ageKey;
+    let due = Math.round(n(t.maint) + (e.familyOffice ? 18000 : 0));
+    if (!due) return false;
+    if (n(s.money) >= due) {
+      s.money = Math.round(n(s.money) - due);
+      addHistory("Auto-paid estate maintenance", due);
+      log("Estate plan maintenance cost " + money(due) + " this year.", { money:-due });
+    } else {
+      e.maintenanceDue = Math.round(n(e.maintenanceDue) + due);
+      addHistory("Estate maintenance due", due);
+      log("Estate plan maintenance of " + money(due) + " is due.", { stress:1 });
+    }
+    return true;
+  }
+
+  const previousResolve = window.resolveLifeAndFinanceYear || (typeof resolveLifeAndFinanceYear === "function" ? resolveLifeAndFinanceYear : null);
+  if (previousResolve && !window.__ledgerResolve1831Wrapped) {
+    window.__ledgerResolve1831Wrapped = true;
+    window.resolveLifeAndFinanceYear = function () {
+      const out = previousResolve.apply(this, arguments);
+      try { yearlyEstateMaintenance(ensure()); } catch (e) { try { console.warn("v18.31 estate yearly failed", e); } catch(ignore) {} }
+      return out;
+    };
+    try { resolveLifeAndFinanceYear = window.resolveLifeAndFinanceYear; } catch (e) {}
+  }
+
+  function selectHtml(value, options, action) {
+    return `<select onchange="event.preventDefault();event.stopPropagation();${action}(this.value)">${Object.keys(options).map(k => `<option value="${esc(k)}" ${k === value ? "selected" : ""}>${esc(options[k])}</option>`).join("")}</select>`;
+  }
+  function button(label, cls, js, disabled) {
+    return `<button class="money-btn ${cls || ""}" onclick="event.preventDefault();event.stopPropagation();${js}" ${disabled ? "disabled" : ""}>${esc(label)}</button>`;
+  }
+  function metric(label, value, tone, sub) {
+    return `<div class="v1831-metric ${tone || ""}"><span>${esc(label)}</span><b>${esc(value)}</b>${sub ? `<em>${esc(sub)}</em>` : ""}</div>`;
+  }
+  function renderPlanOptions(e) {
+    return Object.keys(TRUST_TYPES).filter(k => k !== "none").map(k => {
+      const t = TRUST_TYPES[k];
+      const active = e.trustType === k;
+      return `<div class="v1831-plan ${active ? "active" : ""}"><div><b>${esc(t.name)}</b><span>${esc(t.desc)}</span><em>Setup ${money(t.setup)} · yearly ${money(t.maint)} · probate leak ${pct(t.probate)}</em></div>${button(active ? "Active" : "Create", active ? "" : "gold", `createTrustV1831('${esc(k)}')`, active)}</div>`;
+    }).join("");
+  }
+  function renderAssetControls(s, settlement) {
+    const e = s.estateV1831, a = e.assets;
+    const hasTrust = e.trustType !== "none";
+    const pctButtons = (asset, current) => [0, .25, .50, .75, 1].map(v => button(Math.round(v*100) + "%", v === current ? "green" : "", `setTrustPercentV1831('${asset}',${v})`, !hasTrust || v === current)).join("");
+    return `<section class="money-section v1831-assets"><div class="money-section-title">Fund / Title Assets Into Trust <span>legal ownership, not personal tax</span></div>
+      <div class="v1831-grid four">
+        ${metric("Trust cash", money(a.trustCash), "gold", "Cash already inside trust")}
+        ${metric("Home value", money(homeValue(s)), a.home ? "good" : "", a.home ? "Assigned" : "Not assigned")}
+        ${metric("Business value", money(businessValue(s)), a.businessPercent ? "good" : "", Math.round(a.businessPercent*100)+"% assigned")}
+        ${metric("Projected transfer", money(settlement.netTransfer), "good", "After gameplay probate/tax leak")}
+      </div>
+      <div class="v1831-subtitle">Move cash into trust</div>
+      <div class="v1831-actions">${button("Fund $10K", "gold", "fundTrustCashV1831('checking',10000)", !hasTrust || n(s.money) < 10000)}${button("Fund $100K", "gold", "fundTrustCashV1831('checking',100000)", !hasTrust || n(s.money) < 100000)}${button("Fund All Checking", "green", "fundTrustCashV1831('checking','all')", !hasTrust || n(s.money) <= 0)}${button("Fund All Savings", "green", "fundTrustCashV1831('savings','all')", !hasTrust || n(s.savings) <= 0)}</div>
+      <div class="v1831-custom"><input id="v1831-custom-fund" type="number" min="0" placeholder="Custom amount from checking" /><button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();fundTrustCashV1831('custom')" ${!hasTrust ? "disabled" : ""}>Fund Custom</button></div>
+      <div class="v1831-custom"><input id="v1831-custom-withdraw" type="number" min="0" placeholder="Custom revocable withdrawal" /><button class="money-btn" onclick="event.preventDefault();event.stopPropagation();withdrawTrustCashV1831('custom')" ${e.trustType !== "revocable" || !a.trustCash ? "disabled" : ""}>Withdraw</button><button class="money-btn" onclick="event.preventDefault();event.stopPropagation();withdrawTrustCashV1831('all')" ${e.trustType !== "revocable" || !a.trustCash ? "disabled" : ""}>Withdraw All</button></div>
+      <div class="v1831-subtitle">Retitle major assets</div>
+      <div class="v1831-toggle-grid">
+        <button class="v1831-toggle ${a.home ? "active" : ""}" onclick="event.preventDefault();event.stopPropagation();toggleTrustAssetV1831('home')" ${!hasTrust || !homeValue(s) ? "disabled" : ""}><b>Home</b><span>${a.home ? "In plan" : "Add deed/trust title"}</span></button>
+        <button class="v1831-toggle ${a.rentals ? "active" : ""}" onclick="event.preventDefault();event.stopPropagation();toggleTrustAssetV1831('rentals')" ${!hasTrust || !rentalValue(s) ? "disabled" : ""}><b>Rental properties</b><span>${a.rentals ? "In plan" : "Add portfolio"}</span></button>
+        <button class="v1831-toggle ${a.retirementBeneficiary ? "active" : ""}" onclick="event.preventDefault();event.stopPropagation();toggleTrustAssetV1831('retirementBeneficiary')" ${!retirementValue(s) ? "disabled" : ""}><b>Retirement beneficiaries</b><span>${a.retirementBeneficiary ? "Filed" : "Add beneficiary forms"}</span></button>
+      </div>
+      <div class="v1831-percent-row"><b>Business interests</b><span>${pct(a.businessPercent)} assigned</span><div>${pctButtons("business", a.businessPercent)}</div></div>
+      <div class="v1831-percent-row"><b>Brokerage / stocks</b><span>${pct(a.brokeragePercent)} assigned</span><div>${pctButtons("brokerage", a.brokeragePercent)}</div></div>
+      <div class="v1831-percent-row"><b>Outside manager accounts</b><span>${pct(a.managerPercent)} assigned</span><div>${pctButtons("manager", a.managerPercent)}</div></div>
+    </section>`;
+  }
+  function renderClauseControls(e) {
+    const clauses = [
+      ["spendthrift", "Spendthrift protection", "Protects heirs from blowing all money instantly."],
+      ["guardianship", "Minor guardianship", "Names who cares for minor children."],
+      ["healthDirective", "Health directive", "Reduces chaos if health collapses."],
+      ["powerOfAttorney", "Power of attorney", "Lets a trusted person manage finances if incapacitated."],
+      ["businessSuccession", "Business succession", "Keeps companies from being forced-sold at death."],
+      ["charityRemainder", "Charity remainder", "Adds legacy points and lowers estate-tax exposure."
+      ]
+    ];
+    return `<section class="money-section v1831-clauses"><div class="money-section-title">Estate Documents <span>rules for family, health, business</span></div>
+      <div class="v1831-controls">
+        <label><span>Trustee</span>${selectHtml(e.trustee, TRUSTEES, "setTrusteeV1831")}</label>
+        <label><span>Beneficiaries</span>${selectHtml(e.beneficiaryMode, BENEFICIARIES, "setBeneficiaryModeV1831")}</label>
+        <label><span>Kids receive control at age</span><select onchange="event.preventDefault();event.stopPropagation();setDistributionAgeV1831(this.value)">${[18,21,25,30,35,40].map(age => `<option value="${age}" ${n(e.distributionAge) === age ? "selected" : ""}>${age}</option>`).join("")}</select></label>
+      </div>
+      <div class="v1831-toggle-grid clauses">${clauses.map(([key, title, desc]) => `<button class="v1831-toggle ${e.clauses[key] ? "active" : ""}" onclick="event.preventDefault();event.stopPropagation();toggleTrustClauseV1831('${key}')"><b>${esc(title)}</b><span>${esc(desc)}</span></button>`).join("")}</div>
+    </section>`;
+  }
+  function renderHistory(e) {
+    const rows = (e.history || []).slice(0, 6).map(h => `<div class="v1831-history-row"><span>Age ${esc(h.age)}</span><b>${esc(h.action)}</b><em>${h.amount ? money(h.amount) : "—"}</em></div>`).join("");
+    return rows ? `<section class="money-section v1831-history"><div class="money-section-title">Estate Ledger <span>recent actions</span></div>${rows}</section>` : "";
+  }
+  function renderEstateCommand() {
+    const s = ensure(); if (!s) return "";
+    const e = s.estateV1831;
+    const t = TRUST_TYPES[e.trustType] || TRUST_TYPES.none;
+    const settlement = estateSettlement(s);
+    const kids = childrenList(s);
+    return `<section class="money-section v1831-estate-command"><div class="money-section-title">Family Trust / Estate Planning <span>legal home</span></div>
+      <div class="v1831-hero"><div><div class="v1831-kicker">Dynasty planning</div><h3>${esc(t.name)}</h3><p>${esc(t.desc)}</p></div><div class="v1831-score"><b>${settlement.protection}</b><span>protection</span></div></div>
+      <div class="v1831-grid four">
+        ${metric("Gross estate", money(settlement.gross), "gold", "Gameplay estate value")}
+        ${metric("Trust-protected", money(settlement.protectedValue), settlement.protectedValue ? "good" : "", "Assigned or titled")}
+        ${metric("Probate leak", money(settlement.probateLoss), settlement.probateLoss ? "bad" : "good", pct(settlement.probateRate) + " on unprotected")}
+        ${metric("Heir transfer", money(settlement.netTransfer), "good", kids.length ? kids.length + " child/heir records" : "No child heirs yet")}
+      </div>
+      <div class="v1831-plan-status"><span class="${e.hasWill ? "good" : "bad"}">${e.hasWill ? "Will active" : "No will"}</span><span>${esc(BENEFICIARIES[e.beneficiaryMode] || "Children")}</span><span>Trustee: ${esc(TRUSTEES[e.trustee] || "Self")}</span><span>Distribution age ${esc(e.distributionAge)}</span>${e.familyOffice ? "<span class='good'>Family office active</span>" : ""}</div>
+      <div class="v1831-actions">${button("Create Will", "gold", "createWillV1831()", e.hasWill)}${button("Hire Family Office", "blue", "hireFamilyOfficeV1831()", e.familyOffice || baseNetWorth(s) < 2000000)}${button("Pay Maintenance", "red", "payEstateMaintenanceV1831()", !e.maintenanceDue)}</div>
+      <div class="v1831-subtitle">Trust types</div><div class="v1831-plan-grid">${renderPlanOptions(e)}</div>
+    </section>${renderAssetControls(s, settlement)}${renderClauseControls(e)}${renderHistory(e)}`;
+  }
+  function renderEstateShortcut() {
+    const s = ensure(); if (!s) return "";
+    const e = s.estateV1831;
+    const settlement = estateSettlement(s);
+    return `<section class="money-section v1831-estate-shortcut"><div class="money-section-title">Family Trust / Legacy <span>estate tools live in Legal</span></div><div class="v1831-grid four">${metric("Plan", (TRUST_TYPES[e.trustType] || TRUST_TYPES.none).name, e.trustType === "none" ? "bad" : "good", e.hasWill ? "Will active" : "No will")}${metric("Protection", settlement.protection + "/100", settlement.protection >= 60 ? "good" : settlement.protection ? "gold" : "bad", "Estate readiness")}${metric("Projected heirs", money(settlement.netTransfer), "good", "After leak/tax model")}${metric("Maintenance due", money(e.maintenanceDue), e.maintenanceDue ? "bad" : "good", "Yearly docs/admin")}</div><div class="v1831-actions">${button("Open Legal Estate Desk", "blue", "setTabV16 ? setTabV16('law') : setTab('law')", false)}</div></section>`;
+  }
+
+  function removeSections(html) {
+    let out = String(html || "");
+    ["v1831-estate-command", "v1831-estate-shortcut", "v1831-assets", "v1831-clauses", "v1831-history"].forEach(cls => {
+      let idx = out.indexOf(cls), guard = 0;
+      while (idx >= 0 && guard++ < 20) {
+        const start = out.lastIndexOf("<section", idx);
+        const end = out.indexOf("</section>", idx);
+        if (start < 0 || end < 0) break;
+        out = out.slice(0, start) + out.slice(end + 10);
+        idx = out.indexOf(cls);
+      }
+    });
+    return out;
+  }
+  const previousRenderHubContent = window.renderHubContent || (typeof renderHubContent === "function" ? renderHubContent : null);
+  if (previousRenderHubContent && !window.__ledgerRender1831Wrapped) {
+    window.__ledgerRender1831Wrapped = true;
+    window.renderHubContent = function (hubId) {
+      ensure();
+      let html = "";
+      try { html = previousRenderHubContent.apply(this, arguments) || ""; } catch (e) { html = `<section class="panel"><div class="row-title">Recovered hub</div><div class="row-sub">${esc(e.message || e)}</div></section>`; }
+      html = removeSections(html);
+      if (hubId === "law" || hubId === "legal") return renderEstateCommand() + html;
+      if (hubId === "more") return renderEstateShortcut() + html;
+      if (hubId === "finance" || hubId === "money") return renderEstateShortcut() + html;
+      return html;
+    };
+    try { renderHubContent = window.renderHubContent; } catch (e) {}
+  }
+
+  const previousOverlay = window.renderHubOverlay || (typeof renderHubOverlay === "function" ? renderHubOverlay : null);
+  if (previousOverlay && !window.__ledgerOverlay1831Wrapped) {
+    window.__ledgerOverlay1831Wrapped = true;
+    window.renderHubOverlay = function (hubId) {
+      if (hubId === "law" || hubId === "legal") {
+        return `<div class="hub-overlay" onclick="if(event.target===this)closeHub()"><div class="hub-sheet"><div class="hub-head"><h2>Legal / Estate</h2><button class="hub-close" onclick="closeHub()">×</button></div>${window.renderHubContent(hubId)}</div></div>`;
+      }
+      return previousOverlay.apply(this, arguments);
+    };
+    try { renderHubOverlay = window.renderHubOverlay; } catch (e) {}
+  }
+
+  const previousGetVisibleHubs = window.getVisibleHubs || (typeof getVisibleHubs === "function" ? getVisibleHubs : null);
+  if (previousGetVisibleHubs && !window.__ledgerHubs1831Wrapped) {
+    window.__ledgerHubs1831Wrapped = true;
+    window.getVisibleHubs = function () {
+      let hubs = [];
+      try { hubs = previousGetVisibleHubs.apply(this, arguments) || []; } catch (e) {}
+      hubs = Array.isArray(hubs) ? hubs.slice() : [];
+      const s = ensure();
+      const shouldShow = s && n(s.age) >= 18;
+      if (shouldShow && !hubs.some(h => h && h.id === "law")) {
+        const idx = Math.max(0, hubs.findIndex(h => h && h.id === "more"));
+        const lawHub = { id:"law", icon:"⚖", label:"Legal" };
+        if (idx >= 0) hubs.splice(idx, 0, lawHub); else hubs.push(lawHub);
+      }
+      return hubs.slice(0, 9);
+    };
+    try { getVisibleHubs = window.getVisibleHubs; } catch (e) {}
+  }
+
+  function deathPanelHtml() {
+    const s = ensure(); if (!s) return "";
+    const e = s.estateV1831;
+    const t = TRUST_TYPES[e.trustType] || TRUST_TYPES.none;
+    const x = estateSettlement(s);
+    return `<section class="v1831-death-panel"><div class="v1831-death-title">Family Trust Settlement</div><div class="legacy"><div><span class="mono">Plan</span><b>${esc(x.planName || t.name)}</b></div><div><span class="mono">Protected</span><b>${money(x.protectedValue)}</b></div><div><span class="mono">Probate Loss</span><b>${money(x.probateLoss)}</b></div><div><span class="mono">Estate Tax</span><b>${money(x.estateTax)}</b></div><div><span class="mono">Net To Heirs</span><b>${money(x.netTransfer)}</b></div><div><span class="mono">Each Child</span><b>${money(x.childShare)}</b></div></div><div class="cause">${e.hasWill || x.anyTrust ? "Your estate plan and family trust reduced the leak between final net worth and the next generation." : "No meaningful estate plan existed, so probate and delays reduced the family transfer."}</div></section>`;
+  }
+  const previousRenderDeath = window.renderDeath || (typeof renderDeath === "function" ? renderDeath : null);
+  if (previousRenderDeath && !window.__ledgerDeath1831Wrapped) {
+    window.__ledgerDeath1831Wrapped = true;
+    window.renderDeath = function () {
+      previousRenderDeath.apply(this, arguments);
+      try {
+        const death = document.querySelector(".death");
+        const actions = document.querySelector(".death-actions");
+        if (death && !death.querySelector(".v1831-death-panel")) {
+          const wrap = document.createElement("div");
+          wrap.innerHTML = deathPanelHtml();
+          const node = wrap.firstElementChild;
+          if (actions) death.insertBefore(node, actions); else death.appendChild(node);
+        }
+      } catch (e) { try { console.warn("v18.31 death panel failed", e); } catch(ignore) {} }
+    };
+    try { renderDeath = window.renderDeath; } catch (e) {}
+  }
+
+  const previousContinueAsHeir = window.continueAsHeir || (typeof continueAsHeir === "function" ? continueAsHeir : null);
+  if (previousContinueAsHeir && !window.__ledgerHeir1831Wrapped) {
+    window.__ledgerHeir1831Wrapped = true;
+    window.continueAsHeir = function () {
+      const old = ensure();
+      if (!old || old.alive) return previousContinueAsHeir.apply(this, arguments);
+      const kids = childrenList(old);
+      if (!kids.length) return previousContinueAsHeir.apply(this, arguments);
+      const x = estateSettlement(old);
+      const heir = kids[0] || {};
+      const oldLegacy = old.legacy || {};
+      const familyName = oldLegacy.familyName || String(old.name || "Legacy").split(" ").pop() || "Legacy";
+      const nextName = heir.name || (typeof randomName === "function" ? randomName(Math.random() < .5 ? "male" : "female").replace(/ \w+$/, " " + familyName) : "Heir " + familyName);
+      const inheritance = Math.max(0, Math.round(x.childShare || x.netTransfer * .65));
+      const oldScore = (() => { try { return typeof ledgerLegacyScore === "function" ? n(ledgerLegacyScore(old)) : x.dynastyScore; } catch(e) { return x.dynastyScore; } })();
+      try {
+        newGame({
+          name: nextName,
+          gender: Math.random() < .5 ? "male" : "female",
+          background: old.background || "middle",
+          city: old.city || (typeof cities !== "undefined" && Array.isArray(cities) ? cities[0] : "Philadelphia"),
+          startingMoney: inheritance,
+          sandbox: old.sandbox || {},
+          sandboxMode: !!old.sandboxMode
+        });
+        const s = ensure();
+        if (s) {
+          if (!s.legacy) s.legacy = {};
+          s.legacy.generation = n(oldLegacy.generation, 1) + 1;
+          s.legacy.familyName = familyName;
+          s.legacy.cumulativeScore = n(oldLegacy.cumulativeScore) + oldScore + x.dynastyScore;
+          s.legacy.inheritedFrom = old.name;
+          s.legacy.lastInheritance = inheritance;
+          s.legacy.lastEstatePlanV1831 = { plan:(TRUST_TYPES[old.estateV1831.trustType] || TRUST_TYPES.none).name, gross:x.gross, protectedValue:x.protectedValue, netTransfer:x.netTransfer, childShare:x.childShare, protection:x.protection };
+          s.legacy.milestones = [];
+          log("You carry the " + familyName + " legacy forward after inheriting " + money(inheritance) + " through the family estate plan.", {});
+        }
+        saveRender();
+        try { if (typeof milestoneToast === "function") milestoneToast("Legacy Continued", nextName + " begins generation " + (rootState().legacy && rootState().legacy.generation || "next") + "."); } catch(e) {}
+      } catch (err) {
+        try { console.warn("v18.31 trust-aware heir failed; using base", err); } catch(ignore) {}
+        return previousContinueAsHeir.apply(this, arguments);
+      }
+    };
+    try { continueAsHeir = window.continueAsHeir; } catch (e) {}
+  }
+
+  function injectStyles() {
+    if (document.getElementById("ledger-v1831-style")) return;
+    const style = document.createElement("style");
+    style.id = "ledger-v1831-style";
+    style.textContent = `
+      .v1831-estate-command,.v1831-estate-shortcut,.v1831-assets,.v1831-clauses,.v1831-history{border-color:rgba(216,173,109,.50)!important;background:linear-gradient(135deg,rgba(50,38,20,.97),rgba(29,25,20,.98))!important;overflow:hidden!important}.v1831-assets{border-color:rgba(143,175,108,.45)!important;background:linear-gradient(135deg,rgba(20,43,27,.96),rgba(29,25,20,.98))!important}.v1831-clauses{border-color:rgba(126,160,172,.45)!important;background:linear-gradient(135deg,rgba(20,38,45,.96),rgba(29,25,20,.98))!important}.v1831-estate-shortcut{border-color:rgba(180,146,220,.38)!important;background:linear-gradient(135deg,rgba(36,28,48,.96),rgba(29,25,20,.98))!important}
+      .v1831-hero{display:flex;justify-content:space-between;gap:14px;align-items:center;border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:15px;background:radial-gradient(circle at 20% 0%,rgba(216,173,109,.18),transparent 42%),rgba(255,255,255,.04);margin:8px 0 10px}.v1831-hero h3{font-size:25px;line-height:1.05;margin:2px 0 4px}.v1831-hero p{font-family:'JetBrains Mono',monospace;color:#b9a98e;font-size:10px;line-height:1.45}.v1831-kicker,.v1831-subtitle{font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.16em;font-size:9px;color:#d8ad6d}.v1831-subtitle{margin:12px 0 7px}.v1831-score{min-width:84px;text-align:center;border:1px solid rgba(216,173,109,.35);border-radius:14px;padding:10px;background:rgba(0,0,0,.18)}.v1831-score b{display:block;font-family:'JetBrains Mono',monospace;font-size:31px;color:#d8ad6d}.v1831-score span{display:block;font-family:'JetBrains Mono',monospace;font-size:9px;color:#aa9a82;text-transform:uppercase;letter-spacing:.1em}
+      .v1831-grid{display:grid;gap:8px;margin:10px 0}.v1831-grid.four{grid-template-columns:repeat(4,minmax(0,1fr))}.v1831-metric{border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.045);border-radius:12px;padding:10px;min-width:0}.v1831-metric span{display:block;color:#aa9a82;font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.08em}.v1831-metric b{display:block;font-family:'JetBrains Mono',monospace;font-size:16px;margin-top:4px;color:#f2e7d6;overflow-wrap:anywhere}.v1831-metric em{display:block;color:#8e806c;font-family:'JetBrains Mono',monospace;font-size:9px;font-style:normal;margin-top:4px;line-height:1.35}.v1831-metric.good b{color:#8faf6c}.v1831-metric.bad b{color:#cc7661}.v1831-metric.gold b{color:#d8ad6d}
+      .v1831-plan-status,.v1831-actions{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}.v1831-plan-status span{font-family:'JetBrains Mono',monospace;font-size:9px;border:1px solid rgba(255,255,255,.11);border-radius:999px;padding:5px 8px;color:#aa9a82;background:rgba(255,255,255,.04)}.v1831-plan-status span.good{color:#8faf6c;border-color:rgba(143,175,108,.4)}.v1831-plan-status span.bad{color:#cc7661;border-color:rgba(204,118,97,.4)}.v1831-actions .money-btn{flex:1 1 130px}.v1831-plan-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.v1831-plan{border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04);border-radius:13px;padding:11px;display:grid;gap:9px}.v1831-plan.active{border-color:rgba(143,175,108,.52);background:rgba(143,175,108,.08)}.v1831-plan b{display:block;font-size:15px}.v1831-plan span,.v1831-plan em{display:block;font-family:'JetBrains Mono',monospace;font-size:9px;line-height:1.42;color:#aa9a82;margin-top:4px}.v1831-plan em{color:#d8ad6d;font-style:normal}
+      .v1831-custom{display:grid;grid-template-columns:1fr auto auto;gap:7px;margin-top:7px}.v1831-custom input{min-width:0}.v1831-toggle-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.v1831-toggle-grid.clauses{grid-template-columns:repeat(2,minmax(0,1fr))}.v1831-toggle{border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.04);border-radius:12px;padding:11px;text-align:left;color:#f2e7d6}.v1831-toggle.active{border-color:rgba(143,175,108,.55);background:rgba(143,175,108,.09)}.v1831-toggle b{display:block;font-size:13px}.v1831-toggle span{display:block;color:#aa9a82;font-family:'JetBrains Mono',monospace;font-size:9px;line-height:1.42;margin-top:4px}.v1831-toggle:disabled{opacity:.45;cursor:not-allowed}.v1831-percent-row{border:1px solid rgba(255,255,255,.10);border-radius:12px;padding:10px;margin-top:8px;background:rgba(255,255,255,.035)}.v1831-percent-row>b{display:block;font-size:14px}.v1831-percent-row>span{display:block;color:#d8ad6d;font-family:'JetBrains Mono',monospace;font-size:9px;margin:4px 0 7px}.v1831-percent-row>div{display:flex;gap:6px;flex-wrap:wrap}.v1831-percent-row .money-btn{flex:1 1 56px}.v1831-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px}.v1831-controls label{display:grid;gap:5px}.v1831-controls label span{font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;color:#aa9a82;letter-spacing:.08em}.v1831-controls select{min-width:0}.v1831-history-row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;border-bottom:1px solid rgba(255,255,255,.08);padding:9px 0}.v1831-history-row:last-child{border-bottom:0}.v1831-history-row span,.v1831-history-row em{font-family:'JetBrains Mono',monospace;color:#aa9a82;font-size:9px;font-style:normal}.v1831-history-row b{font-size:13px}.v1831-death-panel{margin:16px 0}.v1831-death-title{font-family:'JetBrains Mono',monospace;color:#d8ad6d;text-transform:uppercase;letter-spacing:.16em;font-size:10px;margin-bottom:8px}
+      @media(max-width:760px){.v1831-grid.four{grid-template-columns:repeat(2,minmax(0,1fr))}.v1831-plan-grid,.v1831-toggle-grid,.v1831-toggle-grid.clauses,.v1831-controls{grid-template-columns:1fr}.v1831-hero{align-items:flex-start}.v1831-score{min-width:72px}.v1831-custom{grid-template-columns:1fr}.v1831-actions .money-btn{flex-basis:100%}}@media(max-width:430px){.v1831-grid.four{grid-template-columns:1fr}.v1831-hero{display:block}.v1831-score{margin-top:10px;width:100%}}
+    `;
+    document.head.appendChild(style);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", injectStyles); else injectStyles();
+  try { ensure(); } catch (e) {}
+})();
+
+
+
+/* END absorbed 08-patch-v18-31.js */
+
+
+/* BEGIN absorbed 09-patch-v18-32.js */
+
+/* LEDGER PATCH v18.32: cleanup, canonical tax audit, stronger interviews, save migration, trust dry run */
+(function () {
+  if (window.__ledgerPatch1832CleanupStability) return;
+  window.__ledgerPatch1832CleanupStability = true;
+
+  var PATCH_ID = "v18.32";
+
+  function rootState() {
+    try { if (typeof state !== "undefined" && state && typeof state === "object") return state; } catch (e) {}
+    try { if (window.state && typeof window.state === "object") return window.state; } catch (e) {}
+    return null;
+  }
+  function assignState(s) {
+    try { state = s; } catch (e) {}
+    try { window.state = s; } catch (e) {}
+    return s;
+  }
+  function n(value, fallback) {
+    var num = Number(value);
+    return Number.isFinite(num) ? num : (fallback == null ? 0 : fallback);
+  }
+  function clamp(value, min, max) { return Math.max(min, Math.min(max, n(value))); }
+  function esc(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+  function money(value) {
+    var v = Math.round(n(value));
+    var sign = v < 0 ? "-" : "";
+    v = Math.abs(v);
+    if (v >= 1e12) return sign + "$" + (v / 1e12).toFixed(1).replace(/\.0$/, "") + "T";
+    if (v >= 1e9) return sign + "$" + (v / 1e9).toFixed(1).replace(/\.0$/, "") + "B";
+    if (v >= 1e6) return sign + "$" + (v / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+    if (v >= 1e4) return sign + "$" + Math.round(v / 1000).toLocaleString() + "K";
+    return sign + "$" + v.toLocaleString();
+  }
+  function pct(value) { return (n(value) * 100).toFixed(1).replace(/\.0$/, "") + "%"; }
+  function toast(text) {
+    try { if (typeof addToast === "function") return addToast(text); } catch (e) {}
+    try { if (typeof addLog === "function") return addLog(text, {}); } catch (e) {}
+    try { console.log(text); } catch (e) {}
+  }
+  function log(text, deltas) {
+    try { if (typeof addLog === "function") return addLog(text, deltas || {}); } catch (e) {}
+    var s = rootState();
+    if (s) {
+      if (!Array.isArray(s.log)) s.log = [];
+      s.log.push({ age: n(s.age), text: text, deltas: deltas || {}, patch: PATCH_ID });
+      if (s.log.length > 300) s.log = s.log.slice(-300);
+    }
+  }
+  function saveRender() {
+    try { if (typeof save === "function") save(); } catch (e) {}
+    try { if (typeof render === "function") render(); } catch (e) {}
+  }
+  function obj(parent, key) {
+    if (!parent[key] || typeof parent[key] !== "object" || Array.isArray(parent[key])) parent[key] = {};
+    return parent[key];
+  }
+  function arr(parent, key) {
+    if (!Array.isArray(parent[key])) parent[key] = [];
+    return parent[key];
+  }
+  function ensureBusiness(b) {
+    if (!b || typeof b !== "object") return b;
+    if (!b.id) b.id = "business_" + Math.random().toString(36).slice(2, 8);
+    if (!b.name) b.name = b.id;
+    if (!b.entityType) b.entityType = n(b.value) >= 150000 ? "llc" : "soleprop";
+    b.value = Math.max(0, Math.round(n(b.value)));
+    b.lastIncome = Math.round(n(b.lastIncome));
+    b.retainedEarnings = Math.max(0, Math.round(n(b.retainedEarnings || b.businessCash)));
+    b.entityTaxDebt = Math.max(0, Math.round(n(b.entityTaxDebt)));
+    b.complianceDue = Math.max(0, Math.round(n(b.complianceDue)));
+    b.ops = obj(b, "ops");
+    if (!Array.isArray(b.historyV1830)) b.historyV1830 = [];
+    return b;
+  }
+  function migrateState() {
+    var s = rootState();
+    var hadState = !!s;
+    if (!s) s = {};
+    if (hadState) assignState(s);
+    s.stats = obj(s, "stats");
+    s.flags = obj(s, "flags");
+    s.actionsTaken = obj(s, "actionsTaken");
+    s.sandbox = obj(s, "sandbox");
+    s.log = arr(s, "log");
+    s.inventory = arr(s, "inventory");
+    s.assets = arr(s, "assets");
+    s.rentals = arr(s, "rentals");
+    s.children = Array.isArray(s.children) ? s.children : [];
+    if (!s.relationships || typeof s.relationships !== "object" || Array.isArray(s.relationships)) s.relationships = {};
+
+    s.finance = obj(s, "finance");
+    var f = s.finance;
+    f.debts = obj(f, "debts");
+    f.incomeSources = obj(f, "incomeSources");
+    f.businesses = arr(f, "businesses");
+    f.businesses.forEach(ensureBusiness);
+    f.businessTaxV1830 = obj(f, "businessTaxV1830");
+    f.businessTaxV1830.history = arr(f.businessTaxV1830, "history");
+    f.businessTaxV1830.processedAges = obj(f.businessTaxV1830, "processedAges");
+    f.externalManager = obj(f, "externalManager");
+    f.personalFirm = obj(f, "personalFirm");
+    f.personalFirm.staff = obj(f.personalFirm, "staff");
+    f.taxCleanupV1832 = obj(f, "taxCleanupV1832");
+    f.taxCleanupV1832.history = arr(f.taxCleanupV1832, "history");
+    f.taxCleanupV1832.totalPersonalReclassed = Math.max(0, n(f.taxCleanupV1832.totalPersonalReclassed));
+    f.taxCleanupV1832.totalBugWriteOff = Math.max(0, n(f.taxCleanupV1832.totalBugWriteOff));
+    f.taxCanonicalV1832 = obj(f, "taxCanonicalV1832");
+    f.taxDebt = Math.max(0, Math.round(n(f.taxDebt)));
+    f.firmEntityTaxDebtV1828 = Math.max(0, Math.round(n(f.firmEntityTaxDebtV1828 || f.entityTaxDebtV1832)));
+    f.entityTaxDebtV1832 = f.firmEntityTaxDebtV1828;
+
+    s.educationV1825 = obj(s, "educationV1825");
+    s.educationV1825.degrees = arr(s.educationV1825, "degrees");
+    s.educationV1827 = obj(s, "educationV1827");
+    s.careerV1827 = obj(s, "careerV1827");
+    s.careerV1827.applications = arr(s.careerV1827, "applications");
+    s.careerV1827.offers = arr(s.careerV1827, "offers");
+    s.careerV1827.history = arr(s.careerV1827, "history");
+    s.careerV1828 = obj(s, "careerV1828");
+    s.careerV1828.interviewHistory = arr(s.careerV1828, "interviewHistory");
+    s.careerV1832 = obj(s, "careerV1832");
+    s.careerV1832.history = arr(s.careerV1832, "history");
+    s.careerV1832.recruiterMessages = arr(s.careerV1832, "recruiterMessages");
+
+    s.estateV1831 = obj(s, "estateV1831");
+    var e = s.estateV1831;
+    if (e.hasWill == null) e.hasWill = false;
+    if (!e.trustType) e.trustType = "none";
+    if (!e.trustee) e.trustee = "self";
+    if (!e.beneficiaryMode) e.beneficiaryMode = "children_equal";
+    if (e.distributionAge == null) e.distributionAge = 25;
+    e.assets = obj(e, "assets");
+    e.assets.trustCash = Math.max(0, Math.round(n(e.assets.trustCash)));
+    e.assets.businessPercent = clamp(e.assets.businessPercent, 0, 1);
+    e.assets.brokeragePercent = clamp(e.assets.brokeragePercent, 0, 1);
+    e.assets.managerPercent = clamp(e.assets.managerPercent, 0, 1);
+    e.clauses = obj(e, "clauses");
+    e.history = arr(e, "history");
+    e.dryRunsV1832 = arr(e, "dryRunsV1832");
+
+    s.migrationV1832 = obj(s, "migrationV1832");
+    s.migrationV1832.lastRun = Date.now();
+    s.migrationV1832.version = PATCH_ID;
+    s.migrationV1832.ok = true;
+
+    if (s.money == null) s.money = 0;
+    if (s.savings == null) s.savings = 0;
+    s.money = Math.round(n(s.money));
+    s.savings = Math.max(0, Math.round(n(s.savings)));
+    return s;
+  }
+  window.migrateLedgerStateV1832 = migrateState;
+
+  var TAX_PROFILES = {
+    us: { name:"United States", personal:.22, invest:.15, entity:.21, regions:{ pa:["Pennsylvania",.0307], de:["Delaware",.038], ny:["New York",.062], ca:["California",.085], tx:["Texas",0], fl:["Florida",0], wa:["Washington",0], il:["Illinois",.0495], ma:["Massachusetts",.05], co:["Colorado",.044] } },
+    canada: { name:"Canada", personal:.26, invest:.18, entity:.15, regions:{ on:["Ontario",.08], bc:["British Columbia",.075], ab:["Alberta",.045] } },
+    uk: { name:"United Kingdom", personal:.28, invest:.20, entity:.19, regions:{ eng:["England",0], sct:["Scotland",.025] } },
+    germany: { name:"Germany", personal:.32, invest:.22, entity:.16, regions:{ berlin:["Berlin",0], bavaria:["Bavaria",.01] } },
+    france: { name:"France", personal:.31, invest:.22, entity:.25, regions:{ idf:["Île-de-France",.015], south:["South",0] } },
+    singapore: { name:"Singapore", personal:.14, invest:.05, entity:.17, regions:{ central:["Central",0] } },
+    uae: { name:"United Arab Emirates", personal:.02, invest:0, entity:.09, regions:{ dubai:["Dubai",0], abudhabi:["Abu Dhabi",0] } },
+    thailand: { name:"Thailand", personal:.16, invest:.08, entity:.20, regions:{ bangkok:["Bangkok",0], phuket:["Phuket",.005], chiangmai:["Chiang Mai",-.01] } },
+    vietnam: { name:"Vietnam", personal:.17, invest:.08, entity:.20, regions:{ hcmc:["Ho Chi Minh City",0], danang:["Da Nang",-.008], hanoi:["Hanoi",0] } }
+  };
+  function taxProfile(s) {
+    var f = (s || migrateState()).finance || {};
+    var country = f.taxCountry || (f.taxResidenceV1826 && f.taxResidenceV1826.country) || "us";
+    var profile = TAX_PROFILES[country] || TAX_PROFILES.us;
+    var regionId = f.taxRegion || (f.taxResidenceV1826 && f.taxResidenceV1826.region) || Object.keys(profile.regions || { pa:1 })[0];
+    var reg = (profile.regions || {})[regionId] || (profile.regions || {}).pa || ["Default",0];
+    return { countryId:country, countryName:profile.name, regionId:regionId, regionName:reg[0], personal:n(profile.personal), invest:n(profile.invest), entity:n(profile.entity), local:n(reg[1]) };
+  }
+  function advisorReduction(s) {
+    var f = (s || migrateState()).finance || {};
+    var raw = String([f.accountant, f.accountantPlan, f.attorney, f.attorneyPlan, f.legalPlan].join(" ")).toLowerCase();
+    var reduction = 0;
+    if (/elite|wealth|family|global|tax_law/.test(raw)) reduction += .24;
+    else if (/cpa|advisor|pro|attorney|lawyer|business/.test(raw)) reduction += .14;
+    else if (/local|basic|preparer/.test(raw)) reduction += .06;
+    return clamp(reduction, 0, .34);
+  }
+  function completedDegreeIds(s) {
+    s = s || migrateState();
+    var ids = [];
+    if (s.major) ids.push(String(s.major).toLowerCase());
+    (s.educationV1825 && s.educationV1825.degrees || []).forEach(function (d) {
+      if (!d) return;
+      var done = d.status === "completed" || d.completed || d.yearsCompleted >= d.targetYears;
+      if (done) ids.push(String(d.majorId || d.id || d.major || d.name || d.majorName || "").toLowerCase());
+    });
+    if (s.educationV1827 && Array.isArray(s.educationV1827.completedDegrees)) {
+      s.educationV1827.completedDegrees.forEach(function (d) { ids.push(String(d.id || d.majorId || d).toLowerCase()); });
+    }
+    var seen = {};
+    return ids.filter(function (id) { if (!id || seen[id]) return false; seen[id] = true; return true; });
+  }
+  function isPassThroughType(type) { return ["soleprop", "sole_prop", "sole-prop", "partnership"].indexOf(String(type || "").toLowerCase()) >= 0; }
+  function computeTaxModel(s) {
+    s = s || migrateState();
+    var f = s.finance || {};
+    var src = f.incomeSources || {};
+    var profile = taxProfile(s);
+    var reduction = advisorReduction(s);
+    var salary = Math.max(0, n(s.job && s.job.salary));
+    var ownerSalary = Math.max(0, n(src.ownerSalaryV1830));
+    var distributions = Math.max(0, n(f.lastFirmDistribution) + n(src.firmDistribution) + n(src.fundCarryV1825) + n(src.businessDistributionsV1830));
+    var investment = Math.max(0, n(src.dividends) + n(src.realizedGains) + n(src.managerDistributionsV1829) + n(src.claimedDistributionsV1829) + n((f.stocksV18 || {}).lastDividends) + n(f.lastDividendIncome));
+    var passThrough = 0;
+    var entityBusinessProfit = 0;
+    (Array.isArray(f.businesses) ? f.businesses : []).forEach(function (b) {
+      ensureBusiness(b);
+      var income = Math.max(0, n(b.lastIncome));
+      if (!income) return;
+      if (isPassThroughType(b.entityType)) passThrough += income;
+      else entityBusinessProfit += Math.max(income, n(b.retainedEarnings));
+    });
+    var firmProfit = Math.max(
+      0,
+      n(f.lastPersonalFirmProfit),
+      n(f.firmProfitV1828),
+      n(f.personalFirm && f.personalFirm.lastReturn),
+      n(f.lastEntrepreneurIncome) && (f.personalFirm && f.personalFirm.hired ? n(f.lastEntrepreneurIncome) : 0),
+      n(f.lastBusinessIncome) && (f.personalFirm && f.personalFirm.hired ? n(f.lastBusinessIncome) : 0)
+    );
+    var firmAssets = Math.max(0, n(f.managedPortfolio) + n(f.firmCashV1828) + n(f.businessCash) + n(f.personalFirm && f.personalFirm.cash));
+    var taxablePersonal = salary + ownerSalary + distributions + investment + passThrough;
+    var personalRate = clamp(profile.personal + profile.local + (taxablePersonal > 1000000 ? .06 : taxablePersonal > 250000 ? .03 : 0), 0, .55);
+    var investRate = clamp(profile.invest + profile.local * .25, 0, .35);
+    var personalDue = Math.round((salary + ownerSalary + distributions + passThrough) * personalRate + investment * investRate);
+    var entityBase = Math.max(0, firmProfit + entityBusinessProfit);
+    var entityRate = clamp(profile.entity * (1 - reduction), 0, .32);
+    var entityDue = Math.round(entityBase * entityRate);
+    var model = {
+      residence: profile.countryName + " / " + profile.regionName,
+      countryId: profile.countryId,
+      regionId: profile.regionId,
+      personalRate: personalRate,
+      investRate: investRate,
+      entityRate: entityRate,
+      advisorReduction: reduction,
+      salary: salary,
+      ownerSalary: ownerSalary,
+      distributions: distributions,
+      investment: investment,
+      passThrough: passThrough,
+      personalTaxable: taxablePersonal,
+      personalDue: personalDue,
+      firmProfit: firmProfit,
+      entityBusinessProfit: entityBusinessProfit,
+      entityBase: entityBase,
+      entityDue: entityDue,
+      personalDebt: Math.max(0, n(f.taxDebt)),
+      firmEntityDebt: Math.max(0, n(f.firmEntityTaxDebtV1828 || f.entityTaxDebtV1832)),
+      firmAssets: firmAssets,
+      degrees: completedDegreeIds(s)
+    };
+    f.taxCanonicalV1832 = model;
+    return model;
+  }
+  window.computeTaxModelV1832 = computeTaxModel;
+
+  function auditAndReclassifyTax(silent) {
+    var s = migrateState();
+    var f = s.finance || {};
+    var m = computeTaxModel(s);
+    var currentPersonalDebt = Math.max(0, n(f.taxDebt));
+    var fairPersonalCap = Math.max(0, Math.round(m.personalDue * 1.10 + 1000));
+    var excess = Math.max(0, currentPersonalDebt - fairPersonalCap);
+    var strongFirmSignal = m.entityBase >= 100000 && m.distributions <= Math.max(1, m.entityBase * .25);
+    var moved = 0;
+    var writeOff = 0;
+    if (excess > 0 && strongFirmSignal) {
+      var fairEntityDebt = Math.max(0, Math.round(m.entityDue * 1.10));
+      var currentEntityDebt = Math.max(0, n(f.firmEntityTaxDebtV1828 || f.entityTaxDebtV1832));
+      moved = Math.min(excess, Math.max(0, fairEntityDebt - currentEntityDebt));
+      writeOff = Math.max(0, excess - moved);
+      f.taxDebt = Math.max(0, Math.round(currentPersonalDebt - moved - writeOff));
+      f.firmEntityTaxDebtV1828 = currentEntityDebt + moved;
+      f.entityTaxDebtV1832 = f.firmEntityTaxDebtV1828;
+      f.taxCleanupV1832.totalPersonalReclassed += moved;
+      f.taxCleanupV1832.totalBugWriteOff += writeOff;
+      f.taxCleanupV1832.history.unshift({ age:n(s.age), personalBefore:currentPersonalDebt, personalAfter:f.taxDebt, moved:moved, writeOff:writeOff, firmProfit:m.entityBase, personalTaxable:m.personalTaxable, reason:"Personal tax exceeded canonical personal exposure while undistributed firm profit was high." });
+      f.taxCleanupV1832.history = f.taxCleanupV1832.history.slice(0, 20);
+      computeTaxModel(s);
+      if (!silent) log("Tax audit: moved " + money(moved) + " off personal tax and wrote off " + money(writeOff) + " as old double-count/bug exposure.", { money:0, stress:-3 });
+      return { moved:moved, writeOff:writeOff, changed:true };
+    }
+    if (!silent) toast("Tax audit found no obvious personal-firm double count right now.");
+    f.taxCleanupV1832.history.unshift({ age:n(s.age), personalBefore:currentPersonalDebt, personalAfter:currentPersonalDebt, moved:0, writeOff:0, firmProfit:m.entityBase, personalTaxable:m.personalTaxable, reason:"No material overtax detected." });
+    f.taxCleanupV1832.history = f.taxCleanupV1832.history.slice(0, 20);
+    return { moved:0, writeOff:0, changed:false };
+  }
+  window.auditAndReclassifyTaxV1832 = function () { auditAndReclassifyTax(false); saveRender(); };
+
+  function getCareerCatalog() {
+    try { if (typeof careerCatalog !== "undefined" && Array.isArray(careerCatalog)) return careerCatalog; } catch (e) {}
+    try { if (Array.isArray(window.careerCatalog)) return window.careerCatalog; } catch (e) {}
+    return [
+      { id:"retail", title:"Retail Associate", salary:28000, minAge:16, req:function(){return true;}, desc:"Entry-level customer service." },
+      { id:"office", title:"Office Coordinator", salary:42000, minAge:18, req:function(s){return n(s.stats && s.stats.discipline) >= 30;}, desc:"Administrative career path." },
+      { id:"registered_nurse", title:"Registered Nurse", salary:76000, minAge:22, degreeIds:["nursing","biology"], desc:"Healthcare career with stability and stress." },
+      { id:"accountant", title:"Accountant", salary:72000, minAge:22, degreeIds:["business","finance","accounting"], desc:"Finance and tax career path." },
+      { id:"software_engineer", title:"Software Engineer", salary:105000, minAge:22, degreeIds:["computer_science","cs","engineering"], desc:"Technical career path." },
+      { id:"attorney", title:"Attorney", salary:120000, minAge:25, degreeIds:["law"], desc:"Legal career path." }
+    ];
+  }
+  function normalizeDegree(id) {
+    id = String(id || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    if (id === "computer_science_degree") id = "computer_science";
+    if (id === "business_degree") id = "business";
+    if (id === "nursing_degree") id = "nursing";
+    if (id === "law_degree") id = "law";
+    return id;
+  }
+  function cloneForDegree(s, degree) {
+    var fake = Object.assign({}, s);
+    fake.major = degree;
+    fake.flags = Object.assign({}, s.flags || {});
+    fake.educationV1825 = s.educationV1825;
+    fake.finance = s.finance;
+    fake.stats = s.stats;
+    return fake;
+  }
+  function jobQualifies(job, s) {
+    s = s || migrateState();
+    if (!job) return false;
+    if (n(s.age) < n(job.minAge)) return false;
+    var reqOk = false;
+    try { reqOk = typeof job.req === "function" ? !!job.req(s) : true; } catch (e) { reqOk = false; }
+    if (reqOk) return true;
+    var degrees = completedDegreeIds(s).map(normalizeDegree);
+    var degreeReqs = (job.degreeIds || job.degrees || job.majors || []).map(normalizeDegree);
+    if (degreeReqs.length && degreeReqs.some(function (id) { return degrees.indexOf(id) >= 0; })) return true;
+    for (var i = 0; i < degrees.length; i++) {
+      try { if (typeof job.req === "function" && job.req(cloneForDegree(s, degrees[i]))) return true; } catch (e2) {}
+    }
+    var title = String(job.title || job.name || "").toLowerCase();
+    if (/nurse/.test(title) && degrees.indexOf("nursing") >= 0) return true;
+    if (/attorney|lawyer|legal/.test(title) && degrees.indexOf("law") >= 0) return true;
+    if (/software|engineer|developer|data/.test(title) && (degrees.indexOf("computer_science") >= 0 || degrees.indexOf("cs") >= 0)) return true;
+    if (/account|finance|business|manager|analyst/.test(title) && (degrees.indexOf("business") >= 0 || degrees.indexOf("finance") >= 0 || degrees.indexOf("accounting") >= 0)) return true;
+    return false;
+  }
+  function missingForJob(job, s) {
+    s = s || migrateState();
+    var parts = [];
+    if (n(s.age) < n(job.minAge)) parts.push("Age " + n(job.minAge) + "+");
+    if (!jobQualifies(job, s)) {
+      var title = String(job.title || job.name || "job").toLowerCase();
+      if (/nurse/.test(title)) parts.push("Nursing degree");
+      else if (/attorney|lawyer|legal/.test(title)) parts.push("Law degree");
+      else if (/software|engineer|developer|data/.test(title)) parts.push("Computer Science degree");
+      else if (/account|finance|business|manager|analyst/.test(title)) parts.push("Business/Finance degree");
+      else parts.push("More education/stats");
+    }
+    return parts.join(" · ") || "Ready";
+  }
+  function fitScore(job, s) {
+    s = s || migrateState();
+    var st = s.stats || {};
+    var score = 42;
+    if (jobQualifies(job, s)) score += 18;
+    score += clamp(n(st.smarts), 0, 100) * .16;
+    score += clamp(n(st.confidence), 0, 100) * .12;
+    score += clamp(n(st.discipline), 0, 100) * .16;
+    score += clamp(n(st.creativity), 0, 100) * .06;
+    score -= clamp(n(st.stress), 0, 100) * .10;
+    return Math.round(clamp(score, 5, 98));
+  }
+  function jobById(jobId) {
+    var list = getCareerCatalog();
+    return list.find(function (j) { return String(j.id || j.title) === String(jobId); }) || null;
+  }
+  function activeApplication(jobId) {
+    var s = migrateState();
+    return (s.careerV1827.applications || []).find(function (a) { return !a.closed && String(a.jobId) === String(jobId); }) || null;
+  }
+  function activeOffer(jobId) {
+    var s = migrateState();
+    return (s.careerV1827.offers || []).find(function (o) { return !o.closed && String(o.jobId) === String(jobId); }) || null;
+  }
+  window.applyToJobV1832 = function (jobId) {
+    var s = migrateState();
+    var job = jobById(jobId);
+    if (!job) return toast("Job not found.");
+    if (!jobQualifies(job, s)) return toast("Still locked: " + missingForJob(job, s));
+    if (activeApplication(jobId)) return toast("Application already active. Use the interview options.");
+    var app = { jobId:String(job.id || job.title), title:job.title || job.name || "Job", salary:Math.round(n(job.salary)), createdAge:n(s.age), stage:"prep", prepPoints:0, prep:{}, referral:false, followUps:0, score:fitScore(job, s), rounds:0, closed:false, patch:PATCH_ID };
+    s.careerV1827.applications.unshift(app);
+    s.careerV1832.history.unshift({ age:n(s.age), action:"Applied", jobId:app.jobId, title:app.title, fit:app.score });
+    log("Applied for " + app.title + ". Prep before the interview for a better offer.", { confidence:1, stress:1 });
+    saveRender();
+  };
+  window.prepInterviewV1832 = function (jobId, type) {
+    var s = migrateState();
+    var app = activeApplication(jobId);
+    if (!app) return toast("Apply first.");
+    app.prep = app.prep || {};
+    var cost = { resume:150, network:100, mock:300, coach:800, cert:1200, rest:0, research:0, practice:0, followup:0 }[type] || 0;
+    if (cost && n(s.money) < cost) return toast("Need " + money(cost) + " checking for that prep.");
+    if (cost) s.money = Math.round(n(s.money) - cost);
+    var gain = { research:6, resume:7, practice:6, network:9, mock:11, coach:14, cert:12, rest:4, followup:3 }[type] || 4;
+    app.prep[type] = n(app.prep[type]) + 1;
+    app.prepPoints = Math.min(55, n(app.prepPoints) + gain);
+    if (type === "network") app.referral = true;
+    if (type === "cert") app.microCredential = true;
+    if (type === "rest" && s.stats) s.stats.stress = clamp(n(s.stats.stress) - 4, 0, 100);
+    if (type === "followup") app.followUps = n(app.followUps) + 1;
+    app.stage = app.stage === "prep" ? "prep" : app.stage;
+    log("Interview prep: " + type + " for " + app.title + ".", { money:-cost, confidence:type === "rest" ? 0 : 1, stress:type === "rest" ? -4 : 0 });
+    saveRender();
+  };
+  window.scheduleInterviewV1832 = function (jobId) {
+    var app = activeApplication(jobId);
+    if (!app) return toast("Apply first.");
+    app.stage = "question";
+    app.question = "Tell us why you are the best hire for this role.";
+    log("Interview scheduled for " + app.title + ". Pick an answer strategy.", { stress:2 });
+    saveRender();
+  };
+  window.answerInterviewV1832 = function (jobId, type) {
+    var s = migrateState();
+    var app = activeApplication(jobId);
+    var job = jobById(jobId) || { title: app && app.title, salary: app && app.salary };
+    if (!app) return toast("No active application.");
+    if (app.stage !== "question" && app.stage !== "second") app.stage = "question";
+    var st = s.stats || {};
+    var bonus = { technical:n(st.smarts)*.13 + n(st.discipline)*.07, behavioral:n(st.confidence)*.12 + n(st.karma)*.05, leadership:n(st.confidence)*.10 + n(st.discipline)*.09, honest:n(st.karma)*.10 + n(st.confidence)*.05, questions:7 }[type] || 0;
+    var score = Math.round(n(app.score) + n(app.prepPoints) + bonus + (app.referral ? 8 : 0) + (app.microCredential ? 5 : 0) + (Math.random()*16 - 6));
+    var threshold = 72 + (n(job.salary) > 100000 ? 6 : 0) + (n(job.salary) > 180000 ? 8 : 0);
+    app.rounds = n(app.rounds) + 1;
+    app.lastInterviewScore = score;
+    app.lastAnswer = type;
+    if (score >= threshold + 16) {
+      app.closed = true;
+      app.stage = "offer";
+      var strongSalary = Math.round(n(job.salary || app.salary) * (1.10 + Math.random() * .12));
+      s.careerV1827.offers.unshift({ jobId:String(job.id || app.jobId), title:job.title || app.title, salary:strongSalary, baseSalary:n(job.salary || app.salary), strength:"strong", createdAge:n(s.age), closed:false, negotiated:false, patch:PATCH_ID });
+      log("Strong interview: " + app.title + " sent a high offer.", { confidence:4, stress:-2 });
+    } else if (score >= threshold) {
+      app.closed = true;
+      app.stage = "offer";
+      var salary = Math.round(n(job.salary || app.salary) * (.98 + Math.random() * .08));
+      s.careerV1827.offers.unshift({ jobId:String(job.id || app.jobId), title:job.title || app.title, salary:salary, baseSalary:n(job.salary || app.salary), strength:"standard", createdAge:n(s.age), closed:false, negotiated:false, patch:PATCH_ID });
+      log("Interview passed: " + app.title + " made an offer.", { confidence:2, stress:-1 });
+    } else if (score >= threshold - 12 && app.rounds < 2) {
+      app.stage = "second";
+      app.question = "Second round: prove you can handle the real pressure of this role.";
+      log("Second interview requested for " + app.title + ". Prep and answer again.", { stress:2 });
+    } else {
+      app.closed = true;
+      app.stage = "rejected";
+      s.careerV1827.history.unshift({ jobId:app.jobId, title:app.title, outcome:"Rejected", score:score, age:n(s.age) });
+      log("Interview rejected: " + app.title + ". The prep score and fit were not enough yet.", { confidence:-1, stress:2 });
+    }
+    s.careerV1828.interviewHistory.unshift({ age:n(s.age), title:app.title, answer:type, score:score, threshold:threshold, outcome:app.stage });
+    s.careerV1828.interviewHistory = s.careerV1828.interviewHistory.slice(0, 20);
+    saveRender();
+  };
+  window.negotiateOfferV1832 = function (jobId) {
+    var s = migrateState();
+    var offer = activeOffer(jobId);
+    if (!offer) return toast("No active offer.");
+    if (offer.negotiated) return toast("Already negotiated this offer.");
+    var st = s.stats || {};
+    var chance = 45 + n(st.confidence) * .25 + n(st.smarts) * .10 - n(st.stress) * .08;
+    offer.negotiated = true;
+    if (Math.random() * 100 < chance) {
+      var bump = Math.round(n(offer.salary) * (.04 + Math.random() * .08));
+      offer.salary += bump;
+      offer.strength = "negotiated";
+      log("Negotiated the offer up by " + money(bump) + ".", { confidence:2, stress:1 });
+    } else {
+      offer.salary = Math.round(n(offer.salary) * .98);
+      log("Negotiation was awkward. The offer stayed about the same.", { confidence:-1, stress:2 });
+    }
+    saveRender();
+  };
+  window.declineJobOfferV1832 = function (jobId) {
+    var offer = activeOffer(jobId);
+    if (!offer) return toast("No active offer.");
+    offer.closed = true;
+    log("Declined the " + offer.title + " offer.", { stress:-1 });
+    saveRender();
+  };
+  window.withdrawApplicationV1832 = function (jobId) {
+    var app = activeApplication(jobId);
+    if (!app) return toast("No active application.");
+    app.closed = true;
+    app.stage = "withdrawn";
+    log("Withdrew the " + app.title + " application.", { stress:-1 });
+    saveRender();
+  };
+  // Route old instant job buttons into the new application pipeline.
+  var previousTakeCareer = window.takeCareer || (typeof takeCareer === "function" ? takeCareer : null);
+  if (previousTakeCareer && !window.__ledgerTakeCareer1832Wrapped) {
+    window.__ledgerTakeCareer1832Wrapped = true;
+    window.forceTakeCareerV1832 = previousTakeCareer;
+    window.takeCareer = function (jobId) { return window.applyToJobV1832(jobId); };
+    try { takeCareer = window.takeCareer; } catch (e) {}
+  }
+  window.applyToJobV1827 = window.applyToJobV1832;
+  window.applyToJobV1828 = window.applyToJobV1832;
+  window.answerInterviewV1828 = window.answerInterviewV1832;
+  window.declineJobOfferV1827 = window.declineJobOfferV1832;
+  try { applyToJobV1827 = window.applyToJobV1832; applyToJobV1828 = window.applyToJobV1832; answerInterviewV1828 = window.answerInterviewV1832; declineJobOfferV1827 = window.declineJobOfferV1832; } catch (e) {}
+
+  function businessValue(s) {
+    return (s.finance && Array.isArray(s.finance.businesses) ? s.finance.businesses : []).reduce(function (sum, b) { ensureBusiness(b); return sum + n(b.value) + n(b.retainedEarnings); }, 0);
+  }
+  function brokerageValue(s) {
+    var f = s.finance || {};
+    return Math.max(0, n(f.brokerage) + n(f.stockValue) + n(f.managedPortfolio) + n(f.externalManager && f.externalManager.capital) + n(f.managerFirmsV1829 && f.managerFirmsV1829.capital));
+  }
+  function homeValue(s) {
+    try { if (typeof homes !== "undefined" && Array.isArray(homes)) { var h = homes.find(function (x) { return x.id === s.home; }); return Math.max(0, n(h && h.price)); } } catch (e) {}
+    return 0;
+  }
+  function rentalValue(s) {
+    try { if (typeof rentals !== "undefined" && Array.isArray(rentals)) { return (s.rentals || []).reduce(function (sum, id) { var r = rentals.find(function (x) { return x.id === id; }); return sum + Math.max(0, n(r && r.price)); }, 0); } } catch (e) {}
+    return 0;
+  }
+  function childrenList(s) {
+    var relKids = [];
+    try { relKids = Object.values(s.relationships || {}).filter(function (r) { return r && r.role === "Child"; }); } catch (e) {}
+    var arrKids = Array.isArray(s.children) ? s.children.map(function (c) { return typeof c === "string" ? { name:c } : c; }).filter(Boolean) : [];
+    var out = {}, list = relKids.concat(arrKids);
+    list.forEach(function (k) { var name = k.name || k.id; if (name) out[name] = k; });
+    return Object.values(out);
+  }
+  function spouseLike(s) {
+    try { return Object.values(s.relationships || {}).find(function (r) { return r && /spouse|partner|wife|husband/i.test(String(r.role || r.type || r.name)); }); } catch (e) { return null; }
+  }
+  function estateDryRun(s) {
+    s = s || migrateState();
+    var e = s.estateV1831 || {};
+    var assets = e.assets || {};
+    var gross = Math.max(0, n(s.money) + n(s.savings) + n(s.finance && s.finance.superSaver) + brokerageValue(s) + businessValue(s) + homeValue(s) + rentalValue(s) + n(assets.trustCash));
+    var debt = Math.max(0, n(s.debt) + n(s.finance && s.finance.creditCardDebt) + n(s.finance && s.finance.taxDebt) + n(s.finance && s.finance.medicalDebt));
+    var protectedValue = Math.max(0, n(assets.trustCash) + (assets.home ? homeValue(s) : 0) + (assets.rentals ? rentalValue(s) : 0) + businessValue(s) * n(assets.businessPercent) + brokerageValue(s) * n(assets.brokeragePercent) + brokerageValue(s) * n(assets.managerPercent));
+    var unprotected = Math.max(0, gross - protectedValue);
+    var trustType = e.trustType || "none";
+    var probateRate = trustType === "dynasty" ? .003 : trustType === "irrevocable" ? .006 : trustType === "revocable" ? .018 : .10;
+    var protection = 0;
+    if (e.hasWill) protection += 12;
+    if (trustType === "revocable") protection += 25;
+    if (trustType === "irrevocable") protection += 48;
+    if (trustType === "dynasty") protection += 72;
+    if (e.clauses && e.clauses.businessSuccession) protection += 8;
+    if (e.clauses && e.clauses.guardianship) protection += 6;
+    if (e.familyOffice) protection += 12;
+    protection = Math.round(clamp(protection, 0, 100));
+    var probateLoss = Math.round(unprotected * probateRate);
+    var taxableEstate = Math.max(0, gross - debt - 13000000);
+    var taxCut = trustType === "dynasty" ? .55 : trustType === "irrevocable" ? .32 : trustType === "revocable" ? .10 : 0;
+    var estateTax = Math.round(taxableEstate * .40 * (1 - taxCut));
+    var netTransfer = Math.max(0, gross - debt - probateLoss - estateTax);
+    var kids = childrenList(s);
+    var spouse = spouseLike(s);
+    var heirCount = kids.length || (spouse ? 1 : 0) || 1;
+    var issues = [];
+    if (!e.hasWill) issues.push("No will");
+    if (trustType === "none" && gross > 250000) issues.push("No trust for large estate");
+    if (!kids.length && !spouse) issues.push("No clear family heir");
+    if (businessValue(s) > 0 && !(e.clauses && e.clauses.businessSuccession)) issues.push("Business succession missing");
+    if (kids.some(function (k) { return n(k.age) < 18; }) && !(e.clauses && e.clauses.guardianship)) issues.push("Minor guardianship missing");
+    return { gross:gross, debt:debt, protectedValue:protectedValue, unprotected:unprotected, probateLoss:probateLoss, estateTax:estateTax, netTransfer:netTransfer, heirCount:heirCount, childShare:Math.round(netTransfer / heirCount), protection:protection, issues:issues };
+  }
+  window.estateDryRunV1832 = estateDryRun;
+  window.runEstateDryRunV1832 = function () {
+    var s = migrateState();
+    var x = estateDryRun(s);
+    s.estateV1831.dryRunsV1832.unshift({ age:n(s.age), at:Date.now(), gross:x.gross, netTransfer:x.netTransfer, protection:x.protection, issues:x.issues.slice() });
+    s.estateV1831.dryRunsV1832 = s.estateV1831.dryRunsV1832.slice(0, 10);
+    log("Estate dry run complete: " + money(x.netTransfer) + " projected to heirs, protection " + x.protection + "/100.", {});
+    saveRender();
+  };
+
+  var previousContinueAsHeir = window.continueAsHeir || (typeof continueAsHeir === "function" ? continueAsHeir : null);
+  if (previousContinueAsHeir && !window.__ledgerHeir1832Wrapped) {
+    window.__ledgerHeir1832Wrapped = true;
+    window.continueAsHeir = function () {
+      var old = migrateState();
+      if (!old || old.alive || childrenList(old).length) return previousContinueAsHeir.apply(this, arguments);
+      var x = estateDryRun(old);
+      if (x.netTransfer <= 0 || (!(old.estateV1831 || {}).hasWill && (old.estateV1831 || {}).trustType === "none")) return previousContinueAsHeir.apply(this, arguments);
+      var familyName = (old.legacy && old.legacy.familyName) || String(old.name || "Legacy").split(" ").pop() || "Legacy";
+      var nextName = spouseLike(old) ? (spouseLike(old).name || "Family Heir") : "Heir " + familyName;
+      try {
+        if (typeof newGame === "function") {
+          newGame({ name: nextName, gender: "female", background: old.background || "middle", city: old.city, startingMoney: Math.round(x.netTransfer * .65), sandbox: old.sandbox || {}, sandboxMode: !!old.sandboxMode });
+          var s = migrateState();
+          s.legacy = obj(s, "legacy");
+          s.legacy.generation = n(old.legacy && old.legacy.generation, 1) + 1;
+          s.legacy.familyName = familyName;
+          s.legacy.lastInheritance = Math.round(x.netTransfer * .65);
+          s.legacy.lastEstatePlanV1832 = x;
+          log("Legacy continued through estate plan with " + money(s.legacy.lastInheritance) + ".", {});
+          saveRender();
+          return;
+        }
+      } catch (e) { try { console.warn("v18.32 heir fallback failed", e); } catch(ignore) {} }
+      return previousContinueAsHeir.apply(this, arguments);
+    };
+    try { continueAsHeir = window.continueAsHeir; } catch (e) {}
+  }
+
+  function saveStableBackup() {
+    var s = migrateState();
+    try {
+      var data = JSON.stringify(s);
+      localStorage.setItem("ledger_v1832_last_good_state", data);
+      s.migrationV1832.lastBackupAt = Date.now();
+      toast("Saved a v18.32 recovery backup.");
+      return true;
+    } catch (e) { toast("Backup failed: " + (e.message || e)); return false; }
+  }
+  window.saveStableBackupV1832 = saveStableBackup;
+  window.restoreStableBackupV1832 = function () {
+    try {
+      var data = localStorage.getItem("ledger_v1832_last_good_state");
+      if (!data) return toast("No v18.32 backup found.");
+      assignState(JSON.parse(data));
+      migrateState();
+      log("Restored v18.32 recovery backup.", {});
+      saveRender();
+    } catch (e) { toast("Restore failed: " + (e.message || e)); }
+  };
+  window.toggleCompactModeV1832 = function () {
+    var s = migrateState();
+    s.uiV1832 = obj(s, "uiV1832");
+    s.uiV1832.compactMode = !s.uiV1832.compactMode;
+    applyCompactClass();
+    saveRender();
+  };
+  function applyCompactClass() {
+    try {
+      var s = migrateState();
+      document.body.classList.toggle("ledger-compact-v1832", !!(s.uiV1832 && s.uiV1832.compactMode));
+    } catch (e) {}
+  }
+
+  function removeSectionByMarker(html, marker, limit) {
+    var out = String(html || "");
+    var idx = out.indexOf(marker), guard = 0;
+    while (idx >= 0 && guard++ < (limit || 30)) {
+      var start = out.lastIndexOf("<section", idx);
+      if (start < 0) start = out.lastIndexOf("<div", idx);
+      var endSection = out.indexOf("</section>", idx);
+      var endDiv = out.indexOf("</div>", idx);
+      var end = endSection >= 0 ? endSection + 10 : (endDiv >= 0 ? endDiv + 6 : -1);
+      if (start < 0 || end < 0 || end <= start) break;
+      out = out.slice(0, start) + out.slice(end);
+      idx = out.indexOf(marker);
+    }
+    return out;
+  }
+  function scrubHtml(html) {
+    var out = String(html || "");
+    [
+      "v1832-tax-office", "v1832-career-command", "v1832-cleanup-center", "v1832-estate-dryrun", "v1832-finance-separation", "v1832-education-link",
+      "v1828-tax-office", "v1828-firm-tax-ledger", "v1828-career-system", "v1827-career-interviews", "v1824-career-reqs", "v1818-career-reqs"
+    ].forEach(function (m) { out = removeSectionByMarker(out, m); });
+    return out;
+  }
+  function dedupeDom() {
+    try {
+      [".v1831-estate-shortcut", ".v1830-business-summary", ".v1829-manager-summary", ".v1832-finance-separation", ".v1832-tax-office", ".v1832-career-command", ".v1832-cleanup-center", ".v1832-estate-dryrun"].forEach(function (sel) {
+        var nodes = Array.prototype.slice.call(document.querySelectorAll(sel));
+        nodes.slice(1).forEach(function (node) { node.remove(); });
+      });
+    } catch (e) {}
+  }
+  window.dedupeLedgerPanelsV1832 = function () { dedupeDom(); toast("Duplicate panel cleanup ran."); };
+
+  function metric(label, value, tone, sub) {
+    return '<div class="v1832-metric ' + (tone || "") + '"><span>' + esc(label) + '</span><b>' + esc(value) + '</b>' + (sub ? '<em>' + esc(sub) + '</em>' : '') + '</div>';
+  }
+  function renderTaxOffice() {
+    var s = migrateState();
+    var f = s.finance || {};
+    var m = computeTaxModel(s);
+    var cleanup = f.taxCleanupV1832 || {};
+    var last = (cleanup.history || [])[0];
+    var warning = (m.personalDebt > Math.max(m.personalDue * 1.5 + 1000, 50000) && m.entityBase > 100000 && m.distributions < m.entityBase * .25)
+      ? '<div class="v1832-note bad"><b>Possible old double-tax detected.</b> The personal bill looks too high compared with actual distributions. Use Reclassify Tax Bill.</div>'
+      : '<div class="v1832-note good"><b>Canonical model active.</b> Personal tax is based on money paid to the player. Firm/entity tax is separate.</div>';
+    return '<section class="money-section v1832-tax-office"><div class="money-section-title">Tax Office Audit <span>read-only tax explanation</span></div>' + warning +
+      '<div class="v1832-grid four">' +
+      metric("Residence", m.residence, "gold", "Move controls live under More") +
+      metric("Personal taxable", money(m.personalTaxable), m.personalTaxable ? "bad" : "good", "Salary, distributions, realized income") +
+      metric("Personal tax debt", money(m.personalDebt), m.personalDebt ? "bad" : "good", "Estimated due " + money(m.personalDue)) +
+      metric("Firm/entity tax", money(m.firmEntityDebt), m.firmEntityDebt ? "bad" : "good", "Firm due " + money(m.entityDue)) +
+      metric("Firm profit held", money(m.entityBase), "good", "Not personal until paid out") +
+      metric("Distributed to you", money(m.distributions + m.ownerSalary), m.distributions || m.ownerSalary ? "gold" : "", "This is personal taxable") +
+      metric("Investment income", money(m.investment), m.investment ? "gold" : "", "Realized/dividends only") +
+      metric("Advisor reduction", pct(m.advisorReduction), m.advisorReduction ? "good" : "", "Attorney/accountant planning") +
+      '</div><div class="v1832-actions"><button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();auditAndReclassifyTaxV1832()">Reclassify Tax Bill</button><button class="money-btn" onclick="event.preventDefault();event.stopPropagation();setTabV16 ? setTabV16(\'more\') : setTab(\'more\')">Move Country/State</button></div>' +
+      (last ? '<div class="v1832-note small">Last audit: moved ' + money(last.moved || 0) + ' to firm tax · old bug write-off ' + money(last.writeOff || 0) + ' · personal before ' + money(last.personalBefore || 0) + ' → after ' + money(last.personalAfter || 0) + '.</div>' : '') +
+      '</section>';
+  }
+  function renderFinanceSeparation() {
+    var s = migrateState();
+    var f = s.finance || {};
+    var trust = s.estateV1831 && s.estateV1831.assets ? n(s.estateV1831.assets.trustCash) : 0;
+    var companyCash = (Array.isArray(f.businesses) ? f.businesses : []).reduce(function (sum, b) { ensureBusiness(b); return sum + n(b.retainedEarnings); }, 0) + n(f.firmCashV1828) + n(f.personalFirm && f.personalFirm.cash);
+    var personalLiquid = Math.max(0, n(s.money) + n(s.savings) + n(f.superSaver));
+    return '<section class="money-section v1832-finance-separation"><div class="money-section-title">Money Separation Audit <span>personal vs company vs trust</span></div><div class="v1832-grid four">' +
+      metric("Personal liquid", money(personalLiquid), "gold", "Checking/savings/super saver") +
+      metric("Company cash", money(companyCash), "good", "Business/firm money") +
+      metric("Trust cash", money(trust), trust ? "good" : "", "Estate money, not daily spending") +
+      metric("Personal tax", money(f.taxDebt), f.taxDebt ? "bad" : "good", "Not firm tax") +
+      '</div></section>';
+  }
+  function prepButtons(app) {
+    var rows = [
+      ["research", "Research", "Free"], ["resume", "Résumé", "$150"], ["practice", "Practice", "Free"], ["network", "Referral", "$100"], ["mock", "Mock", "$300"], ["coach", "Coach", "$800"], ["cert", "Micro-cert", "$1.2K"], ["rest", "Rest", "Free"], ["followup", "Follow up", "Free"]
+    ];
+    return rows.map(function (r) { return '<button class="money-btn" onclick="event.preventDefault();event.stopPropagation();prepInterviewV1832(\'' + esc(app.jobId) + '\',\'' + r[0] + '\')">' + esc(r[1]) + ' <small>' + esc(r[2]) + '</small></button>'; }).join("");
+  }
+  function answerButtons(app) {
+    if (app.stage === "prep") return '<button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();scheduleInterviewV1832(\'' + esc(app.jobId) + '\')">Schedule Interview</button>';
+    return '<div class="v1832-question"><b>' + esc(app.question || "Interview question") + '</b><span>Pick a strategy. Prep, referrals, and stress affect the score.</span></div><div class="v1832-actions"><button class="money-btn green" onclick="event.preventDefault();event.stopPropagation();answerInterviewV1832(\'' + esc(app.jobId) + '\',\'technical\')">Technical Proof</button><button class="money-btn blue" onclick="event.preventDefault();event.stopPropagation();answerInterviewV1832(\'' + esc(app.jobId) + '\',\'behavioral\')">Behavioral Story</button><button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();answerInterviewV1832(\'' + esc(app.jobId) + '\',\'leadership\')">Leadership Example</button><button class="money-btn" onclick="event.preventDefault();event.stopPropagation();answerInterviewV1832(\'' + esc(app.jobId) + '\',\'honest\')">Honest Growth Answer</button></div>';
+  }
+  function renderCareerCommand() {
+    var s = migrateState();
+    var active = (s.careerV1827.applications || []).filter(function (a) { return !a.closed; });
+    var offers = (s.careerV1827.offers || []).filter(function (o) { return !o.closed; });
+    var jobs = getCareerCatalog().slice().sort(function (a, b) { return (jobQualifies(b, s) - jobQualifies(a, s)) || n(b.salary) - n(a.salary); }).slice(0, 18);
+    var pipeline = "";
+    if (offers.length) {
+      pipeline += offers.map(function (o) { return '<div class="v1832-pipeline-card offer"><div><b>' + esc(o.title) + '</b><span>' + esc(o.strength || "standard") + ' offer · ' + money(o.salary) + '/yr' + (o.negotiated ? ' · negotiated' : '') + '</span></div><div class="v1832-actions"><button class="money-btn green" onclick="event.preventDefault();event.stopPropagation();acceptJobOfferV1828 ? acceptJobOfferV1828(\'' + esc(o.jobId) + '\') : acceptJobOfferV1827(\'' + esc(o.jobId) + '\')">Accept</button><button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();negotiateOfferV1832(\'' + esc(o.jobId) + '\')">Negotiate</button><button class="money-btn" onclick="event.preventDefault();event.stopPropagation();declineJobOfferV1832(\'' + esc(o.jobId) + '\')">Decline</button></div></div>'; }).join("");
+    }
+    if (active.length) {
+      pipeline += active.map(function (a) { a.prep = a.prep || {}; return '<div class="v1832-pipeline-card"><div class="v1832-pipeline-top"><div><b>' + esc(a.title) + '</b><span>' + esc(a.stage === "second" ? "Second interview" : a.stage === "question" ? "Interview question" : "Prep stage") + ' · fit ' + Math.round(n(a.score)) + '/100 · prep ' + Math.round(n(a.prepPoints)) + '</span></div><strong>' + (a.referral ? 'Referral' : 'No referral') + '</strong></div><div class="v1832-prep-row">' + prepButtons(a) + '</div>' + answerButtons(a) + '<div class="v1832-actions"><button class="money-btn" onclick="event.preventDefault();event.stopPropagation();withdrawApplicationV1832(\'' + esc(a.jobId) + '\')">Withdraw</button></div></div>'; }).join("");
+    }
+    if (!pipeline) pipeline = '<div class="v1832-note small">No active applications. Qualified jobs below use: Apply → Prep → Interview → Offer → Negotiate/Accept.</div>';
+    var cards = jobs.map(function (job) {
+      var id = String(job.id || job.title);
+      var q = jobQualifies(job, s);
+      var app = activeApplication(id);
+      var offer = activeOffer(id);
+      var current = s.job && (s.job.jobId === id || s.job.title === job.title);
+      var action = current ? '<button class="money-btn" disabled>Current Job</button>' : offer ? '<button class="money-btn green" onclick="event.preventDefault();event.stopPropagation();acceptJobOfferV1828 ? acceptJobOfferV1828(\'' + esc(id) + '\') : acceptJobOfferV1827(\'' + esc(id) + '\')">Accept Offer</button>' : app ? '<button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();scheduleInterviewV1832(\'' + esc(id) + '\')">Interview Options</button>' : q ? '<button class="money-btn blue" onclick="event.preventDefault();event.stopPropagation();applyToJobV1832(\'' + esc(id) + '\')">Apply</button>' : '<button class="money-btn" disabled>Locked</button>';
+      return '<div class="v1832-job-card ' + (current ? 'current' : offer ? 'offer' : app ? 'active' : q ? 'qualified' : 'locked') + '"><div class="v1832-job-head"><b>' + esc(job.title || job.name || id) + '</b><span>' + (current ? 'Current' : offer ? 'Offer' : app ? 'Pipeline' : q ? 'Qualified' : 'Locked') + '</span></div><p>' + esc(job.desc || "Career path.") + '</p><div class="v1832-pill-row"><span>' + money(job.salary || 0) + '/yr</span><span>Age ' + (n(job.minAge) || 16) + '+</span><span>' + (q ? 'Fit ' + fitScore(job, s) + '/100' : missingForJob(job, s)) + '</span></div>' + action + '</div>';
+    }).join("");
+    return '<section class="panel v1832-career-command"><div class="section-label">Career Hiring System</div><div class="v1832-career-hero"><b>Jobs now require real hiring steps.</b><span>Degrees make a job available. Interviews decide whether you actually receive an offer.</span></div><div class="v1832-pill-row"><span>Degrees: ' + esc(completedDegreeIds(s).join(", ") || "none") + '</span><span>Applications: ' + active.length + '</span><span>Offers: ' + offers.length + '</span></div><div class="v1832-pipeline">' + pipeline + '</div><div class="v1832-job-grid">' + cards + '</div></section>';
+  }
+  function renderEducationLink() {
+    var s = migrateState();
+    var degrees = completedDegreeIds(s);
+    var jobs = getCareerCatalog();
+    var unlocked = jobs.filter(function (j) { return jobQualifies(j, s); }).length;
+    return '<section class="money-section v1832-education-link"><div class="money-section-title">Degree → Job Link Audit <span>education feeds career</span></div><div class="v1832-grid four">' + metric("Completed degrees", String(degrees.length), "good", degrees.join(", ") || "None yet") + metric("Qualified jobs", String(unlocked), unlocked ? "good" : "bad", "Career cards become Apply buttons") + metric("Multiple degrees", "Education hub", "gold", "Not Career/Business") + metric("Hiring step", "Interview", "blue", "No instant job switch") + '</div></section>';
+  }
+  function renderEstateDryRun() {
+    var s = migrateState();
+    var x = estateDryRun(s);
+    var issueText = x.issues.length ? x.issues.join(" · ") : "No major gaps found";
+    return '<section class="money-section v1832-estate-dryrun"><div class="money-section-title">Estate Dry Run <span>death/legacy test without dying</span></div><div class="v1832-grid four">' + metric("Gross estate", money(x.gross), "gold", "All counted assets") + metric("Protected", money(x.protectedValue), x.protectedValue ? "good" : "", "Trust/title assets") + metric("Net transfer", money(x.netTransfer), "good", "After debt/leak/tax") + metric("Issues", String(x.issues.length), x.issues.length ? "bad" : "good", issueText) + '</div><div class="v1832-actions"><button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();runEstateDryRunV1832()">Run Dry Run</button></div></section>';
+  }
+  function renderCleanupCenter() {
+    var s = migrateState();
+    var compact = !!(s.uiV1832 && s.uiV1832.compactMode);
+    var migration = s.migrationV1832 || {};
+    return '<section class="money-section v1832-cleanup-center"><div class="money-section-title">v18.32 Cleanup / Stability Center <span>not a feature pile</span></div><div class="v1832-note">This pass audits patch stacking, save migration, duplicate cards, personal-vs-firm tax, job interviews, and estate dry-run behavior.</div><div class="v1832-grid four">' + metric("Migration", migration.ok ? "Healthy" : "Needs repair", migration.ok ? "good" : "bad", PATCH_ID) + metric("Compact UI", compact ? "On" : "Off", compact ? "good" : "", "Hide repeated summary clutter") + metric("Tax cleanup", money(s.finance.taxCleanupV1832.totalPersonalReclassed || 0), "gold", "Moved off personal debt") + metric("Bug write-off", money(s.finance.taxCleanupV1832.totalBugWriteOff || 0), "good", "Old double-count forgiven") + '</div><div class="v1832-actions"><button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();migrateLedgerStateV1832();dedupeLedgerPanelsV1832();auditAndReclassifyTaxV1832();runEstateDryRunV1832()">Run Full Cleanup</button><button class="money-btn" onclick="event.preventDefault();event.stopPropagation();toggleCompactModeV1832()">Toggle Compact UI</button><button class="money-btn blue" onclick="event.preventDefault();event.stopPropagation();saveStableBackupV1832()">Save Backup</button><button class="money-btn" onclick="event.preventDefault();event.stopPropagation();restoreStableBackupV1832()">Restore Backup</button></div></section>';
+  }
+
+  var previousRenderHubContent = window.renderHubContent || (typeof renderHubContent === "function" ? renderHubContent : null);
+  if (previousRenderHubContent && !window.__ledgerRender1832Wrapped) {
+    window.__ledgerRender1832Wrapped = true;
+    window.renderHubContent = function (hubId) {
+      migrateState();
+      var html = "";
+      try { html = previousRenderHubContent.apply(this, arguments) || ""; } catch (e) { html = '<section class="panel"><div class="row-title">Recovered hub</div><div class="row-sub">' + esc(e.message || e) + '</div></section>'; }
+      html = scrubHtml(html);
+      if (hubId === "career") return renderCareerCommand() + html;
+      if (hubId === "school" || hubId === "education") return renderEducationLink() + html;
+      if (hubId === "law" || hubId === "legal" || hubId === "tax") return renderTaxOffice() + renderEstateDryRun() + html;
+      if (hubId === "more") return renderCleanupCenter() + renderEstateDryRun() + html;
+      if (hubId === "money" || hubId === "finance") return renderFinanceSeparation() + renderTaxOffice() + html;
+      return html;
+    };
+    try { renderHubContent = window.renderHubContent; } catch (e) {}
+  }
+
+  function wrap(name, after) {
+    var old = window[name] || null;
+    try { if (!old && typeof eval(name) === "function") old = eval(name); } catch (e) {}
+    if (typeof old !== "function" || old.__ledger1832Wrapped) return;
+    var fn = function () {
+      if (rootState()) migrateState();
+      var beforeDebt = n((rootState() || {}).finance && (rootState() || {}).finance.taxDebt);
+      var result;
+      try { result = old.apply(this, arguments); }
+      finally {
+        try { if (rootState()) { migrateState(); if (after) after(beforeDebt); } applyCompactClass(); setTimeout(dedupeDom, 0); } catch (e) { try { console.warn("v18.32 after hook failed", e); } catch(ignore) {} }
+      }
+      return result;
+    };
+    fn.__ledger1832Wrapped = true;
+    window[name] = fn;
+    try { eval(name + " = window[name]"); } catch (e) {}
+  }
+  wrap("render", function () { computeTaxModel(); });
+  wrap("save", function () { computeTaxModel(); });
+  wrap("loadFromSlot", function () { computeTaxModel(); auditAndReclassifyTax(true); });
+  wrap("ageUp", function (beforeDebt) {
+    var s = migrateState();
+    var afterDebt = n(s.finance && s.finance.taxDebt);
+    if (afterDebt > beforeDebt) auditAndReclassifyTax(true);
+    computeTaxModel(s);
+  });
+  wrap("resolveLifeAndFinanceYear", function () { auditAndReclassifyTax(true); computeTaxModel(); });
+
+  function injectStyles() {
+    if (document.getElementById("ledger-v1832-style")) return;
+    var style = document.createElement("style");
+    style.id = "ledger-v1832-style";
+    style.textContent = [
+      ".v1832-tax-office,.v1832-career-command,.v1832-cleanup-center,.v1832-estate-dryrun,.v1832-finance-separation,.v1832-education-link{border-color:rgba(126,160,172,.52)!important;background:linear-gradient(135deg,rgba(18,35,37,.97),rgba(29,25,20,.98))!important;overflow:hidden!important}.v1832-tax-office{border-color:rgba(216,173,109,.55)!important;background:linear-gradient(135deg,rgba(49,38,20,.97),rgba(24,21,18,.98))!important}.v1832-cleanup-center{border-color:rgba(180,146,220,.48)!important;background:linear-gradient(135deg,rgba(36,28,54,.97),rgba(29,25,20,.98))!important}.v1832-estate-dryrun{border-color:rgba(143,175,108,.45)!important;background:linear-gradient(135deg,rgba(20,42,27,.96),rgba(29,25,20,.98))!important}.v1832-finance-separation{border-color:rgba(197,180,95,.45)!important}",
+      ".v1832-grid{display:grid;gap:8px;margin:10px 0}.v1832-grid.four{grid-template-columns:repeat(4,minmax(0,1fr))}.v1832-metric{border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.045);border-radius:12px;padding:10px;min-width:0}.v1832-metric span{display:block;font-family:'JetBrains Mono',monospace;font-size:9px;color:#aa9a82;text-transform:uppercase;letter-spacing:.08em}.v1832-metric b{display:block;font-family:'JetBrains Mono',monospace;font-size:16px;color:#f2e7d6;margin-top:4px;overflow-wrap:anywhere}.v1832-metric em{display:block;font-family:'JetBrains Mono',monospace;font-size:9px;line-height:1.35;color:#8e806c;font-style:normal;margin-top:4px}.v1832-metric.good b{color:#8faf6c}.v1832-metric.bad b{color:#cc7661}.v1832-metric.gold b{color:#d8ad6d}.v1832-metric.blue b{color:#7ea0ac}",
+      ".v1832-note{font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.55;color:#b9a98e;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.04);border-radius:10px;padding:10px;margin:8px 0}.v1832-note b{color:#d8ad6d}.v1832-note.good{border-color:rgba(143,175,108,.35)}.v1832-note.bad{border-color:rgba(204,118,97,.38)}.v1832-note.small{font-size:9px}.v1832-actions{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}.v1832-actions .money-btn{flex:1 1 120px}.v1832-pill-row{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.v1832-pill-row span{font-family:'JetBrains Mono',monospace;font-size:9px;border:1px solid rgba(255,255,255,.10);border-radius:999px;padding:4px 8px;color:#d8ad6d;background:rgba(255,255,255,.04)}",
+      ".v1832-career-hero{border:1px solid rgba(126,160,172,.25);border-radius:14px;background:linear-gradient(135deg,rgba(126,160,172,.12),rgba(201,155,85,.07));padding:14px;margin:8px 0 10px}.v1832-career-hero b{display:block;font-size:18px}.v1832-career-hero span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.5;margin-top:5px}.v1832-pipeline{display:grid;gap:8px;margin:10px 0}.v1832-pipeline-card,.v1832-job-card,.v1832-question{border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(255,255,255,.045);padding:11px;min-width:0}.v1832-pipeline-card.offer,.v1832-job-card.offer{border-color:rgba(143,175,108,.55)}.v1832-pipeline-top,.v1832-job-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.v1832-pipeline-top b,.v1832-job-head b,.v1832-question b{display:block;color:#fff3df}.v1832-pipeline-card span,.v1832-job-card p,.v1832-question span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.45;margin-top:4px}.v1832-pipeline-top strong,.v1832-job-head span{font-family:'JetBrains Mono',monospace;color:#d8ad6d;font-size:9px;text-transform:uppercase;letter-spacing:.08em}.v1832-prep-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:9px 0}.v1832-prep-row .money-btn{font-size:9px!important;padding:7px!important;white-space:normal!important}.v1832-job-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.v1832-job-card.locked{opacity:.58}.v1832-job-card.qualified{border-color:rgba(126,160,172,.45)}.v1832-job-card.current{border-color:rgba(216,173,109,.65)}.v1832-job-card .money-btn{margin-top:8px;width:100%}",
+      ".ledger-compact-v1832 .v1831-estate-shortcut,.ledger-compact-v1832 .v1830-business-summary,.ledger-compact-v1832 .v1829-manager-summary,.ledger-compact-v1832 .v1832-finance-separation{display:none!important}.ledger-compact-v1832 .money-section{margin-bottom:8px!important}.ledger-compact-v1832 .v1832-grid.four{grid-template-columns:repeat(2,minmax(0,1fr))}",
+      "@media(max-width:760px){.v1832-grid.four{grid-template-columns:repeat(2,minmax(0,1fr))}.v1832-job-grid{grid-template-columns:1fr}.v1832-prep-row{grid-template-columns:repeat(2,minmax(0,1fr))}.v1832-actions .money-btn{flex-basis:45%}}@media(max-width:430px){.v1832-grid.four{grid-template-columns:1fr}.v1832-prep-row{grid-template-columns:1fr}.v1832-actions .money-btn{flex-basis:100%}}"
+    ].join("\n");
+    document.head.appendChild(style);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { injectStyles(); migrateState(); applyCompactClass(); dedupeDom(); });
+  else { injectStyles(); migrateState(); applyCompactClass(); setTimeout(dedupeDom, 0); }
+
+  try { window.addEventListener("error", function (event) {
+    var msg = String((event && event.error && event.error.message) || (event && event.message) || "");
+    if (/undefined|null|length|map|forEach|Cannot read/i.test(msg)) {
+      try { migrateState(); dedupeDom(); toast("v18.32 repaired missing state shape after an error. Try the action again."); } catch (e) {}
+    }
+  }); } catch (e) {}
+
+  try { computeTaxModel(migrateState()); } catch (e) {}
+})();
+
+
+
+/* END absorbed 09-patch-v18-32.js */
+

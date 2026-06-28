@@ -23,6 +23,127 @@
   if (window.__ledgerScrollNavV1857Loaded) return;
   window.__ledgerScrollNavV1857Loaded = true;
 
+  function escNav(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, function (ch) {
+      return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch];
+    });
+  }
+  function stateNav() {
+    try { if (typeof state !== "undefined") return state; } catch (e) {}
+    return window.state || null;
+  }
+  function numNav(value) {
+    value = Number(value);
+    return Number.isFinite(value) ? value : 0;
+  }
+  function normHubNav(id) {
+    id = String(id || "").toLowerCase();
+    if (id === "life") return "lifehub";
+    if (id === "stocks") return "brokerage";
+    if (id === "legal" || id === "lawoffice" || id === "law-office" || id === "taxlaw") return "law";
+    if (id === "education") return "school";
+    if (id === "networth" || id === "network" || id === "financehub") return "finance";
+    if (id === "founder" || id === "startup" || id === "entrepreneur") return "entrepreneurship";
+    return id || "lifehub";
+  }
+  function titleNav(id) {
+    var map = {
+      lifehub:"Life",
+      people:"People",
+      school:"Education",
+      career:"Job",
+      finance:"Finance",
+      money:"Money",
+      brokerage:"Investments",
+      business:"Business",
+      entrepreneurship:"Entrepreneurship",
+      law:"Legal",
+      health:"Health",
+      home:"Real Estate",
+      vehicles:"Vehicles",
+      stats:"Stats",
+      more:"More"
+    };
+    id = normHubNav(id);
+    return map[id] || id.replace(/\b\w/g, function (m) { return m.toUpperCase(); });
+  }
+  function schoolRelevantNav(s) {
+    s = s || {};
+    var flags = s.flags || {};
+    var education = s.education || {};
+    var edu25 = s.educationV1825 || {};
+    var edu27 = s.educationV1827 || {};
+    var age = numNav(s.age);
+    return age < 22 || !!flags.inCollege || !!flags.inSchool || !!s.inCollege || !!s.inSchool ||
+      !!education.inCollege || !!education.inSchool || !!education.enrolled ||
+      !!edu25.active || !!edu25.activeDegree || !!edu27.active || !!edu27.activeDegree;
+  }
+  function hubNav(id, icon, label, disabled) {
+    return { id: normHubNav(id), icon: icon, label: label || titleNav(id), disabled: !!disabled };
+  }
+  function hubMapNav() {
+    return {
+      lifehub: hubNav("lifehub", "Life", "Life"),
+      people: hubNav("people", "People", "People"),
+      school: hubNav("school", "Edu", "Education"),
+      career: hubNav("career", "Job", "Job"),
+      finance: hubNav("finance", "$", "Finance"),
+      money: hubNav("money", "$", "Money"),
+      brokerage: hubNav("brokerage", "Invest", "Investments"),
+      business: hubNav("business", "Biz", "Business"),
+      entrepreneurship: hubNav("entrepreneurship", "Founder", "Entrepreneurship"),
+      law: hubNav("law", "Law", "Legal"),
+      health: hubNav("health", "Health", "Health"),
+      home: hubNav("home", "Home", "Real Estate"),
+      vehicles: hubNav("vehicles", "Cars", "Vehicles"),
+      stats: hubNav("stats", "Stats", "Stats"),
+      more: hubNav("more", "...", "More")
+    };
+  }
+  function primaryHubsNav() {
+    var map = hubMapNav();
+    var middle = schoolRelevantNav(stateNav() || {}) ? "school" : "career";
+    return ["lifehub", "people", middle, "finance", "money", "law", "more"].map(function (id) { return map[id]; });
+  }
+  function allHubsNav() {
+    var map = hubMapNav();
+    return ["lifehub", "people", "school", "career", "finance", "money", "brokerage", "business", "entrepreneurship", "law", "health", "home", "vehicles", "stats", "more"].map(function (id) { return map[id]; });
+  }
+  function tabStripNav(active) {
+    active = normHubNav(active);
+    return '<div class="v11-hub-tab-strip v18336-tab-strip" aria-label="Hub tab wheel"><div class="v11-hub-tab-scroll">' +
+      primaryHubsNav().map(function (h) {
+        var id = normHubNav(h.id);
+        return '<button class="v11-tab-btn' + (id === active ? ' active' : '') + '" onclick="event.preventDefault();event.stopPropagation();(window.setTabV16||window.setTab||setTab)(\'' + escNav(id) + '\')"><span class="v11-tab-ico">' + escNav(h.icon || "") + '</span><span class="v11-tab-lbl">' + escNav(h.label || id) + '</span></button>';
+      }).join("") + '</div></div>';
+  }
+
+  window.getVisibleHubs = primaryHubsNav;
+  window.getAllHubsV186 = allHubsNav;
+  window.getStableHubsV18336 = primaryHubsNav;
+  window.navStripV18335 = tabStripNav;
+  try { getVisibleHubs = primaryHubsNav; } catch (e) {}
+  try { getAllHubsV186 = allHubsNav; } catch (e2) {}
+
+  var previousOverlayNav = window.renderHubOverlay || (typeof renderHubOverlay === "function" ? renderHubOverlay : null);
+  if (typeof previousOverlayNav === "function" && !previousOverlayNav.__ledgerScrollNavOverlay) {
+    window.renderHubOverlay = function (hubId) {
+      var id = normHubNav(hubId);
+      if (id === "law" || id === "business" || id === "entrepreneurship") {
+        var body = "";
+        try {
+          body = typeof renderHubContent === "function" ? renderHubContent(id) : "";
+        } catch (err) {
+          body = '<section class="panel"><div class="section-label">Render recovered</div><div class="row-sub">' + escNav(err && (err.message || err) || "hub render error") + '</div></section>';
+        }
+        return '<div class="hub-overlay hub-' + escNav(id) + ' v16-hub v18336-overlay" data-hub-id="' + escNav(id) + '" onclick="if(event.target===this)closeHub()"><div class="hub-sheet hub-sheet-' + escNav(id) + '"><div class="hub-head"><h2>' + escNav(titleNav(id)) + '</h2><button class="hub-close v16-close" onclick="event.preventDefault();event.stopPropagation();closeHub()">x</button></div><div class="v16-hub-body" data-hub-body="' + escNav(id) + '">' + body + '</div>' + tabStripNav(id) + '</div></div>';
+      }
+      return previousOverlayNav.apply(this, [id]);
+    };
+    window.renderHubOverlay.__ledgerScrollNavOverlay = true;
+    try { renderHubOverlay = window.renderHubOverlay; } catch (e3) {}
+  }
+
   var TAP_FRAC = 0.58;     // gentle: ~58% of the visible width per tap
   var TAP_MIN = 150;       // never less than 150px
   var HOLD_DELAY = 200;    // ms held before continuous scroll kicks in
@@ -94,9 +215,9 @@
   // For new components: content already wrapped with scroll buttons (no inline handlers).
   window.scrollRailV1857 = function (inner, extraCls) {
     return '<div class="snav-wrap ' + (extraCls || "") + '">' +
-      '<button class="snav-btn left" type="button" aria-label="scroll left">‹</button>' +
+      '<button class="snav-btn left" type="button" aria-label="scroll left">&lt;</button>' +
       '<div class="snav-track">' + inner + '</div>' +
-      '<button class="snav-btn right" type="button" aria-label="scroll right">›</button>' +
+      '<button class="snav-btn right" type="button" aria-label="scroll right">&gt;</button>' +
       '</div>';
   };
 
@@ -112,7 +233,7 @@
     b.type = "button";
     b.className = "snav-btn " + side + " legacy";
     b.setAttribute("aria-label", "scroll " + side);
-    b.textContent = side === "left" ? "‹" : "›";
+    b.textContent = side === "left" ? "<" : ">";
     return b; // driven by the delegated pointer handler
   }
 
@@ -141,21 +262,10 @@
   }
   window.decorateRailsV1857 = decorate;
 
-  // run after every render (rAF so layout is settled); fully guarded
-  var prev = window.render || (typeof render === "function" ? render : null);
-  if (typeof prev === "function" && !prev.__snavWrapped) {
-    var wrapped = function () {
-      var out = prev.apply(this, arguments);
-      try {
-        if (typeof requestAnimationFrame === "function") requestAnimationFrame(decorate);
-        else decorate();
-      } catch (e) { try { decorate(); } catch (e2) {} }
-      return out;
-    };
-    wrapped.__snavWrapped = true;
-    window.render = wrapped;
-    try { render = wrapped; } catch (e) {}
-  }
+  // v18.60: do not scan and reparent legacy rails after every render. That
+  // forced layout pass made large hubs feel sticky during normal page scrolling.
+  // Components can still call scrollRailV1857 directly, and diagnostics can call
+  // decorateRailsV1857() manually for a one-off retrofit.
 
   // ----- styles -----
   try {
@@ -174,6 +284,14 @@
         ".snav-btn:active{transform:translateY(-50%) scale(.94)}",
         ".snav-btn.left{left:-3px}.snav-btn.right{right:-3px}",
         ".snav-wrap.legacy-wrap{padding:0 2px}"
+        ,".bottom-nav{display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:4px!important;overflow:visible!important;scroll-snap-type:none!important;padding:6px!important;box-sizing:border-box!important;width:100%!important}"
+        ,".bottom-nav::-webkit-scrollbar{display:none!important}"
+        ,".bottom-nav .nav-btn{flex:1 1 auto!important;min-width:0!important;width:auto!important;scroll-snap-align:none!important;padding:8px 1px!important;gap:3px!important;overflow:hidden!important}"
+        ,".bottom-nav .nav-btn .nav-icon{font-size:12px!important;line-height:1!important;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:clip}"
+        ,".bottom-nav .nav-btn .nav-label{font-size:7px!important;letter-spacing:0!important;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:clip}"
+        ,".v18336-tab-strip .v11-hub-tab-scroll{display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:6px!important;overflow:visible!important}"
+        ,".v18336-tab-strip .v11-tab-btn{min-width:0!important;flex:1 1 auto!important}.v18336-tab-strip .v11-tab-lbl{letter-spacing:0!important}"
+        ,".v18336-overlay .hub-head h2{letter-spacing:0}.v18336-overlay .hub-close{min-width:42px}"
       ].join("\n");
       document.head.appendChild(st);
     }

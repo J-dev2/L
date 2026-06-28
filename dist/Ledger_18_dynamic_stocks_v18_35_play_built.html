@@ -5999,7 +5999,7 @@ body {
 })();
 
 </script>
-<script data-source="pages/runtime/00-core-app-runtime.js?v=20260627-businessage21">
+<script data-source="pages/runtime/00-core-app-runtime.js?v=20260628-absorbedpatches1">
 const $ = (sel) => document.querySelector(sel);
 const SAVE_KEY_PREFIX = "ledger-life-slot-";
 const ACTIVE_SLOT_KEY = "ledger-active-slot";
@@ -23364,8 +23364,11 @@ getSuggestedActions = function(s) {
   document.head.appendChild(style);
 })();
 
-</script>
-<script data-source="pages/patches/01-patch-v18-24.js">
+/* Absorbed legacy patch scripts v18.24-v18.32 on 2026-06-28. Keep after core runtime and before modular systems. */
+
+
+/* BEGIN absorbed 01-patch-v18-24.js */
+
 /* LEDGER PATCH v18.24: solution-notebook pass — liquid tax payoff, cash-flow command, credit depth, job/business requirements */
 (function () {
   if (window.__ledgerV1824Loaded) return;
@@ -23875,8 +23878,12 @@ getSuggestedActions = function(s) {
 })();
 
 
-</script>
-<script data-source="pages/patches/02-patch-v18-25.js">
+
+/* END absorbed 01-patch-v18-24.js */
+
+
+/* BEGIN absorbed 02-patch-v18-25.js */
+
 /* LEDGER PATCH v18.25: people rhythm, family depth, multiple degrees, fund investor economics */
 (function () {
   if (window.__ledgerV1825Loaded) return;
@@ -24484,8 +24491,12 @@ getSuggestedActions = function(s) {
 })();
 
 
-</script>
-<script data-source="pages/patches/03-patch-v18-26.js">
+
+/* END absorbed 02-patch-v18-25.js */
+
+
+/* BEGIN absorbed 03-patch-v18-26.js */
+
 /* LEDGER PATCH v18.26: legal clarity, health insurance effects, relocation, wayback browser, save repair, sandbox calm */
 (function () {
   if (window.__ledgerV1826Loaded) return;
@@ -25266,8 +25277,12 @@ getSuggestedActions = function(s) {
 })();
 
 
-</script>
-<script data-source="pages/patches/04-patch-v18-27.js">
+
+/* END absorbed 03-patch-v18-26.js */
+
+
+/* BEGIN absorbed 04-patch-v18-27.js */
+
 /* LEDGER PATCH v18.27: Tax Office separation, Education degrees, Career interviews */
 (function () {
   if (window.__ledgerV1827Loaded) return;
@@ -25810,8 +25825,12 @@ getSuggestedActions = function(s) {
 })();
 
 
-</script>
-<script data-source="pages/patches/05-patch-v18-28.js">
+
+/* END absorbed 04-patch-v18-27.js */
+
+
+/* BEGIN absorbed 05-patch-v18-28.js */
+
 /* LEDGER PATCH v18.28: firm-level tax separation + interview options */
 (function () {
   if (window.__ledgerV1828Loaded) return;
@@ -26421,8 +26440,12 @@ getSuggestedActions = function(s) {
 })();
 
 
-</script>
-<script data-source="pages/patches/06-patch-v18-29.js">
+
+/* END absorbed 05-patch-v18-28.js */
+
+
+/* BEGIN absorbed 06-patch-v18-29.js */
+
 /* LEDGER PATCH v18.29: manager firms, mandates, dividends, clear investment office controls */
 (function () {
   if (window.__ledgerPatch1829Managers) return;
@@ -26794,8 +26817,12 @@ getSuggestedActions = function(s) {
 })();
 
 
-</script>
-<script data-source="pages/patches/07-patch-v18-30.js">
+
+/* END absorbed 06-patch-v18-29.js */
+
+
+/* BEGIN absorbed 07-patch-v18-30.js */
+
 /* LEDGER PATCH v18.30: business entity structures, retained earnings, owner distributions, clearer launch requirements */
 (function () {
   if (window.__ledgerPatch1830BusinessEntities) return;
@@ -27357,8 +27384,12 @@ getSuggestedActions = function(s) {
 })();
 
 
-</script>
-<script data-source="pages/patches/08-patch-v18-31.js">
+
+/* END absorbed 07-patch-v18-30.js */
+
+
+/* BEGIN absorbed 08-patch-v18-31.js */
+
 /* LEDGER PATCH v18.31: Family Trust / Estate Planning / Dynasty Settlement */
 (() => {
   const PATCH_ID = "v18.31";
@@ -28036,8 +28067,12 @@ getSuggestedActions = function(s) {
 })();
 
 
-</script>
-<script data-source="pages/patches/09-patch-v18-32.js">
+
+/* END absorbed 08-patch-v18-31.js */
+
+
+/* BEGIN absorbed 09-patch-v18-32.js */
+
 /* LEDGER PATCH v18.32: cleanup, canonical tax audit, stronger interviews, save migration, trust dry run */
 (function () {
   if (window.__ledgerPatch1832CleanupStability) return;
@@ -28888,1190 +28923,19 @@ getSuggestedActions = function(s) {
 })();
 
 
+
+/* END absorbed 09-patch-v18-32.js */
+
+
 </script>
+<!-- Retired 2026-06-28: pages/patches/01-patch-v18-24.js through 09-patch-v18-32.js are absorbed by pages/runtime/00-core-app-runtime.js. -->
 <!-- Retired 2026-06-28: pages/patches/10-patch-v18-33.js is absorbed by pages/systems/business-entities.js. -->
-<script data-source="pages/patches/11-patch-v18-33-2.js">
-/* LEDGER PATCH v18.33.2: Law Office overlay + cautious recovery hotfix
-   - Prevents partial/blank state from auto-recovering into a random slot.
-   - Restores Law Office to the standard hub overlay/navigation path instead of the old v18.31 special overlay.
-*/
-(function () {
-  if (window.__ledgerPatch18332LawRecovery) return;
-  window.__ledgerPatch18332LawRecovery = true;
-  var PATCH_ID = "v18.33.2";
-
-  function esc(value) {
-    return String(value == null ? "" : value).replace(/[&<>"']/g, function (ch) {
-      return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch];
-    });
-  }
-  function n(value, fallback) {
-    var x = Number(value);
-    return Number.isFinite(x) ? x : (fallback || 0);
-  }
-  function app() { return document.getElementById("app"); }
-  function getState() {
-    try { if (typeof state !== "undefined") return state; } catch (e) {}
-    try { return window.state; } catch (e2) {}
-    return null;
-  }
-  function setState(next) {
-    try { state = next; } catch (e) {}
-    try { window.state = next; } catch (e2) {}
-    return next;
-  }
-  function activeSlotIndex() {
-    try { if (Number.isFinite(Number(activeSlot))) return Number(activeSlot); } catch (e) {}
-    try {
-      var raw = localStorage.getItem("ledger-active-slot");
-      var idx = Number(raw || 1);
-      return Number.isFinite(idx) && idx >= 1 ? idx : 1;
-    } catch (e2) { return 1; }
-  }
-  function slotKey(idx) {
-    try { if (typeof window.slotKey === "function") return window.slotKey(idx); } catch (e) {}
-    try { if (typeof slotKey === "function") return slotKey(idx); } catch (e2) {}
-    return "ledger-life-slot-" + idx;
-  }
-  function parse(raw) {
-    try { return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
-  }
-  function validName(s) {
-    var name = s && typeof s.name === "string" ? s.name.trim() : "";
-    return !!name && name !== "undefined" && name !== "null" && name !== "NaN";
-  }
-  function validAge(s) {
-    var age = Number(s && s.age);
-    return Number.isFinite(age) && age >= 0 && age < 130;
-  }
-  function validLife(s) {
-    return !!(s && typeof s === "object" && validName(s) && validAge(s) && (s.alive === true || s.alive === false));
-  }
-  function partialLife(s) {
-    if (!s || typeof s !== "object") return false;
-    if (validLife(s)) return false;
-    // Original bug: missing alive/name/age got rendered as a dead person.
-    if (s.alive !== true) return true;
-    if (!validName(s) || !validAge(s)) return true;
-    return false;
-  }
-  function normalizeLife(s) {
-    if (!validLife(s)) return s;
-    if (!s.stats || typeof s.stats !== "object" || Array.isArray(s.stats)) s.stats = {};
-    if (!s.flags || typeof s.flags !== "object" || Array.isArray(s.flags)) s.flags = {};
-    if (!s.relationships || typeof s.relationships !== "object" || Array.isArray(s.relationships)) s.relationships = {};
-    if (!s.legacy || typeof s.legacy !== "object" || Array.isArray(s.legacy)) s.legacy = { generation: 1 };
-    if (!Number.isFinite(Number(s.legacy.generation))) s.legacy.generation = 1;
-    if (!Array.isArray(s.log)) s.log = [];
-    if (!Array.isArray(s.inventory)) s.inventory = [];
-    if (!Array.isArray(s.assets)) s.assets = [];
-    if (!Array.isArray(s.rentals)) s.rentals = [];
-    if (!s.finance || typeof s.finance !== "object" || Array.isArray(s.finance)) s.finance = {};
-    if (!s.finance.debts || typeof s.finance.debts !== "object" || Array.isArray(s.finance.debts)) s.finance.debts = {};
-    if (!s.finance.incomeSources || typeof s.finance.incomeSources !== "object" || Array.isArray(s.finance.incomeSources)) s.finance.incomeSources = {};
-    if (!Number.isFinite(Number(s.money))) s.money = 0;
-    if (!Number.isFinite(Number(s.savings))) s.savings = 0;
-    if (!Number.isFinite(Number(s.fame))) s.fame = 0;
-    if (s.alive === false && !s.cause) s.cause = "natural causes";
-    return s;
-  }
-  function readLife(label, key, slot) {
-    var data = null;
-    try { data = parse(localStorage.getItem(key)); } catch (e) {}
-    if (!data) return null;
-    if (data.state && typeof data.state === "object") data = data.state;
-    if (!validLife(data)) return null;
-    return { label: label, key: key, slot: slot || null, state: normalizeLife(data) };
-  }
-  function activeCandidateOnly() {
-    var idx = activeSlotIndex();
-    return readLife("active slot " + idx, slotKey(idx), idx) ||
-      readLife("active-slot backup", "ledger-v1826-backup-slot-" + idx, idx) ||
-      readLife("last good backup", "ledger_v1832_last_good_state", idx);
-  }
-  function readableSlotList() {
-    var list = [];
-    var active = activeSlotIndex();
-    var seen = {};
-    function push(c) {
-      if (!c || !c.state) return;
-      var id = (c.key || c.label || "") + "|" + (c.state.name || "") + "|" + c.state.age;
-      if (seen[id]) return;
-      seen[id] = true;
-      list.push(c);
-    }
-    push(activeCandidateOnly());
-    try {
-      for (var i = 1; i <= 5; i++) {
-        push(readLife("slot " + i, slotKey(i), i));
-        push(readLife("backup slot " + i, "ledger-v1826-backup-slot-" + i, i));
-      }
-      push(readLife("v18.32 last good backup", "ledger_v1832_last_good_state", null));
-    } catch (e) {}
-    list.sort(function (a, b) {
-      var aw = (a.slot === active ? 10000 : 0) + (a.state.alive === true ? 1000 : 0) + n(a.state.age);
-      var bw = (b.slot === active ? 10000 : 0) + (b.state.alive === true ? 1000 : 0) + n(b.state.age);
-      return bw - aw;
-    });
-    return list;
-  }
-  function showCautiousRecovery(reason) {
-    var el = app();
-    if (!el) return;
-    var list = readableSlotList();
-    var active = activeSlotIndex();
-    var rows = list.length ? list.map(function (c, idx) {
-      var s = c.state || {};
-      return '<button class="secondary v18332-recover-choice" onclick="recoverLedgerSlotV18332(' + idx + ')" style="text-align:left;margin-top:8px">' +
-        '<b>' + esc(s.name) + '</b><br><span>Age ' + esc(s.age) + ' · ' + esc(c.label) + (c.slot === active ? ' · ACTIVE' : '') + '</span></button>';
-    }).join("") : '<div class="cause">No readable life save was found. Start a clean new life to continue.</div>';
-    try { window.__ledgerRecoverChoicesV18332 = list; } catch (e) {}
-    el.innerHTML = '<div class="masthead"><div class="title">The Ledger</div><div class="vol">Recovery</div></div>' +
-      '<section class="panel v18332-recovery"><div class="section-label">Save Recovery</div>' +
-      '<div class="row-title">The game blocked the undefined death-screen bug.</div>' +
-      '<div class="row-sub">It did not auto-pick a random save. Choose the save you actually want, or return to the start screen.</div>' +
-      (reason ? '<div class="row-sub">Reason: ' + esc(reason) + '</div>' : '') +
-      '<div class="row-sub">Active slot: ' + esc(active) + '</div>' + rows +
-      '<div class="mini-actions" style="justify-content:flex-start;margin-top:12px;gap:8px"><button class="secondary" style="width:auto;margin-top:0;padding:12px 16px" onclick="clearPartialLedgerStateV18332()">Return To Start</button></div>' +
-      '</section>';
-  }
-  window.recoverLedgerSlotV18332 = function (idx) {
-    var list = window.__ledgerRecoverChoicesV18332 || [];
-    var c = list[idx];
-    if (!c || !validLife(c.state)) return showCautiousRecovery("selected save was not readable");
-    setState(normalizeLife(c.state));
-    try { if (c.slot) activeSlot = c.slot; } catch (e) {}
-    try { if (c.slot) localStorage.setItem("ledger-active-slot", String(c.slot)); } catch (e2) {}
-    try { if (typeof window.migrateLedgerStateV1832 === "function") window.migrateLedgerStateV1832(); } catch (e3) {}
-    try { if (typeof save === "function") save(); } catch (e4) {}
-    try { if (typeof render === "function") render(); } catch (e5) { location.reload(); }
-  };
-  window.clearPartialLedgerStateV18332 = function () {
-    var s = getState();
-    try { if (partialLife(s)) localStorage.setItem("ledger_v18332_corrupt_state", JSON.stringify(s)); } catch (e) {}
-    setState(null);
-    try { tab = "lifehub"; introMode = "main"; } catch (e2) {}
-    try { if (typeof render === "function") render(); } catch (e3) { location.reload(); }
-  };
-
-  var previousRender = window.render || (typeof render === "function" ? render : null);
-  if (typeof previousRender === "function" && !previousRender.__ledger18332Wrapped) {
-    var guardedRender = function () {
-      var s = getState();
-      if (partialLife(s)) {
-        showCautiousRecovery("partial state cannot be rendered as a life");
-        return;
-      }
-      return previousRender.apply(this, arguments);
-    };
-    guardedRender.__ledger18332Wrapped = true;
-    window.render = guardedRender;
-    try { render = guardedRender; } catch (e) {}
-  }
-
-  var previousDeath = window.renderDeath || (typeof renderDeath === "function" ? renderDeath : null);
-  if (typeof previousDeath === "function" && !previousDeath.__ledger18332Wrapped) {
-    var guardedDeath = function () {
-      var s = getState();
-      if (partialLife(s) || !validLife(s)) {
-        showCautiousRecovery("death screen blocked missing name/age/cause");
-        return;
-      }
-      var result = previousDeath.apply(this, arguments);
-      try {
-        var html = app() ? app().innerHTML : "";
-        if (/undefined|NaN/.test(html)) showCautiousRecovery("death screen contained undefined values");
-      } catch (e) {}
-      return result;
-    };
-    guardedDeath.__ledger18332Wrapped = true;
-    window.renderDeath = guardedDeath;
-    try { renderDeath = guardedDeath; } catch (e) {}
-  }
-
-  var previousSave = window.save || (typeof save === "function" ? save : null);
-  if (typeof previousSave === "function" && !previousSave.__ledger18332Wrapped) {
-    var guardedSave = function () {
-      if (partialLife(getState())) {
-        try { localStorage.setItem("ledger_v18332_blocked_bad_save", JSON.stringify(getState())); } catch (e) {}
-        return false;
-      }
-      return previousSave.apply(this, arguments);
-    };
-    guardedSave.__ledger18332Wrapped = true;
-    window.save = guardedSave;
-    try { save = guardedSave; } catch (e) {}
-  }
-
-  function normHub(id) {
-    id = String(id || "").toLowerCase();
-    if (id === "legal" || id === "lawoffice" || id === "law-office" || id === "taxlaw") return "law";
-    if (id === "stocks") return "brokerage";
-    if (id === "life") return "lifehub";
-    return id || "lifehub";
-  }
-  function titleFor(id) {
-    id = normHub(id);
-    var map = { lifehub:"Life", people:"People", career:"Career", school:"Education", education:"Education", finance:"Finance", money:"Money", brokerage:"Stocks", business:"Business", law:"Law Office", health:"Health", home:"Real Estate", vehicles:"Vehicles", more:"More", stats:"All Stats", tax:"Tax Office" };
-    return map[id] || id.replace(/\b\w/g, function (m) { return m.toUpperCase(); });
-  }
-  function visibleHubs() {
-    var hubs = [];
-    try { hubs = typeof getVisibleHubs === "function" ? getVisibleHubs() : []; } catch (e) {}
-    hubs = Array.isArray(hubs) ? hubs.slice() : [];
-    var by = {}, out = [];
-    hubs.forEach(function (h) {
-      if (!h) return;
-      var id = normHub(h.id);
-      if (id === "legal") id = "law";
-      if (by[id]) return;
-      var copy = {};
-      Object.keys(h).forEach(function (k) { copy[k] = h[k]; });
-      copy.id = id;
-      if (id === "law") { copy.icon = copy.icon || "⚖"; copy.label = "Law"; }
-      if (id === "brokerage") { copy.icon = copy.icon || "📈"; copy.label = "Stocks"; }
-      by[id] = copy;
-      out.push(copy);
-    });
-    function add(id, icon, label, disabled) {
-      if (!by[id]) { by[id] = { id:id, icon:icon, label:label, disabled:!!disabled }; out.push(by[id]); }
-    }
-    var s = getState() || {};
-    add("brokerage", "📈", "Stocks", n(s.age) < 13);
-    add("law", "⚖", "Law", n(s.age) < 13);
-    add("more", "⋯", "More", false);
-    var preferred = ["lifehub", "people", "career", "school", "finance", "money", "brokerage", "business", "law", "more"];
-    out.sort(function (a, b) {
-      var ai = preferred.indexOf(a.id), bi = preferred.indexOf(b.id);
-      ai = ai < 0 ? 999 : ai; bi = bi < 0 ? 999 : bi;
-      return ai - bi;
-    });
-    return out.slice(0, 10);
-  }
-  var oldGetVisibleHubs = window.getVisibleHubs || (typeof getVisibleHubs === "function" ? getVisibleHubs : null);
-  if (typeof oldGetVisibleHubs === "function" && !oldGetVisibleHubs.__ledger18332Wrapped) {
-    var wrappedHubs = function () { return visibleHubs(); };
-    wrappedHubs.__ledger18332Wrapped = true;
-    window.getVisibleHubs = wrappedHubs;
-    try { getVisibleHubs = wrappedHubs; } catch (e) {}
-  }
-
-  function navStrip(active) {
-    var hubs = visibleHubs();
-    return '<div class="v11-hub-tab-strip v18332-tab-strip" aria-label="Hub tab wheel"><div class="v11-hub-tab-scroll">' + hubs.map(function (h) {
-      var id = normHub(h.id);
-      var disabled = h.disabled ? "disabled" : "";
-      return '<button class="v11-tab-btn' + (id === active ? ' active' : '') + '" ' + disabled + ' onclick="event.preventDefault();event.stopPropagation();setTabV16(\'' + esc(id) + '\')"><span class="v11-tab-ico">' + esc(h.icon || "•") + '</span><span class="v11-tab-lbl">' + esc(h.label || titleFor(id)) + '</span></button>';
-    }).join("") + '</div></div>';
-  }
-  var previousOverlay = window.renderHubOverlay || (typeof renderHubOverlay === "function" ? renderHubOverlay : null);
-  if (typeof previousOverlay === "function" && !previousOverlay.__ledger18332Wrapped) {
-    var overlayFix = function (hubId) {
-      hubId = normHub(hubId);
-      // Rebuild Law Office with the normal v16 hub shape. This bypasses the old v18.31 special Law/Estate overlay.
-      if (hubId === "law" || hubId === "legal") {
-        var content = "";
-        try { content = typeof renderHubContent === "function" ? renderHubContent("law") : ""; } catch (e) { content = '<section class="panel"><div class="row-title">Law Office recovered</div><div class="row-sub">' + esc(e.message || e) + '</div></section>'; }
-        return '<div class="hub-overlay hub-law v16-hub v18332-law-overlay" data-hub-id="law" onclick="if(event.target===this)closeHub()"><div class="hub-sheet hub-sheet-law"><div class="hub-head"><h2>Law Office</h2><button class="hub-close v16-close" onclick="event.preventDefault();event.stopPropagation();closeHub()">×</button></div><div class="v16-hub-body" data-hub-body="law">' + content + '</div>' + navStrip("law") + '</div></div>';
-      }
-      return previousOverlay.apply(this, [hubId]);
-    };
-    overlayFix.__ledger18332Wrapped = true;
-    window.renderHubOverlay = overlayFix;
-    try { renderHubOverlay = overlayFix; } catch (e) {}
-  }
-
-  var previousSetTab = window.setTabV16 || window.setTab || (typeof setTab === "function" ? setTab : null);
-  if (typeof previousSetTab === "function" && !previousSetTab.__ledger18332Wrapped) {
-    var tabFix = function (targetTab) {
-      targetTab = normHub(targetTab);
-      try { tab = targetTab; } catch (e) { window.tab = targetTab; }
-      try { return previousSetTab.apply(this, [targetTab]); }
-      catch (e2) {
-        var el = app();
-        if (el) el.innerHTML = (window.renderHubOverlay ? window.renderHubOverlay(targetTab) : "");
-      }
-    };
-    tabFix.__ledger18332Wrapped = true;
-    window.setTabV16 = tabFix;
-    window.setTab = tabFix;
-    try { setTabV16 = tabFix; setTab = tabFix; } catch (e) {}
-  }
-
-  // If the old special Law overlay is on screen, replace it with the normal hub overlay immediately.
-  try {
-    var overlay = document.querySelector(".hub-overlay");
-    if (overlay && /Legal\s*\/\s*Estate/.test(overlay.textContent || "") && !(overlay.className || "").match(/v16-hub/)) {
-      var el = app();
-      if (el && window.renderHubOverlay) el.innerHTML = window.renderHubOverlay("law");
-    }
-  } catch (e) {}
-
-  try {
-    var style = document.createElement("style");
-    style.textContent = ".v18332-recovery{border-color:rgba(233,146,125,.55)!important;background:linear-gradient(135deg,rgba(56,25,22,.96),rgba(29,25,20,.98))!important}.v18332-recover-choice b{color:var(--ink)}.v18332-recover-choice span{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim)}.v18332-law-overlay .hub-sheet{min-height:100vh;max-height:100vh;border-radius:0}.v18332-law-overlay .v16-hub-body{padding-bottom:92px}";
-    document.head.appendChild(style);
-  } catch (e) {}
-})();
-
-
-</script>
-<script data-source="pages/patches/12-patch-v18-33-3.js">
-/* LEDGER PATCH v18.33.3: preserve Wayback restore after v18.33 import */
-(function () {
-  if (window.__ledgerV18333WaybackLoaded) return;
-  window.__ledgerV18333WaybackLoaded = true;
-
-  function esc18333(v) {
-    return String(v == null ? "" : v).replace(/[&<>"']/g, function (ch) {
-      return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch];
-    });
-  }
-  function num18333(v, fallback) {
-    var n = Number(v);
-    return Number.isFinite(n) ? n : (fallback || 0);
-  }
-  function money18333(v) {
-    try { if (typeof money === "function") return money(Math.round(num18333(v))); } catch(e) {}
-    var n = Math.round(num18333(v));
-    var sign = n < 0 ? "-" : "";
-    n = Math.abs(n);
-    if (n >= 1e12) return sign + "$" + (n / 1e12).toFixed(1).replace(/\.0$/, "") + "T";
-    if (n >= 1e9) return sign + "$" + (n / 1e9).toFixed(1).replace(/\.0$/, "") + "B";
-    if (n >= 1e6) return sign + "$" + (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
-    if (n >= 1e4) return sign + "$" + Math.round(n / 1000) + "K";
-    return sign + "$" + n.toLocaleString();
-  }
-  function toast18333(msg) {
-    try { if (typeof addToast === "function") return addToast(msg); } catch(e) {}
-    try { if (typeof addLog === "function") return addLog(msg); } catch(e) {}
-  }
-  function log18333(msg, deltas) {
-    try { if (typeof addLog === "function") return addLog(msg, deltas || {}); } catch(e) {}
-  }
-  function copy18333(obj) {
-    try { if (typeof structuredClone === "function") return structuredClone(obj); } catch(e) {}
-    try { return JSON.parse(JSON.stringify(obj)); } catch(e) { return null; }
-  }
-  function slotKey18333(idx) {
-    try { if (typeof slotKey === "function") return slotKey(idx); } catch(e) {}
-    return "ledger-life-slot-" + idx;
-  }
-  function activeSlot18333() {
-    var idx = 1;
-    try { idx = Number(activeSlot) || 1; } catch(e) {}
-    return Math.max(1, Math.min(Number(window.NUM_SLOTS || 5) || 5, Math.round(idx)));
-  }
-  function syncState18333(s) {
-    if (!s) return null;
-    window.state = s;
-    try { state = s; } catch(e) {}
-    try { if (typeof ensureStateShape === "function") ensureStateShape(); } catch(e) {}
-    if (!Array.isArray(s.timeSnapshotsV1814)) s.timeSnapshotsV1814 = [];
-    if (!s.saveHealthV1826) s.saveHealthV1826 = { backups:0, repairs:0, lastBackupAt:0 };
-    return s;
-  }
-  function ensure18333() {
-    var s = null;
-    try { s = window.state || state; } catch(e) { s = window.state; }
-    if (!s) return null;
-    syncState18333(s);
-    return s;
-  }
-  function saveSlot18333(idx, s) {
-    idx = Math.max(1, Math.min(Number(window.NUM_SLOTS || 5) || 5, Math.round(num18333(idx, activeSlot18333()))));
-    s = syncState18333(s || ensure18333());
-    if (!s) return false;
-    try { localStorage.setItem(slotKey18333(idx), JSON.stringify(s)); } catch(e) { return false; }
-    try { localStorage.setItem("ledger-active-slot", String(idx)); } catch(e) {}
-    try { activeSlot = idx; } catch(e) {}
-    return true;
-  }
-  function render18333() {
-    try { if (typeof render === "function") render(); } catch(e) {}
-  }
-  function netWorth18333(s) {
-    s = s || {};
-    try { if (typeof legacyNetWorth === "function") return legacyNetWorth(s); } catch(e) {}
-    var f = s.finance || {};
-    return Math.round(num18333(s.money) + num18333(s.savings) + num18333(s.ira) + num18333(s.retirement401k) + num18333(f.managedPortfolio) + num18333(f.brokerageCash) - num18333(s.debt) - num18333(f.taxDebt));
-  }
-  function snapshot18333(s) {
-    s = s || ensure18333();
-    if (!s) return null;
-    var snap = copy18333(s);
-    if (!snap) return null;
-    delete snap.pending;
-    delete snap.activeModal;
-    delete snap.timeSnapshotsV1814;
-    return snap;
-  }
-  function label18333(item, fallback) {
-    return item && (item.label || item.reason || item.name) || fallback || "Checkpoint";
-  }
-  function sortedSnapshots18333(s) {
-    s = s || ensure18333();
-    var snaps = Array.isArray(s && s.timeSnapshotsV1814) ? s.timeSnapshotsV1814 : [];
-    return snaps.map(function (item, idx) { return Object.assign({ __idx:idx }, item || {}); }).reverse();
-  }
-
-  window.createWaybackCheckpointV18333 = function (label) {
-    var s = ensure18333();
-    if (!s) return toast18333("Open a life before saving a Wayback checkpoint.");
-    var snap = snapshot18333(s);
-    if (!snap) return toast18333("Could not create a Wayback checkpoint.");
-    s.timeSnapshotsV1814.push({
-      id: Date.now(),
-      age: s.age || 0,
-      at: Date.now(),
-      label: label || "Manual checkpoint",
-      netWorth: netWorth18333(s),
-      state: snap
-    });
-    s.timeSnapshotsV1814 = s.timeSnapshotsV1814.slice(-18);
-    log18333("Saved Wayback checkpoint at age " + (s.age || 0) + ".", {});
-    saveSlot18333(activeSlot18333(), s);
-    render18333();
-  };
-
-  window.restoreWaybackIndexV18333 = function (displayIndex) {
-    var current = ensure18333();
-    if (!current) return toast18333("Open a life before restoring a Wayback checkpoint.");
-    var shown = sortedSnapshots18333(current);
-    var shownItem = shown[Math.round(num18333(displayIndex))];
-    if (!shownItem || shownItem.__idx == null) return toast18333("That Wayback checkpoint is not readable.");
-    var originalIndex = shownItem.__idx;
-    var item = current.timeSnapshotsV1814[originalIndex];
-    var restored = copy18333(item && item.state);
-    if (!restored) return toast18333("That Wayback checkpoint is damaged.");
-    restored.timeSnapshotsV1814 = current.timeSnapshotsV1814.slice(0, originalIndex).concat(current.timeSnapshotsV1814.slice(originalIndex + 1));
-    syncState18333(restored);
-    saveSlot18333(activeSlot18333(), restored);
-    toast18333("Wayback restored this life to age " + (restored.age == null ? "?" : restored.age) + ".");
-    render18333();
-  };
-
-  window.deleteWaybackIndexV18333 = function (displayIndex) {
-    var s = ensure18333();
-    if (!s) return;
-    var shown = sortedSnapshots18333(s);
-    var item = shown[Math.round(num18333(displayIndex))];
-    if (!item || item.__idx == null) return;
-    s.timeSnapshotsV1814.splice(item.__idx, 1);
-    saveSlot18333(activeSlot18333(), s);
-    render18333();
-  };
-
-  window.waybackLifeSlotV18333 = function (idx) {
-    idx = Math.max(1, Math.min(Number(window.NUM_SLOTS || 5) || 5, Math.round(num18333(idx, activeSlot18333()))));
-    var raw = null;
-    try { raw = localStorage.getItem(slotKey18333(idx)); } catch(e) {}
-    if (!raw) return toast18333("No saved life in slot " + idx + ".");
-    var saved = null;
-    try { saved = JSON.parse(raw); } catch(e) {}
-    if (!saved) return toast18333("Slot " + idx + " could not be read.");
-    var snaps = Array.isArray(saved.timeSnapshotsV1814) ? saved.timeSnapshotsV1814 : [];
-    if (!snaps.length) {
-      var fresh = snapshot18333(saved);
-      if (fresh) {
-        saved.timeSnapshotsV1814 = [{
-          id: Date.now(),
-          age: saved.age || 0,
-          at: Date.now(),
-          label: "Starting checkpoint",
-          netWorth: netWorth18333(saved),
-          state: fresh
-        }];
-        try { localStorage.setItem(slotKey18333(idx), JSON.stringify(saved)); } catch(e) {}
-      }
-      return toast18333("Slot " + idx + " has no older checkpoint yet. I saved one for next time.");
-    }
-    var item = snaps[snaps.length - 1];
-    var restored = copy18333(item && item.state);
-    if (!restored) return toast18333("The latest checkpoint in slot " + idx + " is damaged.");
-    restored.timeSnapshotsV1814 = snaps.slice(0, -1);
-    syncState18333(restored);
-    saveSlot18333(idx, restored);
-    toast18333("Wayback restored slot " + idx + " to age " + (restored.age == null ? "?" : restored.age) + ".");
-    render18333();
-  };
-
-  window.createWaybackCheckpointV1826 = window.createWaybackCheckpointV18333;
-  window.restoreWaybackIndexV1826 = window.restoreWaybackIndexV18333;
-  window.deleteWaybackIndexV1826 = window.deleteWaybackIndexV18333;
-  window.createWaybackCheckpointV1823 = window.createWaybackCheckpointV18333;
-  window.waybackLifeSlotV1823 = window.waybackLifeSlotV18333;
-  window.waybackLifeSlotV1820 = window.waybackLifeSlotV18333;
-  try {
-    createWaybackCheckpointV1826 = window.createWaybackCheckpointV1826;
-    restoreWaybackIndexV1826 = window.restoreWaybackIndexV1826;
-    deleteWaybackIndexV1826 = window.deleteWaybackIndexV1826;
-    createWaybackCheckpointV1823 = window.createWaybackCheckpointV1823;
-    waybackLifeSlotV1823 = window.waybackLifeSlotV1823;
-    waybackLifeSlotV1820 = window.waybackLifeSlotV1820;
-  } catch(e) {}
-
-  function waybackPanel18333() {
-    var s = ensure18333();
-    var rows = "";
-    var count = 0;
-    if (s) {
-      var shown = sortedSnapshots18333(s);
-      count = shown.length;
-      rows = shown.length ? shown.map(function (item, displayIdx) {
-        var age = item.age == null ? "?" : item.age;
-        var when = item.at ? new Date(item.at).toLocaleString() : "saved";
-        var net = item.netWorth ? " · net " + money18333(item.netWorth) : "";
-        return '<div class="v18333-wayback-row"><div><b>' + esc18333(label18333(item, "Checkpoint")) + '</b><span>Age ' + esc18333(age) + ' · ' + esc18333(when) + esc18333(net) + '</span></div><div class="v18333-wayback-actions"><button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();restoreWaybackIndexV18333(' + displayIdx + ')">Restore</button><button class="money-btn red" onclick="event.preventDefault();event.stopPropagation();deleteWaybackIndexV18333(' + displayIdx + ')">Delete</button></div></div>';
-      }).join("") : '<div class="v18333-wayback-empty">No checkpoints yet. Hit Save Checkpoint before risky choices, or age up once to create an automatic rewind point.</div>';
-    } else {
-      rows = '<div class="v18333-wayback-empty">Open or continue a life to use Wayback.</div>';
-    }
-    return '<section class="money-section v18333-wayback"><div class="money-section-title">Wayback Machine <span>' + count + ' checkpoints</span></div><div class="money-row"><div><div class="money-row-title">Restore this life from a checkpoint</div><div class="money-row-sub">Newest checkpoints show first. Restore updates the active slot immediately, so the age and money should change right away.</div></div><div class="bank-actions-row"><button class="money-btn green" onclick="event.preventDefault();event.stopPropagation();createWaybackCheckpointV18333(\'Manual checkpoint\')" ' + (!s ? "disabled" : "") + '>Save Checkpoint</button><button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();waybackLifeSlotV18333(activeSlot)" ' + (!count ? "disabled" : "") + '>Restore Latest</button></div></div><div class="v18333-wayback-list">' + rows + '</div></section>';
-  }
-  function removeWaybackSections18333(html) {
-    html = String(html || "");
-    ["v18333-wayback", "v1826-wayback", "v1823-wayback-card", "v1821-wayback-more"].forEach(function (cls) {
-      var idx = html.indexOf(cls);
-      var guard = 0;
-      while (idx >= 0 && guard++ < 20) {
-        var start = html.lastIndexOf("<section", idx);
-        var end = html.indexOf("</section>", idx);
-        if (start < 0 || end < 0 || end <= start) break;
-        html = html.slice(0, start) + html.slice(end + 10);
-        idx = html.indexOf(cls);
-      }
-    });
-    return html;
-  }
-
-  var prevRenderHub18333 = window.renderHubContent || (typeof renderHubContent === "function" ? renderHubContent : null);
-  if (prevRenderHub18333 && !window.__ledgerRenderHub18333Wrapped) {
-    window.__ledgerRenderHub18333Wrapped = true;
-    window.renderHubContent = function (hubId) {
-      var html = "";
-      try { html = prevRenderHub18333.apply(this, arguments) || ""; } catch(e) { html = ""; }
-      html = removeWaybackSections18333(html);
-      if (hubId === "more" || hubId === "lifehub") html = waybackPanel18333() + html;
-      return html;
-    };
-    try { renderHubContent = window.renderHubContent; } catch(e) {}
-  }
-
-  var prevRenderLife18333 = window.renderLifeHub || (typeof renderLifeHub === "function" ? renderLifeHub : null);
-  if (prevRenderLife18333 && !window.__ledgerRenderLife18333Wrapped) {
-    window.__ledgerRenderLife18333Wrapped = true;
-    window.renderLifeHub = function () {
-      var html = "";
-      try { html = prevRenderLife18333.apply(this, arguments) || ""; } catch(e) { html = ""; }
-      html = removeWaybackSections18333(html);
-      return waybackPanel18333() + html;
-    };
-    try { renderLifeHub = window.renderLifeHub; } catch(e) {}
-  }
-
-  function injectStyle18333() {
-    if (document.getElementById("ledger-v18333-wayback-style")) return;
-    var style = document.createElement("style");
-    style.id = "ledger-v18333-wayback-style";
-    style.textContent = [
-      ".v18333-wayback{border-color:rgba(146,130,220,.48)!important;background:linear-gradient(135deg,rgba(33,29,54,.97),rgba(23,28,29,.98))!important;overflow:hidden!important}",
-      ".v18333-wayback-list{display:grid;gap:8px;margin-top:10px}.v18333-wayback-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(255,255,255,.045);padding:10px;min-width:0}.v18333-wayback-row b{display:block;color:#fff3df;overflow-wrap:anywhere}.v18333-wayback-row span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.4;margin-top:3px}.v18333-wayback-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}.v18333-wayback-actions .money-btn{min-width:82px}.v18333-wayback-empty{border:1px dashed rgba(255,255,255,.14);border-radius:12px;padding:11px;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.45;background:rgba(0,0,0,.12)}",
-      "@media(max-width:760px){.v18333-wayback-row{grid-template-columns:1fr}.v18333-wayback-actions .money-btn{flex:1 1 42%}}"
-    ].join("\n");
-    document.head.appendChild(style);
-  }
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", injectStyle18333); else injectStyle18333();
-})();
-
-
-</script>
-<script data-source="pages/patches/13-patch-v18-33-4.js">
-/* LEDGER PATCH v18.33.4: recovery screen unstick + active-slot-first restore */
-(function () {
-  if (window.__ledgerPatch18334RecoveryUnstick) return;
-  window.__ledgerPatch18334RecoveryUnstick = true;
-
-  function esc(v) {
-    return String(v == null ? "" : v).replace(/[&<>"']/g, function (ch) {
-      return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch];
-    });
-  }
-  function app() { return document.getElementById("app"); }
-  function getState() {
-    try { if (typeof state !== "undefined") return state; } catch(e) {}
-    try { return window.state; } catch(e2) {}
-    return null;
-  }
-  function setState(next) {
-    try { state = next; } catch(e) {}
-    try { window.state = next; } catch(e2) {}
-    return next;
-  }
-  function activeSlotIndex() {
-    try {
-      var direct = Number(activeSlot);
-      if (Number.isFinite(direct) && direct >= 1) return Math.round(direct);
-    } catch(e) {}
-    try {
-      var stored = Number(localStorage.getItem("ledger-active-slot") || 1);
-      return Number.isFinite(stored) && stored >= 1 ? Math.round(stored) : 1;
-    } catch(e2) { return 1; }
-  }
-  function keyForSlot(idx) {
-    try { if (typeof slotKey === "function") return slotKey(idx); } catch(e) {}
-    return "ledger-life-slot-" + idx;
-  }
-  function parse(raw) {
-    try { return raw ? JSON.parse(raw) : null; } catch(e) { return null; }
-  }
-  function validLife(s) {
-    var name = s && typeof s.name === "string" ? s.name.trim() : "";
-    var age = Number(s && s.age);
-    return !!(s && typeof s === "object" && name && name !== "undefined" && name !== "null" && Number.isFinite(age) && age >= 0 && age < 130 && (s.alive === true || s.alive === false));
-  }
-  function partialLife(s) {
-    if (!s || typeof s !== "object") return false;
-    if (validLife(s)) return false;
-    if (s.alive !== true) return true;
-    if (!s.name || !Number.isFinite(Number(s.age))) return true;
-    return false;
-  }
-  function normalize(s) {
-    if (!validLife(s)) return s;
-    if (!s.stats || typeof s.stats !== "object" || Array.isArray(s.stats)) s.stats = {};
-    if (!s.finance || typeof s.finance !== "object" || Array.isArray(s.finance)) s.finance = {};
-    if (!s.finance.debts || typeof s.finance.debts !== "object" || Array.isArray(s.finance.debts)) s.finance.debts = {};
-    if (!s.finance.incomeSources || typeof s.finance.incomeSources !== "object" || Array.isArray(s.finance.incomeSources)) s.finance.incomeSources = {};
-    if (!s.relationships || typeof s.relationships !== "object" || Array.isArray(s.relationships)) s.relationships = {};
-    if (!s.legacy || typeof s.legacy !== "object" || Array.isArray(s.legacy)) s.legacy = { generation:1 };
-    if (!Array.isArray(s.log)) s.log = [];
-    if (!Array.isArray(s.inventory)) s.inventory = [];
-    if (!Array.isArray(s.timeSnapshotsV1814)) s.timeSnapshotsV1814 = [];
-    if (!Number.isFinite(Number(s.money))) s.money = 0;
-    if (!Number.isFinite(Number(s.savings))) s.savings = 0;
-    return s;
-  }
-  function readSave(label, key, slot, priority) {
-    var data = null;
-    try { data = parse(localStorage.getItem(key)); } catch(e) {}
-    if (data && data.state && typeof data.state === "object") data = data.state;
-    if (!validLife(data)) return null;
-    return { label:label, key:key, slot:slot || null, priority:priority || 0, state:normalize(data) };
-  }
-  function recoveryChoices() {
-    var active = activeSlotIndex();
-    var out = [], seen = {};
-    function push(c) {
-      if (!c) return;
-      var id = String(c.key || "") + "|" + String(c.state.name || "") + "|" + String(c.state.age);
-      if (seen[id]) return;
-      seen[id] = true;
-      out.push(c);
-    }
-    push(readSave("active slot " + active, keyForSlot(active), active, 10000));
-    push(readSave("active backup slot " + active, "ledger-v1826-backup-slot-" + active, active, 9000));
-    push(readSave("last good backup", "ledger_v1832_last_good_state", active, 8000));
-    for (var i = 1; i <= 5; i++) {
-      push(readSave("slot " + i, keyForSlot(i), i, i === active ? 7000 : 1000 - i));
-      push(readSave("backup slot " + i, "ledger-v1826-backup-slot-" + i, i, i === active ? 6000 : 500 - i));
-    }
-    out.sort(function (a, b) { return (b.priority || 0) - (a.priority || 0); });
-    return out;
-  }
-  function loadChoice(choice, silent) {
-    if (!choice || !validLife(choice.state)) return false;
-    var next = normalize(JSON.parse(JSON.stringify(choice.state)));
-    setState(next);
-    if (choice.slot) {
-      try { activeSlot = choice.slot; } catch(e) {}
-      try { localStorage.setItem("ledger-active-slot", String(choice.slot)); } catch(e2) {}
-      try { localStorage.setItem(keyForSlot(choice.slot), JSON.stringify(next)); } catch(e3) {}
-    }
-    try { if (typeof ensureStateShape === "function") ensureStateShape(); } catch(e4) {}
-    try { if (typeof save === "function") save(); } catch(e5) {}
-    if (!silent) {
-      try { if (typeof addToast === "function") addToast("Loaded " + (next.name || "life") + " from " + choice.label + "."); } catch(e6) {}
-    }
-    return true;
-  }
-  function currentSlotIsPartial() {
-    var idx = activeSlotIndex(), raw = null, parsed = null;
-    try { raw = localStorage.getItem(keyForSlot(idx)); } catch(e) {}
-    parsed = parse(raw);
-    if (parsed && parsed.state) parsed = parsed.state;
-    return partialLife(parsed);
-  }
-  function showRecovery(reason) {
-    var el = app();
-    if (!el) return;
-    var choices = recoveryChoices();
-    window.__ledgerRecoverChoicesV18334 = choices;
-    var active = activeSlotIndex();
-    var rows = choices.length ? choices.map(function (c, idx) {
-      var s = c.state || {};
-      var activeTag = c.slot === active ? " · ACTIVE" : "";
-      return '<button class="secondary v18334-recover-choice" onclick="event.preventDefault();event.stopPropagation();recoverLedgerSlotV18334(' + idx + ')"><b>' + esc(s.name || "Unnamed life") + '</b><span>Age ' + esc(s.age) + ' · ' + esc(c.label) + activeTag + '</span></button>';
-    }).join("") : '<div class="row-sub">No readable saves were found. Return to Start will clear only the broken in-memory state.</div>';
-    el.innerHTML = '<div class="masthead"><div class="title">The Ledger</div><div class="vol">Recovery</div></div>' +
-      '<section class="panel v18334-recovery"><div class="section-label">Save Recovery</div>' +
-      '<div class="row-title">A partial life was stopped before it became a fake character.</div>' +
-      '<div class="row-sub">The active slot is checked first. Pick the life you want, or return to the life stack without saving the broken state.</div>' +
-      (reason ? '<div class="row-sub">Reason: ' + esc(reason) + '</div>' : '') +
-      '<div class="row-sub">Active slot: ' + esc(active) + '</div>' + rows +
-      '<div class="mini-actions" style="justify-content:flex-start;margin-top:12px;gap:8px">' +
-      '<button class="secondary" style="width:auto;margin-top:0;padding:12px 16px" onclick="event.preventDefault();event.stopPropagation();clearPartialLedgerStateV18334()">Return To Life Stack</button>' +
-      '</div></section>';
-  }
-  function autoRecoverActive() {
-    var active = activeSlotIndex();
-    var activeChoice = readSave("active slot " + active, keyForSlot(active), active, 10000);
-    if (activeChoice && loadChoice(activeChoice, true)) return true;
-    var backup = readSave("active backup slot " + active, "ledger-v1826-backup-slot-" + active, active, 9000);
-    if (backup && loadChoice(backup, true)) return true;
-    return false;
-  }
-
-  window.recoverLedgerSlotV18334 = function (idx) {
-    var choices = window.__ledgerRecoverChoicesV18334 || recoveryChoices();
-    var c = choices[Math.max(0, Math.round(Number(idx) || 0))];
-    if (!loadChoice(c, false)) return showRecovery("selected save was not readable");
-    try { if (typeof render === "function") render(); } catch(e) { try { location.reload(); } catch(ignore) {} }
-  };
-  window.clearPartialLedgerStateV18334 = function () {
-    var s = getState();
-    try { if (partialLife(s)) localStorage.setItem("ledger_v18334_corrupt_state", JSON.stringify(s)); } catch(e) {}
-    if (currentSlotIsPartial()) {
-      try { localStorage.removeItem(keyForSlot(activeSlotIndex())); } catch(e2) {}
-    }
-    setState(null);
-    try { tab = "lifehub"; introMode = "main"; } catch(e3) {}
-    try { if (typeof render === "function") render(); } catch(e4) { try { location.reload(); } catch(ignore) {} }
-  };
-  window.recoverLedgerSlotV18332 = window.recoverLedgerSlotV18334;
-  window.clearPartialLedgerStateV18332 = window.clearPartialLedgerStateV18334;
-  try { recoverLedgerSlotV18332 = window.recoverLedgerSlotV18332; clearPartialLedgerStateV18332 = window.clearPartialLedgerStateV18332; } catch(e) {}
-
-  var previousRender = window.render || (typeof render === "function" ? render : null);
-  if (typeof previousRender === "function" && !previousRender.__ledger18334Wrapped) {
-    var fixedRender = function () {
-      if (partialLife(getState())) {
-        if (autoRecoverActive()) return previousRender.apply(this, arguments);
-        showRecovery("partial state cannot be rendered as a life");
-        return;
-      }
-      return previousRender.apply(this, arguments);
-    };
-    fixedRender.__ledger18334Wrapped = true;
-    window.render = fixedRender;
-    try { render = fixedRender; } catch(e) {}
-  }
-
-  try {
-    var style = document.createElement("style");
-    style.textContent = ".v18334-recovery{border-color:rgba(233,146,125,.55)!important;background:linear-gradient(135deg,rgba(56,25,22,.96),rgba(29,25,20,.98))!important}.v18334-recover-choice{display:block;width:100%;text-align:left;margin-top:8px}.v18334-recover-choice b{display:block;color:var(--ink)}.v18334-recover-choice span{display:block;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);margin-top:4px}";
-    document.head.appendChild(style);
-  } catch(e) {}
-
-  setTimeout(function () {
-    if (partialLife(getState())) {
-      if (autoRecoverActive()) { try { if (typeof render === "function") render(); } catch(e) {} }
-      else showRecovery("partial state found on load");
-    }
-  }, 0);
-})();
-
-
-</script>
-<script data-source="pages/patches/14-patch-v18-33-5.js">
-/* LEDGER PATCH v18.33.5: stable hub navigation after v18.33 import
-   The v18.33.2 law/recovery import wrapped getVisibleHubs through a helper
-   that calls getVisibleHubs again. When that recursion fails, only the
-   emergency Stocks/Law/More hubs survive. This patch replaces the hub source
-   with a known-good core list and gives the Law overlay a non-recursive tab
-   strip so a save can never get trapped in three buttons again. */
-(function () {
-  if (window.__ledgerPatch18335StableNav) return;
-  window.__ledgerPatch18335StableNav = true;
-
-  function esc18335(v) {
-    return String(v == null ? "" : v).replace(/[&<>"']/g, function (ch) {
-      return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch];
-    });
-  }
-  function state18335() {
-    try { if (typeof state !== "undefined") return state; } catch (e) {}
-    return window.state || null;
-  }
-  function num18335(v) {
-    v = Number(v);
-    return isFinite(v) ? v : 0;
-  }
-  function normHub18335(id) {
-    id = String(id || "").toLowerCase();
-    if (id === "life") return "lifehub";
-    if (id === "stocks") return "brokerage";
-    if (id === "legal" || id === "lawoffice" || id === "law-office" || id === "taxlaw") return "law";
-    if (id === "networth" || id === "network" || id === "financehub") return "finance";
-    if (id === "education") return "school";
-    if (id === "founder" || id === "startup" || id === "entrepreneur") return "entrepreneurship";
-    return id || "lifehub";
-  }
-  function title18335(id) {
-    id = normHub18335(id);
-    var map = {
-      lifehub:"Life",
-      people:"People",
-      school:"Education",
-      career:"Job",
-      finance:"Finance",
-      money:"Money",
-      brokerage:"Stocks",
-      business:"Business",
-      entrepreneurship:"Entrepreneurship",
-      law:"Legal",
-      more:"More",
-      health:"Health",
-      home:"Real Estate",
-      vehicles:"Vehicles",
-      stats:"Stats"
-    };
-    return map[id] || id.replace(/\b\w/g, function (m) { return m.toUpperCase(); });
-  }
-  function hub18335(id, icon, label, disabled) {
-    return { id:normHub18335(id), icon:icon, label:label || title18335(id), disabled:!!disabled };
-  }
-  function schoolRelevant18335(s) {
-    s = s || {};
-    var flags = s.flags || {};
-    var education = s.education || {};
-    var edu25 = s.educationV1825 || {};
-    var edu27 = s.educationV1827 || {};
-    var age = num18335(s.age);
-    return age < 22 || !!flags.inCollege || !!flags.inSchool || !!s.inSchool || !!s.inCollege ||
-      !!education.inSchool || !!education.inCollege || !!education.enrolled ||
-      !!edu25.active || !!edu25.activeDegree || !!edu27.active || !!edu27.activeDegree;
-  }
-  function stableHubs18335() {
-    var s = state18335() || {};
-    var ids = ["lifehub", "people"];
-    if (schoolRelevant18335(s)) ids.push("school");
-    ids = ids.concat(["career", "finance", "money", "brokerage", "business", "law", "more"]);
-    var data = {
-      lifehub: hub18335("lifehub", "Life", "Life"),
-      people: hub18335("people", "People", "People"),
-      school: hub18335("school", "Edu", "Education"),
-      career: hub18335("career", "Job", "Job"),
-      finance: hub18335("finance", "$", "Finance"),
-      money: hub18335("money", "$", "Money"),
-      brokerage: hub18335("brokerage", "Stock", "Stocks"),
-      business: hub18335("business", "Biz", "Business"),
-      law: hub18335("law", "Law", "Legal"),
-      more: hub18335("more", "...", "More")
-    };
-    return ids.map(function (id) { return data[id]; }).filter(Boolean);
-  }
-
-  function fullHubs18335() {
-    var s = state18335() || {};
-    var hubs = stableHubs18335().slice();
-    var seen = {};
-    hubs.forEach(function (h) { seen[h.id] = true; });
-    [
-      hub18335("health", "Health", "Health"),
-      hub18335("home", "⌂", "Real Estate"),
-      hub18335("vehicles", "🚗", "Vehicles"),
-      hub18335("stats", "Stats", "Stats")
-    ].forEach(function (h) {
-      if (!seen[h.id]) {
-        if (h.id === "home" && num18335(s.age) < 10) h.disabled = false;
-        hubs.push(h);
-        seen[h.id] = true;
-      }
-    });
-    return hubs;
-  }
-
-  window.getVisibleHubs = stableHubs18335;
-  window.getAllHubsV186 = fullHubs18335;
-  window.getStableHubsV18335 = stableHubs18335;
-  try { getVisibleHubs = stableHubs18335; } catch (e) {}
-
-  function openCode18335(id) {
-    id = esc18335(normHub18335(id));
-    return "(window.setTabV16 || window.setTab || setTab)('" + id + "')";
-  }
-  function navStrip18335(active) {
-    active = normHub18335(active);
-    return '<div class="v11-hub-tab-strip v18335-tab-strip" aria-label="Hub tab wheel"><div class="v11-hub-tab-scroll">' +
-      stableHubs18335().map(function (h) {
-        var id = normHub18335(h.id);
-        return '<button class="v11-tab-btn' + (id === active ? ' active' : '') + '" ' + (h.disabled ? 'disabled' : '') +
-          ' onclick="event.preventDefault();event.stopPropagation();' + openCode18335(id) + '">' +
-          '<span class="v11-tab-ico">' + esc18335(h.icon || "") + '</span><span class="v11-tab-lbl">' + esc18335(h.label || title18335(id)) + '</span></button>';
-      }).join("") + '</div></div>';
-  }
-  window.navStripV18335 = navStrip18335;
-
-  var previousOverlay18335 = window.renderHubOverlay || (typeof renderHubOverlay === "function" ? renderHubOverlay : null);
-  window.renderHubOverlay = function (hubId) {
-    var id = normHub18335(hubId);
-    if (id === "law") {
-      var content = "";
-      try {
-        content = typeof renderHubContent === "function" ? renderHubContent("law") : "";
-      } catch (e) {
-        content = '<section class="panel"><div class="section-label">Legal recovered</div><div class="row-sub">' + esc18335(e && (e.message || e) || "Law render error") + '</div></section>';
-      }
-      return '<div class="hub-overlay hub-law v16-hub v18335-law-overlay" data-hub-id="law" onclick="if(event.target===this)closeHub()">' +
-        '<div class="hub-sheet hub-sheet-law"><div class="hub-head"><h2>Legal</h2>' +
-        '<button class="hub-close v16-close" onclick="event.preventDefault();event.stopPropagation();closeHub()">x</button></div>' +
-        '<div class="v16-hub-body" data-hub-body="law">' + content + '</div>' + navStrip18335("law") + '</div></div>';
-    }
-    if (id === "business" || id === "entrepreneurship") {
-      var body = "";
-      try {
-        body = typeof renderHubContent === "function" ? renderHubContent(id) : "";
-      } catch (businessError) {
-        body = '<section class="panel"><div class="section-label">Render recovered</div><div class="row-sub">' + esc18335(businessError && (businessError.message || businessError) || "business render error") + '</div></section>';
-      }
-      return '<div class="hub-overlay hub-' + esc18335(id) + ' v16-hub v18335-business-overlay" data-hub-id="' + esc18335(id) + '" onclick="if(event.target===this)closeHub()">' +
-        '<div class="hub-sheet hub-sheet-' + esc18335(id) + '"><div class="hub-head"><h2>' + esc18335(title18335(id)) + '</h2>' +
-        '<button class="hub-close v16-close" onclick="event.preventDefault();event.stopPropagation();closeHub()">x</button></div>' +
-        '<div class="v16-hub-body" data-hub-body="' + esc18335(id) + '">' + body + '</div>' + navStrip18335(id) + '</div></div>';
-    }
-    if (typeof previousOverlay18335 === "function") return previousOverlay18335.apply(this, [id]);
-    var fallback = "";
-    try { fallback = typeof renderHubContent === "function" ? renderHubContent(id) : ""; } catch (e2) {
-      fallback = '<section class="panel"><div class="section-label">Render recovered</div><div class="row-sub">' + esc18335(e2 && (e2.message || e2) || "hub render error") + '</div></section>';
-    }
-    return '<div class="hub-overlay hub-' + esc18335(id) + '" onclick="if(event.target===this)closeHub()"><div class="hub-sheet hub-sheet-' + esc18335(id) + '"><div class="hub-head"><h2>' + esc18335(title18335(id)) + '</h2><button class="hub-close" onclick="closeHub()">x</button></div>' + fallback + navStrip18335(id) + '</div></div>';
-  };
-  try { renderHubOverlay = window.renderHubOverlay; } catch (e) {}
-
-  try {
-    var style = document.createElement("style");
-    style.textContent = ".v18335-tab-strip .v11-hub-tab-scroll{scrollbar-width:thin}.v18335-law-overlay .hub-head h2{letter-spacing:0}.v18335-law-overlay .hub-close{min-width:42px}";
-    document.head.appendChild(style);
-  } catch (e) {}
-
-  try {
-    if (state18335() && typeof render === "function") render();
-  } catch (e) {
-    try { console.warn("Ledger v18.33.5 nav refresh skipped", e); } catch (ignore) {}
-  }
-})();
-
-</script>
-<script data-source="pages/patches/15-patch-v18-33-6.js">
-/* LEDGER PATCH v18.33.6: readable seven-slot primary nav */
-(function () {
-  if (window.__ledgerPatch18336ReadablePrimaryNav) return;
-  window.__ledgerPatch18336ReadablePrimaryNav = true;
-
-  function esc18336(v) {
-    return String(v == null ? "" : v).replace(/[&<>"']/g, function (ch) {
-      return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch];
-    });
-  }
-  function state18336() {
-    try { if (typeof state !== "undefined") return state; } catch (e) {}
-    return window.state || null;
-  }
-  function n18336(v) {
-    v = Number(v);
-    return isFinite(v) ? v : 0;
-  }
-  function norm18336(id) {
-    id = String(id || "").toLowerCase();
-    if (id === "life") return "lifehub";
-    if (id === "stocks") return "brokerage";
-    if (id === "legal" || id === "lawoffice" || id === "law-office" || id === "taxlaw") return "law";
-    if (id === "education") return "school";
-    if (id === "networth" || id === "network") return "finance";
-    return id || "lifehub";
-  }
-  function schoolRelevant18336(s) {
-    s = s || {};
-    var flags = s.flags || {};
-    var education = s.education || {};
-    var edu25 = s.educationV1825 || {};
-    var edu27 = s.educationV1827 || {};
-    var age = n18336(s.age);
-    return age < 22 || !!flags.inCollege || !!flags.inSchool || !!s.inCollege || !!s.inSchool ||
-      !!education.inCollege || !!education.inSchool || !!education.enrolled ||
-      !!edu25.active || !!edu25.activeDegree || !!edu27.active || !!edu27.activeDegree;
-  }
-  function hub18336(id, icon, label) {
-    return { id:norm18336(id), icon:icon, label:label };
-  }
-  function hubMap18336() {
-    return {
-      lifehub: hub18336("lifehub", "📖", "Life"),
-      people: hub18336("people", "👥", "People"),
-      school: hub18336("school", "🎓", "Education"),
-      career: hub18336("career", "💼", "Job"),
-      finance: hub18336("finance", "📊", "Finance"),
-      money: hub18336("money", "💰", "Money"),
-      brokerage: hub18336("brokerage", "📈", "Stocks"),
-      business: hub18336("business", "🏢", "Business"),
-      law: hub18336("law", "⚖", "Legal"),
-      health: hub18336("health", "❤", "Health"),
-      home: hub18336("home", "⌂", "Real Estate"),
-      vehicles: hub18336("vehicles", "🚗", "Vehicles"),
-      stats: hub18336("stats", "▦", "Stats"),
-      more: hub18336("more", "...", "More")
-    };
-  }
-  function primaryHubs18336() {
-    var map = hubMap18336();
-    var s = state18336() || {};
-    var middle = schoolRelevant18336(s) ? "school" : "career";
-    return ["lifehub", "people", middle, "finance", "money", "law", "more"].map(function (id) { return map[id]; });
-  }
-  function allHubs18336() {
-    var map = hubMap18336();
-    return ["lifehub", "people", "school", "career", "finance", "money", "brokerage", "business", "law", "health", "home", "vehicles", "stats", "more"].map(function (id) { return map[id]; });
-  }
-  function nav18336(active) {
-    active = norm18336(active);
-    return '<div class="v11-hub-tab-strip v18336-tab-strip" aria-label="Hub tab wheel"><div class="v11-hub-tab-scroll">' +
-      primaryHubs18336().map(function (h) {
-        var id = norm18336(h.id);
-        return '<button class="v11-tab-btn' + (id === active ? ' active' : '') + '" onclick="event.preventDefault();event.stopPropagation();(window.setTabV16||window.setTab||setTab)(\'' + esc18336(id) + '\')"><span class="v11-tab-ico">' + esc18336(h.icon || "") + '</span><span class="v11-tab-lbl">' + esc18336(h.label || id) + '</span></button>';
-      }).join("") + '</div></div>';
-  }
-
-  window.getVisibleHubs = primaryHubs18336;
-  window.getAllHubsV186 = allHubs18336;
-  window.getStableHubsV18336 = primaryHubs18336;
-  try { getVisibleHubs = primaryHubs18336; } catch (e) {}
-
-  var previousOverlay18336 = window.renderHubOverlay || (typeof renderHubOverlay === "function" ? renderHubOverlay : null);
-  window.renderHubOverlay = function (hubId) {
-    var id = norm18336(hubId);
-    if (id === "law") {
-      var content = "";
-      try { content = typeof renderHubContent === "function" ? renderHubContent("law") : ""; }
-      catch (e) { content = '<section class="panel"><div class="section-label">Legal recovered</div><div class="row-sub">' + esc18336(e && (e.message || e) || "Law render error") + '</div></section>'; }
-      return '<div class="hub-overlay hub-law v16-hub v18336-law-overlay" data-hub-id="law" onclick="if(event.target===this)closeHub()"><div class="hub-sheet hub-sheet-law"><div class="hub-head"><h2>Legal</h2><button class="hub-close v16-close" onclick="event.preventDefault();event.stopPropagation();closeHub()">x</button></div><div class="v16-hub-body" data-hub-body="law">' + content + '</div>' + nav18336("law") + '</div></div>';
-    }
-    return typeof previousOverlay18336 === "function" ? previousOverlay18336.apply(this, [id]) : "";
-  };
-  try { renderHubOverlay = window.renderHubOverlay; } catch (e) {}
-
-  try {
-    var style = document.createElement("style");
-    style.textContent = [
-      ".bottom-nav{display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:4px!important;overflow:visible!important;scroll-snap-type:none!important;padding:6px!important;box-sizing:border-box!important;width:100%!important}",
-      ".bottom-nav::-webkit-scrollbar{display:none!important}",
-      ".bottom-nav .nav-btn{flex:1 1 auto!important;min-width:0!important;width:auto!important;scroll-snap-align:none!important;padding:8px 1px!important;gap:3px!important;overflow:hidden!important}",
-      ".bottom-nav .nav-btn .nav-icon{font-size:12px!important;line-height:1!important;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:clip}",
-      ".bottom-nav .nav-btn .nav-label{font-size:7px!important;letter-spacing:0!important;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:clip}",
-      ".v18336-tab-strip .v11-hub-tab-scroll{display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:6px!important;overflow:visible!important}",
-      ".v18336-tab-strip .v11-tab-btn{min-width:0!important;flex:1 1 auto!important}.v18336-tab-strip .v11-tab-lbl{letter-spacing:0!important}"
-    ].join("\n");
-    document.head.appendChild(style);
-  } catch (e2) {}
-
-  try { if (state18336() && typeof render === "function") render(); } catch (e3) {}
-})();
-
-</script>
-<script data-source="pages/patches/16-patch-v18-33-7.js">
-/* LEDGER PATCH v18.33.7: splash Enter opens Life Stack, not a random active save */
-(function () {
-  if (window.__ledgerPatch18337SplashStackGate) return;
-  window.__ledgerPatch18337SplashStackGate = true;
-
-  function state18337() {
-    try { if (typeof state !== "undefined") return state; } catch (e) {}
-    try { return window.state; } catch (e2) {}
-    return null;
-  }
-  function setState18337(next) {
-    try { state = next; } catch (e) {}
-    try { window.state = next; } catch (e2) {}
-    return next;
-  }
-  function validLife18337(s) {
-    var name = s && typeof s.name === "string" ? s.name.trim() : "";
-    var age = Number(s && s.age);
-    return !!(s && typeof s === "object" && name && name !== "undefined" && name !== "null" && Number.isFinite(age) && age >= 0 && age < 130 && (s.alive === true || s.alive === false));
-  }
-  function partialLife18337(s) {
-    if (!s || typeof s !== "object") return false;
-    if (validLife18337(s)) return false;
-    if (s.alive !== true) return true;
-    if (!s.name || !Number.isFinite(Number(s.age))) return true;
-    return false;
-  }
-  function storePartial18337(reason) {
-    var s = state18337();
-    if (!partialLife18337(s)) return false;
-    try {
-      localStorage.setItem("ledger_v18337_startup_partial_state", JSON.stringify({ at:Date.now(), reason:reason || "startup", state:s }));
-    } catch (e) {}
-    setState18337(null);
-    try { tab = "life"; introMode = "main"; } catch (e2) {}
-    return true;
-  }
-
-  // Run before the older v18.33.4 zero-delay recovery timer can auto-pick the active slot.
-  storePartial18337("startup before splash/menu");
-
-  var previousRender18337 = window.render || (typeof render === "function" ? render : null);
-  if (typeof previousRender18337 === "function" && !previousRender18337.__ledger18337Wrapped) {
-    window.render = function () {
-      if (partialLife18337(state18337())) storePartial18337("render gate");
-      return previousRender18337.apply(this, arguments);
-    };
-    window.render.__ledger18337Wrapped = true;
-    try { render = window.render; } catch (e) {}
-  }
-
-  var previousEnter18337 = window.enterFromSplash || (typeof enterFromSplash === "function" ? enterFromSplash : null);
-  window.enterFromSplash = function () {
-    storePartial18337("splash enter");
-    try {
-      if (Array.isArray(splashTimers)) {
-        splashTimers.forEach(function (t) { try { clearInterval(t); clearTimeout(t); } catch (e) {} });
-        splashTimers = [];
-      }
-    } catch (e2) {}
-    var root = null;
-    try { root = document.getElementById("splash-root"); } catch (e3) {}
-    function openStack() {
-      try { splashShown = true; introMode = "main"; tab = "life"; } catch (e4) {}
-      setState18337(null);
-      try { if (typeof render === "function") render(); } catch (e5) {}
-    }
-    if (root) {
-      try { root.classList.add("fading"); } catch (e6) {}
-      setTimeout(openStack, 180);
-    } else {
-      openStack();
-    }
-  };
-  window.enterFromSplash.__ledger18337Wrapped = true;
-  try { enterFromSplash = window.enterFromSplash; } catch (e) {}
-
-  document.addEventListener("keydown", function (event) {
-    if (!event || event.key !== "Enter") return;
-    var s = state18337();
-    if (s) return;
-    var target = event.target || {};
-    var tag = String(target.tagName || "").toLowerCase();
-    var id = String(target.id || "");
-    var inBuilder = id === "name" || id === "city" || id.indexOf("sb-") === 0 || tag === "select" || tag === "input";
-    if (inBuilder) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-  }, true);
-})();
-
-</script>
+<!-- Retired 2026-06-28: pages/patches/11-patch-v18-33-2.js moved into pages/systems/save-recovery.js and pages/systems/scroll-nav.js. -->
+<!-- Retired 2026-06-28: pages/patches/12-patch-v18-33-3.js moved into pages/systems/life-command.js. -->
+<!-- Retired 2026-06-28: pages/patches/13-patch-v18-33-4.js moved into pages/systems/save-recovery.js. -->
+<!-- Retired 2026-06-28: pages/patches/14-patch-v18-33-5.js moved into pages/systems/scroll-nav.js. -->
+<!-- Retired 2026-06-28: pages/patches/15-patch-v18-33-6.js moved into pages/systems/scroll-nav.js. -->
+<!-- Retired 2026-06-28: pages/patches/16-patch-v18-33-7.js moved into pages/systems/save-recovery.js. -->
 <script data-source="state/state-map.js">
 /* Ledger state map.
    This documents the current global state shape before deeper refactoring. */
@@ -48198,7 +47062,7 @@ getSuggestedActions = function(s) {
 })();
 
 </script>
-<script data-source="pages/systems/save-recovery.js">
+<script data-source="pages/systems/save-recovery.js?v=20260628-recovery2">
 /* Save / recovery system bridge plus play-page boot guard. */
 (function () {
   var SYSTEM_META = {
@@ -48206,7 +47070,7 @@ getSuggestedActions = function(s) {
     file: "pages/systems/save-recovery.js",
     status: "active-boot-guard",
     globals: ["save", "loadFromSlot", "pickSlot", "recoverLedgerSlotV18334", "enterFromSplash"],
-    nextMove: "Move slot loading, recovery picker, and Wayback save reads fully out of the legacy runtime."
+    nextMove: "Move the remaining slot loading code fully out of the legacy runtime."
   };
 
   if (window.registerLedgerSystem) window.registerLedgerSystem(SYSTEM_META);
@@ -48278,6 +47142,17 @@ getSuggestedActions = function(s) {
     return s;
   }
 
+  function activeSlotIndex() {
+    try {
+      var direct = Number(activeSlot);
+      if (Number.isFinite(direct) && direct >= 1) return clampSlot(direct);
+    } catch (e) {}
+    try {
+      return clampSlot(localStorage.getItem("ledger-active-slot") || 1);
+    } catch (e2) {}
+    return 1;
+  }
+
   function storeBadState(reason, s) {
     try {
       localStorage.setItem("ledger_v1835_blocked_startup_state", JSON.stringify({
@@ -48286,6 +47161,134 @@ getSuggestedActions = function(s) {
         state: s || getState()
       }));
     } catch (e) {}
+  }
+
+  function readRecoverySave(label, key, slot, priority) {
+    var data = null;
+    try { data = parse(localStorage.getItem(key)); } catch (e) {}
+    if (data && data.state && typeof data.state === "object") data = data.state;
+    if (!validLife(data)) return null;
+    return { label: label, key: key, slot: slot || null, priority: priority || 0, state: normalizeLife(data) };
+  }
+
+  function recoveryChoices() {
+    var active = activeSlotIndex();
+    var out = [];
+    var seen = {};
+    function push(choice) {
+      if (!choice || !choice.state) return;
+      var id = String(choice.key || "") + "|" + String(choice.state.name || "") + "|" + String(choice.state.age);
+      if (seen[id]) return;
+      seen[id] = true;
+      out.push(choice);
+    }
+    push(readRecoverySave("active slot " + active, slotKeyFor(active), active, 10000));
+    push(readRecoverySave("active backup slot " + active, "ledger-v1826-backup-slot-" + active, active, 9000));
+    push(readRecoverySave("last good backup", "ledger_v1832_last_good_state", active, 8000));
+    for (var i = 1; i <= 5; i++) {
+      push(readRecoverySave("slot " + i, slotKeyFor(i), i, i === active ? 7000 : 1000 - i));
+      push(readRecoverySave("backup slot " + i, "ledger-v1826-backup-slot-" + i, i, i === active ? 6000 : 500 - i));
+    }
+    out.sort(function (a, b) { return (b.priority || 0) - (a.priority || 0); });
+    return out;
+  }
+
+  function loadRecoveryChoice(choice, silent) {
+    if (!choice || !validLife(choice.state)) return false;
+    var next = null;
+    try { next = normalizeLife(JSON.parse(JSON.stringify(choice.state))); } catch (e) {}
+    if (!validLife(next)) return false;
+    setState(next);
+    if (choice.slot) {
+      try { activeSlot = choice.slot; } catch (e2) {}
+      try { localStorage.setItem("ledger-active-slot", String(choice.slot)); } catch (e3) {}
+      try { localStorage.setItem(slotKeyFor(choice.slot), JSON.stringify(next)); } catch (e4) {}
+    }
+    try { if (typeof ensureStateShape === "function") ensureStateShape(); } catch (e5) {}
+    try { if (typeof save === "function") save(); } catch (e6) {}
+    if (!silent) {
+      try { if (typeof addToast === "function") addToast("Loaded " + (next.name || "life") + " from " + choice.label + "."); } catch (e7) {}
+    }
+    return true;
+  }
+
+  function currentSlotIsPartial() {
+    var raw = null;
+    var parsed = null;
+    try { raw = localStorage.getItem(slotKeyFor(activeSlotIndex())); } catch (e) {}
+    parsed = parse(raw);
+    if (parsed && parsed.state) parsed = parsed.state;
+    return partialLife(parsed);
+  }
+
+  function showRecovery(reason) {
+    var el = app();
+    if (!el) return;
+    var choices = recoveryChoices();
+    window.__ledgerRecoverChoicesV18334 = choices;
+    var active = activeSlotIndex();
+    var rows = choices.length ? choices.map(function (choice, idx) {
+      var s = choice.state || {};
+      var activeTag = choice.slot === active ? " - ACTIVE" : "";
+      return '<button class="secondary v18334-recover-choice" onclick="event.preventDefault();event.stopPropagation();recoverLedgerSlotV18334(' + idx + ')"><b>' + esc(s.name || "Unnamed life") + '</b><span>Age ' + esc(s.age) + ' - ' + esc(choice.label) + activeTag + '</span></button>';
+    }).join("") : '<div class="row-sub">No readable saves were found. Return to Life Stack will clear only the broken in-memory state.</div>';
+    el.innerHTML = '<div class="masthead"><div class="title">The Ledger</div><div class="vol">Recovery</div></div>' +
+      '<section class="panel v18334-recovery"><div class="section-label">Save Recovery</div>' +
+      '<div class="row-title">A partial life was stopped before it became a fake character.</div>' +
+      '<div class="row-sub">The active slot is checked first. Pick the life you want, or return to the life stack without saving the broken state.</div>' +
+      (reason ? '<div class="row-sub">Reason: ' + esc(reason) + '</div>' : '') +
+      '<div class="row-sub">Active slot: ' + esc(active) + '</div>' + rows +
+      '<div class="mini-actions" style="justify-content:flex-start;margin-top:12px;gap:8px">' +
+      '<button class="secondary" style="width:auto;margin-top:0;padding:12px 16px" onclick="event.preventDefault();event.stopPropagation();clearPartialLedgerStateV18334()">Return To Life Stack</button>' +
+      '</div></section>';
+  }
+
+  function autoRecoverActive() {
+    var active = activeSlotIndex();
+    var activeChoice = readRecoverySave("active slot " + active, slotKeyFor(active), active, 10000);
+    if (activeChoice && loadRecoveryChoice(activeChoice, true)) return true;
+    var backup = readRecoverySave("active backup slot " + active, "ledger-v1826-backup-slot-" + active, active, 9000);
+    return !!(backup && loadRecoveryChoice(backup, true));
+  }
+
+  window.recoverLedgerSlotV18334 = function (idx) {
+    var choices = window.__ledgerRecoverChoicesV18334 || recoveryChoices();
+    var choice = choices[Math.max(0, Math.round(Number(idx) || 0))];
+    if (!loadRecoveryChoice(choice, false)) return showRecovery("selected save was not readable");
+    try { if (typeof render === "function") render(); } catch (e) { try { location.reload(); } catch (ignore) {} }
+  };
+
+  window.clearPartialLedgerStateV18334 = function () {
+    var s = getState();
+    try { if (partialLife(s)) localStorage.setItem("ledger_v18334_corrupt_state", JSON.stringify(s)); } catch (e) {}
+    if (currentSlotIsPartial()) {
+      try { localStorage.removeItem(slotKeyFor(activeSlotIndex())); } catch (e2) {}
+    }
+    setState(null);
+    try { tab = "lifehub"; introMode = "main"; } catch (e3) {}
+    try { if (typeof render === "function") render(); } catch (e4) { try { location.reload(); } catch (ignore) {} }
+  };
+
+  window.recoverLedgerSlotV18332 = window.recoverLedgerSlotV18334;
+  window.clearPartialLedgerStateV18332 = window.clearPartialLedgerStateV18334;
+  try {
+    recoverLedgerSlotV18332 = window.recoverLedgerSlotV18332;
+    clearPartialLedgerStateV18332 = window.clearPartialLedgerStateV18332;
+  } catch (e) {}
+
+  function storePartialStartup(reason) {
+    var s = getState();
+    if (!partialLife(s)) return false;
+    try {
+      localStorage.setItem("ledger_v18337_startup_partial_state", JSON.stringify({
+        at: Date.now(),
+        reason: reason || "startup",
+        state: s
+      }));
+    } catch (e) {}
+    setState(null);
+    try { tab = "life"; introMode = "main"; } catch (e2) {}
+    return true;
   }
 
   function clearPatchGhosts(reason) {
@@ -48381,14 +47384,47 @@ getSuggestedActions = function(s) {
   var previousRender = window.render || (typeof render === "function" ? render : null);
   if (typeof previousRender === "function" && !previousRender.__ledger1835BootGuard) {
     window.render = function () {
-      if (clearPatchGhosts("render blocked partial life")) {
-        showLandingReturn("A partial startup state was blocked before it could become a random character.");
+      if (partialLife(getState())) {
+        if (autoRecoverActive()) return previousRender.apply(this, arguments);
+        showRecovery("partial state cannot be rendered as a life");
         return;
       }
       return previousRender.apply(this, arguments);
     };
     window.render.__ledger1835BootGuard = true;
     try { render = window.render; } catch (e) {}
+  }
+
+  var previousDeath = window.renderDeath || (typeof renderDeath === "function" ? renderDeath : null);
+  if (typeof previousDeath === "function" && !previousDeath.__ledger1835RecoveryGuard) {
+    window.renderDeath = function () {
+      var s = getState();
+      if (partialLife(s) || (s && !validLife(s))) {
+        showRecovery("death screen blocked missing name/age/cause");
+        return;
+      }
+      var result = previousDeath.apply(this, arguments);
+      try {
+        var html = app() ? app().innerHTML : "";
+        if (/undefined|NaN/.test(html)) showRecovery("death screen contained undefined values");
+      } catch (e) {}
+      return result;
+    };
+    window.renderDeath.__ledger1835RecoveryGuard = true;
+    try { renderDeath = window.renderDeath; } catch (e2) {}
+  }
+
+  var previousSave = window.save || (typeof save === "function" ? save : null);
+  if (typeof previousSave === "function" && !previousSave.__ledger1835RecoveryGuard) {
+    window.save = function () {
+      if (partialLife(getState())) {
+        try { localStorage.setItem("ledger_v1835_blocked_bad_save", JSON.stringify(getState())); } catch (e) {}
+        return false;
+      }
+      return previousSave.apply(this, arguments);
+    };
+    window.save.__ledger1835RecoveryGuard = true;
+    try { save = window.save; } catch (e3) {}
   }
 
   var previousPickSlot = window.pickSlot || (typeof pickSlot === "function" ? pickSlot : null);
@@ -48403,9 +47439,54 @@ getSuggestedActions = function(s) {
   };
   try { pickSlot = window.pickSlot; } catch (e3) {}
 
+  storePartialStartup("startup before splash/menu");
+
+  var previousEnter = window.enterFromSplash || (typeof enterFromSplash === "function" ? enterFromSplash : null);
+  window.enterFromSplash = function () {
+    storePartialStartup("splash enter");
+    try {
+      if (Array.isArray(splashTimers)) {
+        splashTimers.forEach(function (timer) {
+          try { clearInterval(timer); clearTimeout(timer); } catch (e) {}
+        });
+        splashTimers = [];
+      }
+    } catch (e2) {}
+    function openStack() {
+      try { splashShown = true; introMode = "main"; tab = "life"; } catch (e3) {}
+      setState(null);
+      try { if (typeof render === "function") render(); } catch (e4) {
+        if (typeof previousEnter === "function") return previousEnter.apply(window, arguments);
+      }
+    }
+    var root = null;
+    try { root = document.getElementById("splash-root"); } catch (e5) {}
+    if (root) {
+      try { root.classList.add("fading"); } catch (e6) {}
+      setTimeout(openStack, 180);
+    } else {
+      openStack();
+    }
+  };
+  window.enterFromSplash.__ledger18337Wrapped = true;
+  try { enterFromSplash = window.enterFromSplash; } catch (e7) {}
+
+  document.addEventListener("keydown", function (event) {
+    if (!event || event.key !== "Enter") return;
+    if (getState()) return;
+    var target = event.target || {};
+    var tag = String(target.tagName || "").toLowerCase();
+    var id = String(target.id || "");
+    var inBuilder = id === "name" || id === "city" || id.indexOf("sb-") === 0 || tag === "select" || tag === "input";
+    if (inBuilder) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }, true);
+
   try {
     var style = document.createElement("style");
-    style.textContent = ".v1835-boot-return{border-color:rgba(126,160,172,.44)!important;background:linear-gradient(135deg,rgba(22,38,42,.96),rgba(35,28,22,.96))!important}";
+    style.textContent = ".v1835-boot-return{border-color:rgba(126,160,172,.44)!important;background:linear-gradient(135deg,rgba(22,38,42,.96),rgba(35,28,22,.96))!important}.v18334-recovery{border-color:rgba(233,146,125,.55)!important;background:linear-gradient(135deg,rgba(56,25,22,.96),rgba(29,25,20,.98))!important}.v18334-recover-choice{display:block;width:100%;text-align:left;margin-top:8px}.v18334-recover-choice b{display:block;color:var(--ink)}.v18334-recover-choice span{display:block;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);margin-top:4px}";
     document.head.appendChild(style);
   } catch (e4) {}
 
@@ -48756,7 +47837,7 @@ getSuggestedActions = function(s) {
 })();
 
 </script>
-<script data-source="pages/systems/life-command.js">
+<script data-source="pages/systems/life-command.js?v=20260628-wayback1">
 /* Ledger system v18.44: richer Life home and Life hub command surfaces. */
 (function () {
   if (window.__ledgerLifeCommandV1844Loaded) return;
@@ -48800,6 +47881,190 @@ getSuggestedActions = function(s) {
     if (abs >= 10000) return sign + "$" + Math.round(abs / 1000) + "K";
     return sign + "$" + abs.toLocaleString();
   }
+
+  function copyV18333(obj) {
+    try { if (typeof structuredClone === "function") return structuredClone(obj); } catch (e) {}
+    try { return JSON.parse(JSON.stringify(obj)); } catch (e2) { return null; }
+  }
+
+  function activeSlotV18333() {
+    var idx = 1;
+    try { idx = Number(activeSlot) || 1; } catch (e) {}
+    return Math.max(1, Math.min(Number(window.NUM_SLOTS || 5) || 5, Math.round(idx)));
+  }
+
+  function slotKeyV18333(idx) {
+    try { if (typeof slotKey === "function") return slotKey(idx); } catch (e) {}
+    return "ledger-life-slot-" + idx;
+  }
+
+  function syncStateV18333(s) {
+    if (!s) return null;
+    window.state = s;
+    try { state = s; } catch (e) {}
+    try { if (typeof ensureStateShape === "function") ensureStateShape(); } catch (e2) {}
+    if (!Array.isArray(s.timeSnapshotsV1814)) s.timeSnapshotsV1814 = [];
+    if (!s.saveHealthV1826) s.saveHealthV1826 = { backups: 0, repairs: 0, lastBackupAt: 0 };
+    return s;
+  }
+
+  function ensureStateV18333() {
+    var s = getStateV1844();
+    if (!s) return null;
+    return syncStateV18333(s);
+  }
+
+  function saveSlotV18333(idx, s) {
+    idx = Math.max(1, Math.min(Number(window.NUM_SLOTS || 5) || 5, Math.round(numberV1844(idx) || activeSlotV18333())));
+    s = syncStateV18333(s || ensureStateV18333());
+    if (!s) return false;
+    try { localStorage.setItem(slotKeyV18333(idx), JSON.stringify(s)); } catch (e) { return false; }
+    try { localStorage.setItem("ledger-active-slot", String(idx)); } catch (e2) {}
+    try { activeSlot = idx; } catch (e3) {}
+    return true;
+  }
+
+  function renderNowV18333() {
+    try { if (typeof render === "function") render(); } catch (e) {}
+  }
+
+  function netWorthV18333(s) {
+    s = s || {};
+    try { if (typeof legacyNetWorth === "function") return legacyNetWorth(s); } catch (e) {}
+    return netWorthV1844(s);
+  }
+
+  function snapshotV18333(s) {
+    s = s || ensureStateV18333();
+    if (!s) return null;
+    var snap = copyV18333(s);
+    if (!snap) return null;
+    delete snap.pending;
+    delete snap.activeModal;
+    delete snap.timeSnapshotsV1814;
+    return snap;
+  }
+
+  function sortedSnapshotsV18333(s) {
+    s = s || ensureStateV18333();
+    var snaps = Array.isArray(s && s.timeSnapshotsV1814) ? s.timeSnapshotsV1814 : [];
+    return snaps.map(function (item, idx) {
+      item = item || {};
+      var copy = {};
+      Object.keys(item).forEach(function (key) { copy[key] = item[key]; });
+      copy.__idx = idx;
+      return copy;
+    }).reverse();
+  }
+
+  function toastV18333(message) {
+    try { if (typeof addToast === "function") return addToast(message); } catch (e) {}
+    try { if (typeof addLog === "function") return addLog(message, {}); } catch (e2) {}
+  }
+
+  function logV18333(message, deltas) {
+    try { if (typeof addLog === "function") return addLog(message, deltas || {}); } catch (e) {}
+  }
+
+  function labelV18333(item, fallback) {
+    return item && (item.label || item.reason || item.name) || fallback || "Checkpoint";
+  }
+
+  window.createWaybackCheckpointV18333 = function (label) {
+    var s = ensureStateV18333();
+    if (!s) return toastV18333("Open a life before saving a Wayback checkpoint.");
+    var snap = snapshotV18333(s);
+    if (!snap) return toastV18333("Could not create a Wayback checkpoint.");
+    s.timeSnapshotsV1814.push({
+      id: Date.now(),
+      age: s.age || 0,
+      at: Date.now(),
+      label: label || "Manual checkpoint",
+      netWorth: netWorthV18333(s),
+      state: snap
+    });
+    s.timeSnapshotsV1814 = s.timeSnapshotsV1814.slice(-18);
+    logV18333("Saved Wayback checkpoint at age " + (s.age || 0) + ".", {});
+    saveSlotV18333(activeSlotV18333(), s);
+    renderNowV18333();
+  };
+
+  window.restoreWaybackIndexV18333 = function (displayIndex) {
+    var current = ensureStateV18333();
+    if (!current) return toastV18333("Open a life before restoring a Wayback checkpoint.");
+    var shown = sortedSnapshotsV18333(current);
+    var shownItem = shown[Math.round(numberV1844(displayIndex))];
+    if (!shownItem || shownItem.__idx == null) return toastV18333("That Wayback checkpoint is not readable.");
+    var originalIndex = shownItem.__idx;
+    var item = current.timeSnapshotsV1814[originalIndex];
+    var restored = copyV18333(item && item.state);
+    if (!restored) return toastV18333("That Wayback checkpoint is damaged.");
+    restored.timeSnapshotsV1814 = current.timeSnapshotsV1814.slice(0, originalIndex).concat(current.timeSnapshotsV1814.slice(originalIndex + 1));
+    syncStateV18333(restored);
+    saveSlotV18333(activeSlotV18333(), restored);
+    toastV18333("Wayback restored this life to age " + (restored.age == null ? "?" : restored.age) + ".");
+    renderNowV18333();
+  };
+
+  window.deleteWaybackIndexV18333 = function (displayIndex) {
+    var s = ensureStateV18333();
+    if (!s) return;
+    var shown = sortedSnapshotsV18333(s);
+    var item = shown[Math.round(numberV1844(displayIndex))];
+    if (!item || item.__idx == null) return;
+    s.timeSnapshotsV1814.splice(item.__idx, 1);
+    saveSlotV18333(activeSlotV18333(), s);
+    renderNowV18333();
+  };
+
+  window.waybackLifeSlotV18333 = function (idx) {
+    idx = Math.max(1, Math.min(Number(window.NUM_SLOTS || 5) || 5, Math.round(numberV1844(idx) || activeSlotV18333())));
+    var raw = null;
+    try { raw = localStorage.getItem(slotKeyV18333(idx)); } catch (e) {}
+    if (!raw) return toastV18333("No saved life in slot " + idx + ".");
+    var saved = null;
+    try { saved = JSON.parse(raw); } catch (e2) {}
+    if (!saved) return toastV18333("Slot " + idx + " could not be read.");
+    var snaps = Array.isArray(saved.timeSnapshotsV1814) ? saved.timeSnapshotsV1814 : [];
+    if (!snaps.length) {
+      var fresh = snapshotV18333(saved);
+      if (fresh) {
+        saved.timeSnapshotsV1814 = [{
+          id: Date.now(),
+          age: saved.age || 0,
+          at: Date.now(),
+          label: "Starting checkpoint",
+          netWorth: netWorthV18333(saved),
+          state: fresh
+        }];
+        try { localStorage.setItem(slotKeyV18333(idx), JSON.stringify(saved)); } catch (e3) {}
+      }
+      return toastV18333("Slot " + idx + " has no older checkpoint yet. I saved one for next time.");
+    }
+    var item = snaps[snaps.length - 1];
+    var restored = copyV18333(item && item.state);
+    if (!restored) return toastV18333("The latest checkpoint in slot " + idx + " is damaged.");
+    restored.timeSnapshotsV1814 = snaps.slice(0, -1);
+    syncStateV18333(restored);
+    saveSlotV18333(idx, restored);
+    toastV18333("Wayback restored slot " + idx + " to age " + (restored.age == null ? "?" : restored.age) + ".");
+    renderNowV18333();
+  };
+
+  window.createWaybackCheckpointV1826 = window.createWaybackCheckpointV18333;
+  window.restoreWaybackIndexV1826 = window.restoreWaybackIndexV18333;
+  window.deleteWaybackIndexV1826 = window.deleteWaybackIndexV18333;
+  window.createWaybackCheckpointV1823 = window.createWaybackCheckpointV18333;
+  window.waybackLifeSlotV1823 = window.waybackLifeSlotV18333;
+  window.waybackLifeSlotV1820 = window.waybackLifeSlotV18333;
+  try {
+    createWaybackCheckpointV1826 = window.createWaybackCheckpointV1826;
+    restoreWaybackIndexV1826 = window.restoreWaybackIndexV1826;
+    deleteWaybackIndexV1826 = window.deleteWaybackIndexV1826;
+    createWaybackCheckpointV1823 = window.createWaybackCheckpointV1823;
+    waybackLifeSlotV1823 = window.waybackLifeSlotV1823;
+    waybackLifeSlotV1820 = window.waybackLifeSlotV1820;
+  } catch (e) {}
 
   function stageV1844(s) {
     try {
@@ -49314,6 +48579,25 @@ getSuggestedActions = function(s) {
     '</div>';
   }
 
+  function renderWaybackPanelV18333() {
+    var s = ensureStateV18333();
+    var rows = "";
+    var count = 0;
+    if (s) {
+      var shown = sortedSnapshotsV18333(s);
+      count = shown.length;
+      rows = shown.length ? shown.map(function (item, displayIdx) {
+        var age = item.age == null ? "?" : item.age;
+        var when = item.at ? new Date(item.at).toLocaleString() : "saved";
+        var net = item.netWorth ? " - net " + moneyV1844(item.netWorth) : "";
+        return '<div class="v18333-wayback-row"><div><b>' + escapeV1844(labelV18333(item, "Checkpoint")) + '</b><span>Age ' + escapeV1844(age) + ' - ' + escapeV1844(when) + escapeV1844(net) + '</span></div><div class="v18333-wayback-actions"><button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();restoreWaybackIndexV18333(' + displayIdx + ')">Restore</button><button class="money-btn red" onclick="event.preventDefault();event.stopPropagation();deleteWaybackIndexV18333(' + displayIdx + ')">Delete</button></div></div>';
+      }).join("") : '<div class="v18333-wayback-empty">No checkpoints yet. Hit Save Checkpoint before risky choices, or age up once to create an automatic rewind point.</div>';
+    } else {
+      rows = '<div class="v18333-wayback-empty">Open or continue a life to use Wayback.</div>';
+    }
+    return '<section class="money-section v18333-wayback"><div class="money-section-title">Wayback Machine <span>' + count + ' checkpoints</span></div><div class="money-row"><div><div class="money-row-title">Restore this life from a checkpoint</div><div class="money-row-sub">Newest checkpoints show first. Restore updates the active slot immediately, so the age and money should change right away.</div></div><div class="bank-actions-row"><button class="money-btn green" onclick="event.preventDefault();event.stopPropagation();createWaybackCheckpointV18333(\'Manual checkpoint\')" ' + (!s ? "disabled" : "") + '>Save Checkpoint</button><button class="money-btn gold" onclick="event.preventDefault();event.stopPropagation();waybackLifeSlotV18333(activeSlot)" ' + (!count ? "disabled" : "") + '>Restore Latest</button></div></div><div class="v18333-wayback-list">' + rows + '</div></section>';
+  }
+
   function removeSectionByClassV1844(html, className) {
     html = String(html || "");
     var idx = html.indexOf(className);
@@ -49381,9 +48665,10 @@ getSuggestedActions = function(s) {
       if (id === "lifehub" || id === "life" || id === "stack" || id === "life-stack") {
         html = cleanLifeHubHtmlV1844(html);
         if (String(html).indexOf("lifehub-command-v1844") < 0) {
-          return renderLifeHubCommandV1844() + html;
+          return renderLifeHubCommandV1844() + renderWaybackPanelV18333() + html;
         }
       }
+      if (id === "more") return renderWaybackPanelV18333() + cleanLifeHubHtmlV1844(html);
       return html;
     };
     wrapped.__v1844LifeCommandHub = true;
@@ -49411,6 +48696,7 @@ getSuggestedActions = function(s) {
       ".life-v1844-meter{height:7px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;margin-top:10px}.life-v1844-meter span{display:block;height:100%;border-radius:999px}.life-v1844-meter.good span{background:#b9dc8a}.life-v1844-meter.warn span{background:#f2c978}.life-v1844-meter.bad span{background:#e9927d}",
       ".lifehub-command-v1844{display:grid;gap:12px;margin-bottom:14px}.life-v1844-hub-hero{grid-template-columns:minmax(0,1fr) minmax(170px,230px);border:1px solid rgba(126,160,172,.36);border-radius:16px;background:linear-gradient(135deg,rgba(17,38,38,.82),rgba(31,25,18,.88));padding:15px}.life-v1844-hub-hero h2{margin:6px 0;color:#fff3df;font-size:34px;line-height:1;letter-spacing:0}.life-v1844-hub-grid{margin-bottom:0}.life-v1844-hub-two{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.life-v1844-timeline-item,.life-v1844-memory{border-top:1px solid rgba(255,255,255,.08);padding:10px 0}.life-v1844-timeline-item:first-of-type,.life-v1844-memory:first-of-type{border-top:0}.life-v1844-timeline-item span,.life-v1844-memory span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.12em;font-size:9px}.life-v1844-timeline-item b,.life-v1844-memory b{display:block;color:#f6ead8;line-height:1.25;margin-top:3px}.life-v1844-empty{color:#cdbf9f;font-family:'JetBrains Mono',monospace;font-size:11px}",
       ".life-v1844-tool-desk{border:1px solid rgba(216,173,109,.24);border-radius:15px;background:linear-gradient(135deg,rgba(42,31,18,.68),rgba(16,35,36,.62));padding:13px}.life-v1844-tool-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:9px}.life-v1844-tool-card{border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(0,0,0,.18);padding:11px;min-width:0}.life-v1844-tool-card h3{margin:0 0 5px;color:#fff3df;font-size:18px;line-height:1.05}.life-v1844-tool-card p{margin:0 0 10px;color:#cdbf9f;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.35}.life-v1844-tool-row{display:flex;flex-wrap:wrap;gap:7px}.life-v1844-tool{border:1px solid rgba(216,173,109,.4);border-radius:999px;background:rgba(36,28,18,.82);color:#f6ead8;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:8px 10px;cursor:pointer}.life-v1844-tool.blue{border-color:rgba(126,160,172,.5);background:rgba(23,43,46,.7)}.life-v1844-tool.gold{border-color:rgba(216,173,109,.58);background:rgba(66,45,18,.66)}.life-v1844-tool:disabled{opacity:.45;cursor:not-allowed}",
+      ".v18333-wayback{border-color:rgba(146,130,220,.48)!important;background:linear-gradient(135deg,rgba(33,29,54,.97),rgba(23,28,29,.98))!important;overflow:hidden!important}.v18333-wayback-list{display:grid;gap:8px;margin-top:10px}.v18333-wayback-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(255,255,255,.045);padding:10px;min-width:0}.v18333-wayback-row b{display:block;color:#fff3df;overflow-wrap:anywhere}.v18333-wayback-row span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.4;margin-top:3px}.v18333-wayback-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}.v18333-wayback-actions .money-btn{min-width:82px}.v18333-wayback-empty{border:1px dashed rgba(255,255,255,.14);border-radius:12px;padding:11px;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.45;background:rgba(0,0,0,.12)}",
       ".life-v1844-bond-scan{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid rgba(126,160,172,.24);border-radius:12px;background:linear-gradient(135deg,rgba(18,38,39,.68),rgba(35,27,17,.55));padding:10px;margin:10px 0 0}.life-v1844-bond-scan span,.life-v1844-bond-scan em{display:block;font-family:'JetBrains Mono',monospace;font-style:normal;color:#b9a98e;font-size:9px;text-transform:uppercase;letter-spacing:.11em}.life-v1844-bond-scan b{display:block;color:#f2c978;font-size:28px;line-height:1}.life-v1844-bond-scan strong{border:1px solid rgba(216,173,109,.28);border-radius:999px;padding:7px 9px;color:#f2c978;background:rgba(0,0,0,.16);font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}.life-v1844-bond-scan strong.good{border-color:rgba(185,220,138,.36);color:#b9dc8a;background:rgba(30,55,25,.22)}.life-v1844-bond-scan strong.people{border-color:rgba(126,160,172,.38);color:#9fc8d3;background:rgba(18,44,47,.24)}",
       ".lifehub-command-v1844 .life-v1844-hub-grid{grid-template-columns:repeat(auto-fit,minmax(132px,1fr))!important}.lifehub-command-v1844 .life-v1844-stat{min-height:82px}",
       ".hub-lifehub .life-dashboard{display:grid!important;gap:12px!important}.hub-lifehub .life-dashboard>.panel:not(.v1816-life-tools){position:relative;border:1px solid rgba(216,173,109,.22)!important;border-radius:15px!important;background:linear-gradient(135deg,rgba(36,29,21,.86),rgba(20,18,14,.92))!important;box-shadow:0 12px 28px rgba(0,0,0,.18)!important;padding:14px!important;overflow:hidden}.hub-lifehub .life-dashboard>.panel:not(.v1816-life-tools):before{content:\"\";position:absolute;inset:0;background:linear-gradient(110deg,rgba(216,173,109,.055),transparent 34%,rgba(126,160,172,.045));pointer-events:none}.hub-lifehub .life-dashboard>.panel:not(.v1816-life-tools)>*{position:relative}.hub-lifehub .life-dashboard .section-label{font-size:9px!important;letter-spacing:.18em!important;color:#d8ad6d!important}.hub-lifehub .life-dashboard .row-title{font-size:20px!important;line-height:1.08!important;color:#fff3df!important;overflow-wrap:anywhere}.hub-lifehub .life-dashboard .row-sub{font-size:10px!important;line-height:1.45!important;color:#cdbf9f!important}.hub-lifehub .life-dashboard .lf-pill-row{display:flex!important;flex-wrap:wrap!important;gap:7px!important;margin-top:10px!important}.hub-lifehub .life-dashboard .lf-pill{min-width:0!important;border-radius:999px!important;padding:4px 7px!important;font-size:9px!important;line-height:1.15!important;background:rgba(0,0,0,.18)!important}",
@@ -49454,14 +48740,14 @@ getSuggestedActions = function(s) {
       id: "life-command",
       file: "pages/systems/life-command.js",
       status: "active",
-      globals: ["openLifeCommandHubV1844", "runLifeCommandActionV1844", "runLifeUtilityV1844"],
-      notes: "Reworks the Life home surface and Life hub with status cards, next moves, timeline, and chapter planning."
+      globals: ["openLifeCommandHubV1844", "runLifeCommandActionV1844", "runLifeUtilityV1844", "createWaybackCheckpointV18333", "restoreWaybackIndexV18333", "waybackLifeSlotV18333"],
+      notes: "Reworks the Life home surface and Life hub with status cards, next moves, timeline, chapter planning, and Wayback checkpoint controls."
     });
   }
 })();
 
 </script>
-<script data-source="pages/systems/scroll-nav.js">
+<script data-source="pages/systems/scroll-nav.js?v=20260628-nav2">
 /* ============================================================================
  * scroll-nav.js  (v18.59 — scroll buttons for horizontal rails)
  * ----------------------------------------------------------------------------
@@ -49486,6 +48772,127 @@ getSuggestedActions = function(s) {
   "use strict";
   if (window.__ledgerScrollNavV1857Loaded) return;
   window.__ledgerScrollNavV1857Loaded = true;
+
+  function escNav(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, function (ch) {
+      return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch];
+    });
+  }
+  function stateNav() {
+    try { if (typeof state !== "undefined") return state; } catch (e) {}
+    return window.state || null;
+  }
+  function numNav(value) {
+    value = Number(value);
+    return Number.isFinite(value) ? value : 0;
+  }
+  function normHubNav(id) {
+    id = String(id || "").toLowerCase();
+    if (id === "life") return "lifehub";
+    if (id === "stocks") return "brokerage";
+    if (id === "legal" || id === "lawoffice" || id === "law-office" || id === "taxlaw") return "law";
+    if (id === "education") return "school";
+    if (id === "networth" || id === "network" || id === "financehub") return "finance";
+    if (id === "founder" || id === "startup" || id === "entrepreneur") return "entrepreneurship";
+    return id || "lifehub";
+  }
+  function titleNav(id) {
+    var map = {
+      lifehub:"Life",
+      people:"People",
+      school:"Education",
+      career:"Job",
+      finance:"Finance",
+      money:"Money",
+      brokerage:"Investments",
+      business:"Business",
+      entrepreneurship:"Entrepreneurship",
+      law:"Legal",
+      health:"Health",
+      home:"Real Estate",
+      vehicles:"Vehicles",
+      stats:"Stats",
+      more:"More"
+    };
+    id = normHubNav(id);
+    return map[id] || id.replace(/\b\w/g, function (m) { return m.toUpperCase(); });
+  }
+  function schoolRelevantNav(s) {
+    s = s || {};
+    var flags = s.flags || {};
+    var education = s.education || {};
+    var edu25 = s.educationV1825 || {};
+    var edu27 = s.educationV1827 || {};
+    var age = numNav(s.age);
+    return age < 22 || !!flags.inCollege || !!flags.inSchool || !!s.inCollege || !!s.inSchool ||
+      !!education.inCollege || !!education.inSchool || !!education.enrolled ||
+      !!edu25.active || !!edu25.activeDegree || !!edu27.active || !!edu27.activeDegree;
+  }
+  function hubNav(id, icon, label, disabled) {
+    return { id: normHubNav(id), icon: icon, label: label || titleNav(id), disabled: !!disabled };
+  }
+  function hubMapNav() {
+    return {
+      lifehub: hubNav("lifehub", "Life", "Life"),
+      people: hubNav("people", "People", "People"),
+      school: hubNav("school", "Edu", "Education"),
+      career: hubNav("career", "Job", "Job"),
+      finance: hubNav("finance", "$", "Finance"),
+      money: hubNav("money", "$", "Money"),
+      brokerage: hubNav("brokerage", "Invest", "Investments"),
+      business: hubNav("business", "Biz", "Business"),
+      entrepreneurship: hubNav("entrepreneurship", "Founder", "Entrepreneurship"),
+      law: hubNav("law", "Law", "Legal"),
+      health: hubNav("health", "Health", "Health"),
+      home: hubNav("home", "Home", "Real Estate"),
+      vehicles: hubNav("vehicles", "Cars", "Vehicles"),
+      stats: hubNav("stats", "Stats", "Stats"),
+      more: hubNav("more", "...", "More")
+    };
+  }
+  function primaryHubsNav() {
+    var map = hubMapNav();
+    var middle = schoolRelevantNav(stateNav() || {}) ? "school" : "career";
+    return ["lifehub", "people", middle, "finance", "money", "law", "more"].map(function (id) { return map[id]; });
+  }
+  function allHubsNav() {
+    var map = hubMapNav();
+    return ["lifehub", "people", "school", "career", "finance", "money", "brokerage", "business", "entrepreneurship", "law", "health", "home", "vehicles", "stats", "more"].map(function (id) { return map[id]; });
+  }
+  function tabStripNav(active) {
+    active = normHubNav(active);
+    return '<div class="v11-hub-tab-strip v18336-tab-strip" aria-label="Hub tab wheel"><div class="v11-hub-tab-scroll">' +
+      primaryHubsNav().map(function (h) {
+        var id = normHubNav(h.id);
+        return '<button class="v11-tab-btn' + (id === active ? ' active' : '') + '" onclick="event.preventDefault();event.stopPropagation();(window.setTabV16||window.setTab||setTab)(\'' + escNav(id) + '\')"><span class="v11-tab-ico">' + escNav(h.icon || "") + '</span><span class="v11-tab-lbl">' + escNav(h.label || id) + '</span></button>';
+      }).join("") + '</div></div>';
+  }
+
+  window.getVisibleHubs = primaryHubsNav;
+  window.getAllHubsV186 = allHubsNav;
+  window.getStableHubsV18336 = primaryHubsNav;
+  window.navStripV18335 = tabStripNav;
+  try { getVisibleHubs = primaryHubsNav; } catch (e) {}
+  try { getAllHubsV186 = allHubsNav; } catch (e2) {}
+
+  var previousOverlayNav = window.renderHubOverlay || (typeof renderHubOverlay === "function" ? renderHubOverlay : null);
+  if (typeof previousOverlayNav === "function" && !previousOverlayNav.__ledgerScrollNavOverlay) {
+    window.renderHubOverlay = function (hubId) {
+      var id = normHubNav(hubId);
+      if (id === "law" || id === "business" || id === "entrepreneurship") {
+        var body = "";
+        try {
+          body = typeof renderHubContent === "function" ? renderHubContent(id) : "";
+        } catch (err) {
+          body = '<section class="panel"><div class="section-label">Render recovered</div><div class="row-sub">' + escNav(err && (err.message || err) || "hub render error") + '</div></section>';
+        }
+        return '<div class="hub-overlay hub-' + escNav(id) + ' v16-hub v18336-overlay" data-hub-id="' + escNav(id) + '" onclick="if(event.target===this)closeHub()"><div class="hub-sheet hub-sheet-' + escNav(id) + '"><div class="hub-head"><h2>' + escNav(titleNav(id)) + '</h2><button class="hub-close v16-close" onclick="event.preventDefault();event.stopPropagation();closeHub()">x</button></div><div class="v16-hub-body" data-hub-body="' + escNav(id) + '">' + body + '</div>' + tabStripNav(id) + '</div></div>';
+      }
+      return previousOverlayNav.apply(this, [id]);
+    };
+    window.renderHubOverlay.__ledgerScrollNavOverlay = true;
+    try { renderHubOverlay = window.renderHubOverlay; } catch (e3) {}
+  }
 
   var TAP_FRAC = 0.58;     // gentle: ~58% of the visible width per tap
   var TAP_MIN = 150;       // never less than 150px
@@ -49558,9 +48965,9 @@ getSuggestedActions = function(s) {
   // For new components: content already wrapped with scroll buttons (no inline handlers).
   window.scrollRailV1857 = function (inner, extraCls) {
     return '<div class="snav-wrap ' + (extraCls || "") + '">' +
-      '<button class="snav-btn left" type="button" aria-label="scroll left">‹</button>' +
+      '<button class="snav-btn left" type="button" aria-label="scroll left">&lt;</button>' +
       '<div class="snav-track">' + inner + '</div>' +
-      '<button class="snav-btn right" type="button" aria-label="scroll right">›</button>' +
+      '<button class="snav-btn right" type="button" aria-label="scroll right">&gt;</button>' +
       '</div>';
   };
 
@@ -49576,7 +48983,7 @@ getSuggestedActions = function(s) {
     b.type = "button";
     b.className = "snav-btn " + side + " legacy";
     b.setAttribute("aria-label", "scroll " + side);
-    b.textContent = side === "left" ? "‹" : "›";
+    b.textContent = side === "left" ? "<" : ">";
     return b; // driven by the delegated pointer handler
   }
 
@@ -49605,21 +49012,10 @@ getSuggestedActions = function(s) {
   }
   window.decorateRailsV1857 = decorate;
 
-  // run after every render (rAF so layout is settled); fully guarded
-  var prev = window.render || (typeof render === "function" ? render : null);
-  if (typeof prev === "function" && !prev.__snavWrapped) {
-    var wrapped = function () {
-      var out = prev.apply(this, arguments);
-      try {
-        if (typeof requestAnimationFrame === "function") requestAnimationFrame(decorate);
-        else decorate();
-      } catch (e) { try { decorate(); } catch (e2) {} }
-      return out;
-    };
-    wrapped.__snavWrapped = true;
-    window.render = wrapped;
-    try { render = wrapped; } catch (e) {}
-  }
+  // v18.60: do not scan and reparent legacy rails after every render. That
+  // forced layout pass made large hubs feel sticky during normal page scrolling.
+  // Components can still call scrollRailV1857 directly, and diagnostics can call
+  // decorateRailsV1857() manually for a one-off retrofit.
 
   // ----- styles -----
   try {
@@ -49638,6 +49034,14 @@ getSuggestedActions = function(s) {
         ".snav-btn:active{transform:translateY(-50%) scale(.94)}",
         ".snav-btn.left{left:-3px}.snav-btn.right{right:-3px}",
         ".snav-wrap.legacy-wrap{padding:0 2px}"
+        ,".bottom-nav{display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:4px!important;overflow:visible!important;scroll-snap-type:none!important;padding:6px!important;box-sizing:border-box!important;width:100%!important}"
+        ,".bottom-nav::-webkit-scrollbar{display:none!important}"
+        ,".bottom-nav .nav-btn{flex:1 1 auto!important;min-width:0!important;width:auto!important;scroll-snap-align:none!important;padding:8px 1px!important;gap:3px!important;overflow:hidden!important}"
+        ,".bottom-nav .nav-btn .nav-icon{font-size:12px!important;line-height:1!important;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:clip}"
+        ,".bottom-nav .nav-btn .nav-label{font-size:7px!important;letter-spacing:0!important;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:clip}"
+        ,".v18336-tab-strip .v11-hub-tab-scroll{display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:6px!important;overflow:visible!important}"
+        ,".v18336-tab-strip .v11-tab-btn{min-width:0!important;flex:1 1 auto!important}.v18336-tab-strip .v11-tab-lbl{letter-spacing:0!important}"
+        ,".v18336-overlay .hub-head h2{letter-spacing:0}.v18336-overlay .hub-close{min-width:42px}"
       ].join("\n");
       document.head.appendChild(st);
     }

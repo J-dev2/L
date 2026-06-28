@@ -2,7 +2,7 @@
 
 > Single consolidated list of everything still open, written so a new chat can start cold.
 > Detail for finished work lives in `SESSION_SUMMARY.md` (checkpoints, latest on top).
-> Last updated 2026-06-26.
+> Last updated 2026-06-28.
 
 ---
 
@@ -32,6 +32,12 @@ Cache-stamps currently in `play.html` (bump again after any further edit): `entr
 
 Note: the 4 `dist/*.html` files got the nav-dock CSS patched in by hand but are otherwise STALE (missing all the
 entrepreneurship + wellbeing work). A clean rebuild fixes that.
+
+Mobile QA note from user (2026-06-28): On the GitHub-hosted/mobile build, the Finance page is the only checked hub
+that appears to use the wrong vertical height. Its content can extend down under the browser chrome/bottom area,
+making the page hard to play; Money and the other checked pages did not show the same issue. Hosted site may be one
+or two versions behind current source, so verify against latest `play.html`/rebuilt `dist` first. Likely affected
+file: `pages/systems/finance-ledger.js` (and possibly hub-sheet/mobile CSS if the issue reproduces).
 
 ---
 
