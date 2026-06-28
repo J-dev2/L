@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-06-28T01:34:59.588Z",
+  "builtAt": "2026-06-28T06:55:47.071Z",
   "source": "outputs/ledger18_modular_v18_35",
   "entries": [
     {
@@ -11,7 +11,7 @@
           "bytes": 11028
         }
       ],
-      "bytes": 204590
+      "bytes": 205027
     },
     {
       "entry": "play.html",
@@ -62,10 +62,6 @@
           "bytes": 60141
         },
         {
-          "src": "pages/patches/10-patch-v18-33.js",
-          "bytes": 46417
-        },
-        {
           "src": "pages/patches/11-patch-v18-33-2.js",
           "bytes": 16349
         },
@@ -110,8 +106,8 @@
           "bytes": 131427
         },
         {
-          "src": "pages/systems/business-entities.js?v=20260627-age21",
-          "bytes": 184127
+          "src": "pages/systems/business-entities.js?v=20260628-businesscash1",
+          "bytes": 190479
         },
         {
           "src": "pages/systems/business-sectors.js?v=20260627-age21",
@@ -170,8 +166,8 @@
           "bytes": 8028
         },
         {
-          "src": "pages/systems/scroll-stability.js",
-          "bytes": 5994
+          "src": "pages/systems/scroll-stability.js?v=20260628-flicker1",
+          "bytes": 12519
         },
         {
           "src": "pages/systems/life-command.js",
@@ -246,13 +242,13 @@
           "bytes": 15386
         }
       ],
-      "bytes": 3482104
+      "bytes": 3449075
     },
     {
       "entry": "index.html",
       "output": "outputs/ledger18_modular_v18_35/dist/index.html",
       "aliasFor": "Ledger_18_dynamic_stocks_v18_35_landing_built.html",
-      "bytes": 204590
+      "bytes": 205027
     },
     {
       "entry": "play.html",

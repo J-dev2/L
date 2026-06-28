@@ -1304,6 +1304,34 @@
     return { total: cost, fromBusiness: fromBiz, fromPersonal: remaining };
   }
 
+  // v18.74: entity setup is a company expense when company cash exists.
+  window.setBusinessEntityV1830 = function (businessId, entityType) {
+    var s = ensureBusinessState();
+    var b = businessById(businessId);
+    if (!b) return toast("Business not found.");
+    ensureBusiness(b);
+    var st = STRUCTURES[entityType];
+    if (!st) return toast("Entity type not found.");
+    if (b.entityType === entityType) return toast(b.name + " is already a " + st.name + ".");
+    if (n(b.value) < st.minValue) return toast(st.name + " needs " + compactMoney(st.minValue) + " business value.");
+    var paid = spendBusinessCostV1857(b, st.cost);
+    if (!paid) return toast("Setup cost is " + compactMoney(st.cost) + " from company cash/checking.");
+    var old = (STRUCTURES[b.entityType] || STRUCTURES.soleprop).name;
+    b.entityType = entityType;
+    b.historyV1830.unshift({
+      age: round(n(s.age)),
+      action: "Entity changed",
+      from: old,
+      to: st.name,
+      amount: st.cost,
+      paidFromCompany: paid.fromBusiness,
+      paidFromChecking: paid.fromPersonal
+    });
+    b.historyV1830 = b.historyV1830.slice(0, 18);
+    log("Set " + b.name + " as " + st.name + ".", { money: -paid.fromPersonal });
+    saveRender();
+  };
+
   function locationCostBaseV1857(b) {
     var v = catalogFor(b.id, b);
     return Math.max(20000, n(v.startup, 25000));
@@ -1351,10 +1379,11 @@
     var open = locationOpenCountV1857(b);
     var cost = openLocationCostV1857(b, model);
     var available = n(b.retainedEarnings) + n(stateNow().money);
-    if (n(b.assets && b.assets.location) < 3) return { ok: false, cost: cost, reason: "Needs Flagship Location asset." };
+    var locationTier = n(b.assets && b.assets.location);
+    if (locationTier < 2) return { ok: false, cost: cost, reason: "Needs Owned Location asset." };
     if (n(b.reputation) < 70) return { ok: false, cost: cost, reason: "Needs reputation 70+." };
     if ((b.stage || "startup") === "startup") return { ok: false, cost: cost, reason: "Needs Growing stage or better." };
-    if (model === "franchise" && (open < 3 || n(b.reputation) < 80)) return { ok: false, cost: cost, reason: "Franchise partners unlock at 3+ sites and reputation 80+." };
+    if (model === "franchise" && (open < 2 || n(b.reputation) < 72)) return { ok: false, cost: cost, reason: "Franchise partners unlock at 2+ sites and reputation 72+." };
     if (available < cost) return { ok: false, cost: cost, reason: "Needs " + compactMoney(cost) + " available." };
     return { ok: true, cost: cost, reason: "Ready." };
   }
@@ -1584,6 +1613,114 @@
     b.lastLocationEffectsV1857 = effects;
     return effects;
   };
+
+  function businessCashRetentionRateV1874(b, income) {
+    ensureBusiness(b);
+    var st = STRUCTURES[b.entityType] || STRUCTURES.soleprop;
+    var rate = Math.max(0, n(st.retain));
+    if (b.entityType === "soleprop") rate = Math.max(rate, .55);
+    else if (b.entityType === "partnership") rate = Math.max(rate, .45);
+    else rate = Math.max(rate, .35);
+    if (n(b.value) < 1000000) rate = Math.max(rate, .60);
+    var reserveTarget = Math.max(25000, Math.min(1500000, n(b.value) * .18 + Math.max(0, income) * .5));
+    if (n(b.retainedEarnings) < reserveTarget) rate = Math.max(rate, .68);
+    if (b.ops && b.ops.bookkeeper) rate += .03;
+    if (b.ops && b.ops.manager) rate += .02;
+    return clamp(rate, .25, .94);
+  }
+
+  function retainedAlreadyRecordedV1874(b, age) {
+    var rows = Array.isArray(b.historyV1830) ? b.historyV1830 : [];
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i] || {};
+      if (round(n(row.age)) !== round(n(age))) continue;
+      if (row.action === "Entity year" || row.action === "Pass-through year") return Math.max(0, round(n(row.retained)));
+    }
+    return 0;
+  }
+
+  function reducePersonalDistributionV1874(f, amount) {
+    amount = Math.max(0, round(amount));
+    if (!amount || !f) return;
+    var src = f.incomeSources || (f.incomeSources = {});
+    var current = Math.max(0, round(n(src.businessDistributionsV1830)));
+    var cut = Math.min(current, amount);
+    if (cut) src.businessDistributionsV1830 = current - cut;
+    var firm = Math.max(0, round(n(f.lastFirmDistribution)));
+    f.lastFirmDistribution = Math.max(0, firm - cut);
+    if (f.businessTaxV1830 && f.businessTaxV1830.distributions != null) {
+      f.businessTaxV1830.distributions = Math.max(0, round(n(f.businessTaxV1830.distributions) - cut));
+    }
+  }
+
+  function reconcileBusinessCashV1874(silent) {
+    var s = ensureBusinessState();
+    var f = s.finance || {};
+    if (!f.businessCashV1874 || typeof f.businessCashV1874 !== "object") f.businessCashV1874 = { processedAges: {}, history: [] };
+    var ledger = f.businessCashV1874;
+    if (!ledger.processedAges || typeof ledger.processedAges !== "object") ledger.processedAges = {};
+    if (!Array.isArray(ledger.history)) ledger.history = [];
+    var age = round(n(s.age));
+    var ageKey = String(age);
+    if (ledger.processedAges[ageKey]) return false;
+    var total = 0;
+    var movedCount = 0;
+    var touched = 0;
+    businesses().forEach(function (b) {
+      if (!b || isEntrepreneurPortV1862(b)) return;
+      ensureBusiness(b);
+      var income = round(n(b.lastIncome));
+      if (income <= 0) return;
+      touched++;
+      var already = retainedAlreadyRecordedV1874(b, age);
+      var target = Math.min(income, Math.max(0, round(income * businessCashRetentionRateV1874(b, income))));
+      var extra = Math.max(0, target - already);
+      if (!extra) return;
+      var availableChecking = Math.max(0, round(n(s.money)));
+      var moved = Math.min(extra, availableChecking);
+      if (!moved) return;
+      s.money = Math.max(0, round(n(s.money) - moved));
+      b.retainedEarnings = Math.max(0, round(n(b.retainedEarnings) + moved));
+      b._lastReserveSweepAgeV1874 = age;
+      b._lastReserveSweepAmountV1874 = moved;
+      if (!Array.isArray(b.historyV1830)) b.historyV1830 = [];
+      b.historyV1830.unshift({
+        age: age,
+        action: "Company reserve sweep",
+        amount: moved,
+        income: income,
+        targetRetained: target,
+        alreadyRetained: already
+      });
+      b.historyV1830 = b.historyV1830.slice(0, 18);
+      reducePersonalDistributionV1874(f, moved);
+      total += moved;
+      movedCount++;
+    });
+    if (!touched) return false;
+    ledger.processedAges[ageKey] = true;
+    ledger.lastReserveSweep = total;
+    ledger.lastReserveAge = age;
+    if (total) {
+      ledger.history.unshift({ age: age, amount: total, businesses: movedCount, at: Date.now ? Date.now() : 0 });
+      ledger.history = ledger.history.slice(0, 16);
+      if (!silent) log("Company cash reserve kept " + compactMoney(total) + " inside operating businesses.", { money: -total });
+    }
+    return !!total;
+  }
+  window.businessCashRetentionRateV1874 = businessCashRetentionRateV1874;
+  window.reconcileBusinessCashV1874 = reconcileBusinessCashV1874;
+
+  var previousResolveV1874 = window.resolveLifeAndFinanceYear || (typeof resolveLifeAndFinanceYear === "function" ? resolveLifeAndFinanceYear : null);
+  if (previousResolveV1874 && !window.__ledgerBusinessCashV1874Wrapped) {
+    window.__ledgerBusinessCashV1874Wrapped = true;
+    window.resolveLifeAndFinanceYear = function () {
+      var out = previousResolveV1874.apply(this, arguments);
+      try { reconcileBusinessCashV1874(false); } catch (e) { try { console.warn("v18.74 business cash reserve failed", e); } catch (ignore) {} }
+      return out;
+    };
+    try { resolveLifeAndFinanceYear = window.resolveLifeAndFinanceYear; } catch (e) {}
+  }
 
   window.setEntrepreneurshipPathV1841 = function (path) {
     var s = ensureBusinessState();
@@ -2103,7 +2240,7 @@
     var id = safeId(b.id);
     var eid = esc(b.id);
     var distMax = Math.max(0, round(b.retainedEarnings));
-    return '<div class="v1851-cash-explain"><b>' + compactMoney(b.retainedEarnings) + '</b> is held inside the company &mdash; this is <b>not</b> your personal checking. (Taxes &amp; compliance are paid in the <b>Taxes</b> popup.)</div>' +
+    return '<div class="v1851-cash-explain"><b>' + compactMoney(b.retainedEarnings) + '</b> is held inside the company &mdash; this is <b>not</b> your personal checking. Profitable years now reserve operating cash first; use distributions or salary when you want owner take-home. (Taxes &amp; compliance are paid in the <b>Taxes</b> popup.)</div>' +
       '<div class="v1840-cash-grid">' +
       '<div class="v1851-cash-group"><span class="v1851-cash-label">🧍 Take it out &rarr; checking</span>' +
       '<div class="v1840-action-strip">' +
@@ -2635,6 +2772,7 @@
         "payBusinessDividendToTrustV1840",
         "trustLoanToBusinessV1840",
         "repayTrustLoanV1840",
+        "reconcileBusinessCashV1874",
         "businessEnterpriseScoreV1840"
       ],
       notes: "Business is now a focused command center: portfolio rail, one selected company desk, entity cash/tax controls, family enterprise governance, trust ownership, dividends, trust loans, successor training, acquisitions, and launch rails."

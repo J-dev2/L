@@ -45,8 +45,8 @@ only pulls scripts referenced in `play.html` / `index.html`).
 | `business-age21.js` | Business opportunity age gates above 21 are capped at 21 in UI/actions | 8 |
 | `wayback.js`    | Checkpoint create/restore + death-screen "Undo Death" | 11 |
 | `devtools.js`   | Hidden dev-tools gate/unlock + panel tools (run with `&dev=1`) | 17 |
-| `business-locations.js` | Business #10 locations/franchises/rival share | 23 |
-| `business-income.js` | Old/drifted-catalog business still earns (no silent $0) | 2 |
+| `business-locations.js` | Business #10 locations/franchises/rival share | 25 |
+| `business-income.js` | Old/drifted-catalog business still earns + company cash reserve sweep | 7 |
 | `estate-trust.js` | Death settlement honors the Legal family trust (plan/protected/tax) | 4 |
 | `trust-nav.js` | Trust/business actions re-render the current hub (no hub jump) | 2 |
 | `networth-genetics.js` | Net worth consistent across hubs (fund counted, bridge once) + child IQ inheritance | 9 |

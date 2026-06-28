@@ -4374,6 +4374,22 @@ body[data-ledger-width="max"] .hub-overlay.v16-hub.hub-money .v16-bank-row {
 }
 .hub-overlay.v16-hub .v16-hub-body { scroll-behavior: auto !important; }
 
+/* V18.74 FLICKER STABILITY: dynamic hubs and popups rerender their bodies in place. */
+.hub-overlay.v16-hub,
+.hub-overlay.v16-hub .hub-sheet,
+.hub-overlay.v16-hub .v16-hub-body *,
+.life71-backdrop,
+.life71-backdrop *,
+.fo72-backdrop,
+.fo72-backdrop * {
+  animation: none !important;
+  transition-duration: 0s !important;
+}
+.hub-overlay.v16-hub .v16-hub-body,
+.hub-overlay.v16-hub .v16-hub-body * {
+  scroll-behavior: auto !important;
+}
+
 .v17-brokerage-hub { display: grid; gap: 14px; width: min(100%, 1240px); margin-inline: auto; }
 .v17-broker-hero,
 .v17-brokerage-section,
@@ -4430,4 +4446,3 @@ body[data-ledger-width="compact"] .hub-overlay.v16-hub .v17-transfer-desk { grid
   .v17-balance { text-align: left; }
   .v17-brokerage-hub { width: 100%; }
 }
-

@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-  <style data-source="styles/ledger-ui.css?v=20260626-navdock5">
+  <style data-source="styles/ledger-ui.css?v=20260628-flicker1">
 
   :root {
     --bg: #14110d;
@@ -4384,6 +4384,22 @@ body[data-ledger-width="max"] .hub-overlay.v16-hub.hub-money .v16-bank-row {
 }
 .hub-overlay.v16-hub .v16-hub-body { scroll-behavior: auto !important; }
 
+/* V18.74 FLICKER STABILITY: dynamic hubs and popups rerender their bodies in place. */
+.hub-overlay.v16-hub,
+.hub-overlay.v16-hub .hub-sheet,
+.hub-overlay.v16-hub .v16-hub-body *,
+.life71-backdrop,
+.life71-backdrop *,
+.fo72-backdrop,
+.fo72-backdrop * {
+  animation: none !important;
+  transition-duration: 0s !important;
+}
+.hub-overlay.v16-hub .v16-hub-body,
+.hub-overlay.v16-hub .v16-hub-body * {
+  scroll-behavior: auto !important;
+}
+
 .v17-brokerage-hub { display: grid; gap: 14px; width: min(100%, 1240px); margin-inline: auto; }
 .v17-broker-hero,
 .v17-brokerage-section,
@@ -4440,7 +4456,6 @@ body[data-ledger-width="compact"] .hub-overlay.v16-hub .v17-transfer-desk { grid
   .v17-balance { text-align: left; }
   .v17-brokerage-hub { width: 100%; }
 }
-
 
 </style>
 <style data-source="themes/ledger-dark.css?v=20260626-navdock5">

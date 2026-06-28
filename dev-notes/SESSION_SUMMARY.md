@@ -5,6 +5,85 @@
 
 ---
 
+## Checkpoint 55 - 2026-06-28 (Codex) - Business cash reserves, franchise unlock, patch audit
+
+User reported old patch scripts piling up, business profit not showing in company cash, business expenses hitting checking despite company cash, and franchise systems feeling broken.
+
+Changed:
+
+- `pages/systems/business-entities.js`
+  - Added `reconcileBusinessCashV1874`, a post-year reserve sweep that moves the intended retained share of positive operating-company profit from checking back into company cash.
+  - Sub-$1M / sole-prop / partnership businesses now keep real operating reserves instead of leaving all profit as personal checking.
+  - Entity setup (`setBusinessEntityV1830`) now uses company cash first, then checking only for any remainder.
+  - Franchise expansion now unlocks at 2+ open sites and reputation 72+; location expansion requires an Owned Location asset instead of the old Flagship-only gate.
+  - Company cash popup copy now explains reserve-first profit and owner take-home controls.
+- `play.html`
+  - Retired `pages/patches/10-patch-v18-33.js` from runtime loading because its family enterprise/business trust work is now absorbed by `business-entities.js` and `tax-legal.js`.
+  - Bumped `business-entities.js` cache stamp.
+- `dev-notes/PATCH_AUDIT.md`
+  - Added a patch-script audit documenting the retired patch and why patches 01-09/11-16 remain loaded for now.
+- `cdp/business-income.js`
+  - Added deterministic `$500K` profit coverage proving sub-$1M business profit reserves company cash.
+- `cdp/business-locations.js`
+  - Updated franchise coverage for the new two-site unlock and positive franchise location income.
+
+Verification:
+
+- `node --check pages/systems/business-entities.js`
+- `node --check cdp/business-income.js`
+- `node --check cdp/business-locations.js`
+- `node build\build-ledger18.js`
+- `cdp/business-income.js`: 7/7
+- `cdp/business-locations.js`: 25/25
+- `cdp/business-modals.js`: 23/23
+- `cdp/business-age21.js`: 8/8
+- `cdp/business-tabs.js`: 16/16
+- `cdp/trust-business-protection.js`: 19/19
+- `cdp/trust.js`: 18/18
+- `cdp/wayback.js`: 11/11
+- `cdp/dashboard.js`: 32/32
+- `cdp/family-office.js`: 20/20
+- `cdp/flicker.js`: 18/18
+
+Notes:
+
+- Build report confirms `10-patch-v18-33.js` is no longer bundled.
+- Next cleanup target is patch 07, but only after its remaining entity/tax action globals are fully owned by `business-entities.js`.
+
+---
+
+## Checkpoint 54 - 2026-06-28 (Codex) - Flicker guard for hub action rerenders
+
+User reported the page sometimes starts flickering heavily. Idle CDP sampling showed the main hubs were not rerendering on their own, so the likely trigger was action/layout repaint paths.
+
+Changed:
+
+- `pages/systems/scroll-stability.js`
+  - Added a shared flicker guard around `render`, `renderHubInPlaceV16`, `v17HubAction`/stable action aliases, `v181MoneyAction`, and hub layout controls.
+  - Guard clears legacy V13/V14 scroll-lock state before/after action rerenders.
+  - Guard temporarily disables smooth scroll during the repaint window and still restores hub scroll.
+- `styles/ledger-ui.css`
+  - Permanently disables entrance animations and transition duration inside dynamic V16 hub bodies, Life popups, and Family Office popups so in-place body rerenders do not replay animations.
+- `play.html` / `index.html`
+  - Bumped `ledger-ui.css` cache stamp.
+  - Bumped `scroll-stability.js` cache stamp in `play.html`.
+- `cdp/flicker.js`
+  - Added action/layout checks in addition to idle hub sampling.
+
+Verification:
+
+- `node --check pages/systems/scroll-stability.js`
+- `node --check cdp/flicker.js`
+- `node build\build-ledger18.js`
+- `cdp/flicker.js`: 18/18
+- `cdp/life.js`: 19/19
+- `cdp/family-office.js`: 20/20
+- `cdp/trust.js`: 18/18
+- `cdp/dashboard.js`: 32/32
+- `cdp/trust-holdings.js`: 12/12
+
+---
+
 ## Checkpoint 53 - 2026-06-28 (Codex) - Family Office follow-up fix: real founder ids, no duplicate panels, selective carry
 
 Fixed the tested-side issues exposed by the Trust hub DOM:

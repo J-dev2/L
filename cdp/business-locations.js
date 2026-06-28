@@ -43,11 +43,11 @@
     ok("old_save_migrates_sites", oldLoc && oldLoc.sites && oldLoc.sites.length === 3, "sites=" + (oldLoc && oldLoc.sites && oldLoc.sites.length));
     ok("old_save_market_created", !!oldSave.marketV1857 && num(oldSave.marketV1857.share) > 0);
 
-    var locked = { id: "coffeehouse", baseId: "coffeehouse", name: "Locked Cafe", category: "Food & Drink", value: 200000, reputation: 80, stage: "growing", retainedEarnings: 500000, assets: { location: 2, staff: 1, equipment: 1 } };
+    var locked = { id: "coffeehouse", baseId: "coffeehouse", name: "Locked Cafe", category: "Food & Drink", value: 200000, reputation: 80, stage: "growing", retainedEarnings: 500000, assets: { location: 1, staff: 1, equipment: 1 } };
     state.finance.businesses.push(locked);
     var beforeLocked = window.businessLocationsV1857(locked).sites.length;
     window.openBusinessLocationV1857(locked.id, "owned");
-    ok("locked_cannot_open_without_flagship", window.businessLocationsV1857(locked).sites.length === beforeLocked);
+    ok("locked_cannot_open_without_owned_location", window.businessLocationsV1857(locked).sites.length === beforeLocked);
 
     // Network controls now live in the focused-company "Network" management popup, built by
     // buildBizModalV1862(id,'network'); the hub itself only shows the active tab.
@@ -83,10 +83,11 @@
     window.competeBusinessMarketShareV1857(focus.id);
     ok("compete_once_per_year", cash() === cashAfterCompete);
 
-    // franchise partners unlock at 3+ open sites — add another owned site to clear the gate
-    window.openBusinessLocationV1857(focus.id, "owned");
+    // franchise partners unlock once the company has a real two-site footprint.
+    var sitesBeforeFranchise = window.businessLocationsV1857(focus).sites.filter(function (s) { return s.status !== "closed"; }).length;
     window.openBusinessLocationV1857(focus.id, "franchise");
-    ok("franchise_adds_partner", window.businessLocationsV1857(focus).sites.some(function (s) { return s.model === "franchise" && s.status !== "closed"; }));
+    ok("franchise_adds_partner_at_two_sites", window.businessLocationsV1857(focus).sites.filter(function (s) { return s.status !== "closed"; }).length === sitesBeforeFranchise + 1);
+    ok("franchise_partner_exists", window.businessLocationsV1857(focus).sites.some(function (s) { return s.model === "franchise" && s.status !== "closed"; }));
 
     focus.retainedEarnings = 10000000;
     focus.value = 6000000;
@@ -107,6 +108,7 @@
     window.resolveLifeAndFinanceYear();
     ok("year_tick_runs", state.age === ageBefore);
     ok("year_tick_stores_location_effects", !!focus.lastLocationEffectsV1857 && typeof focus.lastLocationEffectsV1857.income === "number");
+    ok("franchise_location_income_positive", num(focus.lastLocationEffectsV1857 && focus.lastLocationEffectsV1857.income) > 0, "income=" + (focus.lastLocationEffectsV1857 && focus.lastLocationEffectsV1857.income));
     ok("risk_breakdown_has_location", !!window.businessRiskBreakdownV1856(focus).location);
 
     var netHtml1 = window.buildBizModalV1862 ? (window.buildBizModalV1862(focus.id, "network").html || "") : "";

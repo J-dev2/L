@@ -54,7 +54,8 @@ See `cdp/README.md` for the full list and run steps.
 - `cdp/trust.js` — family trust net worth + succession carry + death haircut (18)
 - `cdp/wayback.js` — checkpoint create/restore + death-screen "Undo Death" (11)
 - `cdp/devtools.js` — hidden dev-tools gate/unlock + panel tools (run with `&dev=1` in the URL) (17)
-- `cdp/business-locations.js` — Business #10 locations/franchises/rival share (22)
+- `cdp/business-locations.js` — Business #10 locations/franchises/rival share (25)
+- `cdp/business-income.js` — old/drifted business income + company cash reserve sweep (7)
 
 How to run a probe (Chrome must be started with `--remote-debugging-port=<PORT>`
 and a temp `--user-data-dir`; `cdp/driver.js` navigates + evaluates the probe). Reuse ONE
