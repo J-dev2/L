@@ -5,6 +5,152 @@
 
 ---
 
+## Checkpoint 68 - 2026-06-29 (Codex) - Default live candles + Buy Max stocks
+
+Updated Real Stocks toward the user's intended live day-trading feel while keeping the larger Investments redesign as a later backlog item.
+
+Changed:
+
+- `pages/runtime/00-core-app-runtime.js`
+  - Live market now defaults on for Real Stocks when the desk opens, unless the player explicitly stops it.
+  - Added persistent `stocksV18.candles` OHLC history per stock, seeded from old price history for save compatibility.
+  - Reworked live ticks to create candle-style movement: momentum, pullback/rebound pressure, random breakouts/selloffs, and stronger Bitcoin/speculative-stock spikes.
+  - Added candlestick mini charts to every stock card and compact holding-row charts for owned positions.
+  - Added pattern labels such as `Fresh tape`, `Green tick`, `Red tick`, `Rebound watch`, `Pullback risk`, `Momentum run`, `Falling knife`, `Breakout spike`, and `Sharp selloff`.
+  - Added `Buy Max` per stock card so the player can push all current Investment Cash into one stock after funding it.
+- `play.html`
+  - Bumped runtime and Investments cache stamps to `20260629-livecandle1`.
+- `cdp/entrepreneur-backlog.js`, `cdp/README.md`
+  - Added probe checks for default-on live mode, candlestick markup, and `Buy Max`; expected count is now 17.
+
+Verification:
+
+- `node --check pages\runtime\00-core-app-runtime.js`
+- `node --check pages\systems\stocks-investing.js`
+- `node --check cdp\entrepreneur-backlog.js`
+- `node build\build-ledger18.js`
+- In-app browser smoke on a fresh `20260629-livecandle1` page:
+  - Confirmed the new cache-stamped runtime and Investments wrapper loaded.
+  - Opened Investments and saw live default on (`Stop Live`, `Live: ON`, status tick count).
+  - Confirmed 15 candle charts and 15 `Buy Max` buttons render.
+  - Clicked AAPL `Buy Max`; all Investment Cash moved into AAPL, live ticks continued, and owned value moved with the ticker.
+  - No console errors.
+
+Notes:
+
+- Larger Investments redo is intentionally not done here. It is now logged as a future backlog item: rebuild Investments around an Asset Summary plus separated live trading, outside management, personal firm, and fund-economics areas instead of one increasingly long page.
+
+---
+
+## Checkpoint 67 - 2026-06-29 (Codex) - Investments funding + visible live status
+
+Followed up after the user showed Investments with `Investment Cash $0` and a `Live Market` button that appeared to do nothing.
+
+Changed:
+
+- `pages/runtime/00-core-app-runtime.js`
+  - Added `fundStockCashV18(amount)` so Investments can move checking cash directly into Investment Cash without sending the player back to Money.
+  - Added `Fund $10K`, `Fund $100K`, and `Fund Max` buttons to the Real Stocks action row.
+  - Added a visible `data-stock18-live-panel` status strip under the action row. It states whether live mode is paused/running, current tick count, investment cash, and holdings.
+  - Updated the empty holdings copy to say `Fund Investment Cash from checking`.
+- `play.html`
+  - Bumped cache stamps for the runtime and `stocks-investing.js` to `20260629-livefund1`, because the user's open page was still loading the old runtime URL.
+- `cdp/entrepreneur-backlog.js`, `cdp/README.md`
+  - Added coverage for funding controls and checking-to-investment-cash transfer. Probe count is now 15.
+
+Verification:
+
+- `node --check pages\runtime\00-core-app-runtime.js`
+- `node --check pages\systems\stocks-investing.js`
+- `node --check pages\systems\tax-legal.js`
+- `node --check cdp\entrepreneur-backlog.js`
+- `node build\build-ledger18.js`
+- In-app browser smoke on the fresh cache-stamped build:
+  - Confirmed scripts load as `00-core-app-runtime.js?v=20260629-livefund1` and `stocks-investing.js?v=20260629-livefund1`.
+  - Opened Investments; saw `Fund $10K`, `Fund $100K`, `Fund Max`, and the live status strip.
+  - Clicked `Fund $10K`, bought `$1K` AAPL, started `Live Market`, observed `Stop Live`, tick count, moving prices, and AAPL owned value around `$1K`.
+  - Stopped live mode; no console errors.
+
+Notes:
+
+- The live button was already changing prices after CP66, but the UI looked broken in saves with `$0` Investment Cash. CP67 makes the required cash transfer explicit and local to Investments.
+
+---
+
+## Checkpoint 66 - 2026-06-29 (Codex) - Investments live crash hardening
+
+Followed up on the user-reported crash after pressing the Investments live button.
+
+Changed:
+
+- `pages/runtime/00-core-app-runtime.js`
+  - Moved live market ownership into the base v18 stock runtime instead of keeping a duplicate live ticker in the Investments wrapper.
+  - Added `toggleLiveMarketV18`, `liveMarketTickV18`, and `stopLiveMarketV18`.
+  - Live mode now updates the same `state.finance.stocksV18.prices`, history, owned-value chips, market move, and brokerage/net-worth refresh path used by normal buy/sell.
+  - The stock cards now expose stable `data-stock18-id` / owned-value hooks so live ticks can update the visible stock desk without a full rerender loop.
+- `pages/systems/stocks-investing.js`
+  - Removed the duplicate v18.75 live ticker UI/functions/styles.
+  - Kept this module focused on the Investments label, pulse rail, input/readout UX, and route compatibility.
+- `cdp/entrepreneur-backlog.js`
+  - Updated the backlog probe to assert the base v18 live-market controls/functions instead of the removed wrapper ticker.
+
+Verification:
+
+- `node --check pages\runtime\00-core-app-runtime.js`
+- `node --check pages\systems\stocks-investing.js`
+- `node --check cdp\entrepreneur-backlog.js`
+- `node build\build-ledger18.js`
+- In-app browser smoke on `http://127.0.0.1:8124/play.html?sandbox=1&from=codex&v=livefix3`
+  - Opened Sandbox Life with Instant Investor.
+  - Opened Finance -> Open Investments.
+  - Pressed `Live Market`; button changed to `Stop Live`; stock prices ticked; no console errors.
+  - Bought `$1K` AAPL while live ticks were running; AAPL owned value updated; no console errors.
+  - Pressed `Stop Live`; button returned to `Live Market`; no console errors.
+
+Notes:
+
+- The user's already-open crashed tab was stale (`v=20260628-familyoffice6`) and did not reflect this source after rebuild. It needs a refresh/new load to pick up CP66.
+- Standalone headless Chrome/Edge CDP launch did not expose a debug port in this environment, so the post-cleanup browser verification was done through the in-app browser plus syntax/build checks. CP65 CDP probes were green before this ownership cleanup; rerun `cdp/entrepreneur-backlog.js`, `cdp/stock.js`, `cdp/death.js`, and `cdp/no-patches.js` when standalone CDP is available.
+
+---
+
+## Checkpoint 65 - 2026-06-29 (Codex) - Live trading moved to Investments + death safety
+
+Corrected the live-trading placement based on user feedback.
+
+Changed:
+
+- `pages/systems/stocks-investing.js`
+  - Added the live stock tape to Investments / Brokerage.
+  - Prices tick every second while Investments is open and mutate `state.finance.stocksV18.prices`, so existing stock holdings gain/lose value from the same price source used by buy/sell and net-worth calculations.
+  - The live tape updates DOM prices, owned values, and mini charts without full page rerenders every second.
+- `pages/systems/entrepreneur.js`
+  - Removed the Trading tab from the Entrepreneurship dashboard and stopped advertising day-trading globals as active Entrepreneurship surface.
+- `pages/systems/tax-legal.js`
+  - Added a death render safety wrapper: if age-up leaves the character dead but the decorated death screen fails or stale hub markup remains, the safe In Memoriam fallback is rendered.
+- `cdp/entrepreneur-backlog.js`, `cdp/death.js`, `cdp/README.md`
+  - Updated probes to enforce live trading in Investments, no Entrepreneurship Trading tab, and death from an open Investments hub.
+
+Verification:
+
+- `node --check pages\systems\stocks-investing.js`
+- `node --check pages\systems\entrepreneur.js`
+- `node --check pages\systems\tax-legal.js`
+- `node --check cdp\entrepreneur-backlog.js`
+- `node --check cdp\death.js`
+- `node build\build-ledger18.js`
+- `cdp/entrepreneur-backlog.js`: 13/13
+- `cdp/death.js`: 22/22
+- `cdp/stock.js`: 30/30
+- `cdp/dashboard.js`: 32/32
+- `cdp/no-patches.js`: 2/2
+
+Notes:
+
+- The old CP64 Entrepreneurship day-trading panel was the wrong home. The intended player-facing live trading surface is now Investments.
+
+---
+
 ## Checkpoint 64 - 2026-06-29 (Codex) - Life polish + Entrepreneurship backlog shipped
 
 Finished the requested Life page polish and Entrepreneurship backlog items.

@@ -59,6 +59,15 @@
     state.finance.brokerage = 5000;
     var invHtml = typeof window.renderHubContent === "function" ? window.renderHubContent("brokerage") : "";
     ok("investments_uses_shared_donut_tile", /v1838-chart-tile/.test(invHtml) && /v1838-donut-wrap/.test(invHtml), "len=" + invHtml.length);
+    ok("investments_has_base_live_market", /Live Market|Stop Live/.test(invHtml) && typeof window.toggleLiveMarketV18 === "function" && typeof window.liveMarketTickV18 === "function", "len=" + invHtml.length);
+    ok("investments_has_funding_controls", /Fund \$10K/.test(invHtml) && /Fund Max/.test(invHtml) && /data-stock18-live-panel/.test(invHtml), "len=" + invHtml.length);
+    ok("investments_live_defaults_on", /Stop Live/.test(invHtml) && /Live market running/.test(invHtml), "len=" + invHtml.length);
+    ok("investments_has_candles_and_buy_max", /v18-candle-chart/.test(invHtml) && /data-stock18-chart/.test(invHtml) && /Buy Max/.test(invHtml), "len=" + invHtml.length);
+    if (typeof window.stopLiveMarketV18 === "function") window.stopLiveMarketV18();
+    var moneyBeforeFund = num(state.money);
+    state.finance.brokerage = 0;
+    window.fundStockCashV18(10000);
+    ok("investment_funding_moves_checking_to_investment_cash", num(state.money) === moneyBeforeFund - 10000 && num(state.finance.brokerage) === 10000 && state.finance.brokerageOpened === true, "money=" + num(state.money) + " brokerage=" + num(state.finance.brokerage));
 
     window.bizSetPanelV1862("team");
     var teamHtml = window.renderEntrepreneurHubV1861();
@@ -76,20 +85,7 @@
 
     window.bizSetPanelV1862("trading");
     var tradingHtml = window.renderEntrepreneurHubV1861();
-    ok("day_trading_ui_present", /Day-trading desk/.test(tradingHtml) && /biz1874-trade-card/.test(tradingHtml) && /bizDayTradeBuyV1874/.test(tradingHtml));
-    var moneyBeforeBuy = num(state.money);
-    window.bizDayTradeBuyV1874("LGR", 1000);
-    var T = window.EntrepreneurV1861.tradeStateV1874();
-    var pos = (T.positions || []).find(function (p) { return p.id === "LGR"; });
-    ok("day_trade_buy_uses_personal_cash", !!pos && num(state.money) === moneyBeforeBuy - 1000, "money=" + num(state.money));
-    var histBefore = (T.history.LGR || []).length;
-    window.bizDayTradeTapeV1874();
-    T = window.EntrepreneurV1861.tradeStateV1874();
-    ok("day_trade_tape_moves_watchlist", (T.history.LGR || []).length >= histBefore && num(T.tradesThisYear) >= 2, "hist=" + (T.history.LGR || []).length + " trades=" + T.tradesThisYear);
-    var moneyBeforeSell = num(state.money);
-    window.bizDayTradeSellV1874("LGR", "all");
-    T = window.EntrepreneurV1861.tradeStateV1874();
-    ok("day_trade_sell_returns_cash", !(T.positions || []).some(function (p) { return p.id === "LGR"; }) && num(state.money) > moneyBeforeSell, "money=" + num(state.money));
+    ok("entrepreneur_trading_tab_removed", !/Day-trading desk/.test(tradingHtml) && !/biz1874-trade-card/.test(tradingHtml) && !/>Trading<\/button>/.test(tradingHtml));
 
     if (typeof window.ensureStateShape === "function") window.ensureStateShape();
     state.finance = state.finance || {};
@@ -99,6 +95,17 @@
     window.buyStockV18("AAPL", 1000);
     var h = state.finance.stocksV18.holdings.find(function (x) { return x.id === "AAPL"; });
     var stockSharesBefore = num(h && h.shares);
+    document.body.insertAdjacentHTML("beforeend", '<div class="hub-overlay hub-brokerage">' + window.renderHubContent("brokerage") + '</div>');
+    var stockValueBeforeLive = num(window.investmentSnapshotV1838 && window.investmentSnapshotV1838().stocks);
+    var priceBeforeLive = num(state.finance.stocksV18.prices.AAPL);
+    var randomBefore = Math.random;
+    Math.random = function () { return 0.99; };
+    state.finance.stocksV18.liveV18 = { enabled: true, ticks: 0 };
+    try { window.liveMarketTickV18(); } finally { Math.random = randomBefore; }
+    var priceAfterLive = num(state.finance.stocksV18.prices.AAPL);
+    var stockValueAfterLive = num(window.investmentSnapshotV1838 && window.investmentSnapshotV1838().stocks);
+    ok("live_ticker_moves_real_stock_price", priceAfterLive !== priceBeforeLive && (state.finance.stocksV18.history.AAPL || []).length > 1, "price " + priceBeforeLive + " -> " + priceAfterLive);
+    ok("live_ticker_moves_owned_stock_value", stockValueAfterLive !== stockValueBeforeLive, "value " + stockValueBeforeLive + " -> " + stockValueAfterLive);
     var brokerageBeforeSell = num(state.finance.brokerage);
     var input = document.createElement("input");
     input.id = "stock-sell-custom-test";
@@ -122,7 +129,7 @@
 
     out.info = {
       employeeCount: (biz.employees || []).length,
-      tradesThisYear: num(T.tradesThisYear),
+      livePriceAAPL: num(state.finance && state.finance.stocksV18 && state.finance.stocksV18.prices && state.finance.stocksV18.prices.AAPL),
       brokerageCash: num(state.finance && state.finance.brokerage),
       founderCashAfterSell: num(state.money)
     };

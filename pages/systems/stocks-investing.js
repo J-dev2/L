@@ -257,8 +257,8 @@
     if (String(html || "").indexOf("v1838-investment-pulse") >= 0) return html;
     var source = String(html || "");
     var end = source.indexOf("</section>");
-    var pulse = investmentsPulseHtml();
-    return end >= 0 ? source.slice(0, end + 10) + pulse + source.slice(end + 10) : pulse + source;
+    var panels = investmentsPulseHtml();
+    return end >= 0 ? source.slice(0, end + 10) + panels + source.slice(end + 10) : panels + source;
   }
 
   function relabelHub(hub) {
@@ -412,7 +412,7 @@
       file: "pages/systems/stocks-investing.js",
       status: "active",
       globals: ["renderBrokerageHubV11", "buyStock", "sellStock", "investBrokerage", "openInvestmentsV1837", "decorateMoneyInputsV1838", "clampInvestmentInputV1838", "fixInvestmentLabelsV1838"],
-      notes: "The underlying route remains brokerage for compatibility, but visible UI labels now say Investments. v18.38.1 adds the investment command ledger, horizontal firm rails, smart max readouts, and header/nav label cleanup."
+      notes: "The underlying route remains brokerage for compatibility, but visible UI labels now say Investments. v18.38.1 adds the investment command ledger, horizontal firm rails, smart max readouts, and header/nav label cleanup. Live stock ticks are owned by the base v18 stock runtime."
     });
   }
 })();

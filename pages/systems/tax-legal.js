@@ -1496,6 +1496,59 @@
   window.continueAsHeirV1846 = continueAsHeirV1846;
   window.continueAsHeir = continueAsHeirV1846;
   try { continueAsHeir = continueAsHeirV1846; } catch (e0) {}
+
+  function renderDeathFallbackV1875(error) {
+    if (typeof document === "undefined") return;
+    var app = document.getElementById("app");
+    if (!app) return;
+    var s = stateNow();
+    var kids = Object.values((s && s.relationships) || {}).filter(function (r) { return r && r.role === "Child" && r.alive !== false; }).length;
+    var name = esc(s && s.name || "Your character");
+    var ageText = esc(s && s.age != null ? s.age : "?");
+    var net = 0;
+    try { if (typeof legacyNetWorth === "function") net = legacyNetWorth(); } catch (e) {}
+    app.innerHTML = '<div class="masthead"><div class="title">The Ledger</div><div class="vol">Final Entry</div></div>' +
+      '<section class="death"><div class="mono">In Memoriam</div><h1>' + name + '</h1>' +
+      '<p class="cause">Age ' + ageText + '. The final ledger is ready for the next generation.</p>' +
+      '<div class="legacy"><div><span>Net Worth</span><b>' + moneyText(net) + '</b></div><div><span>Children</span><b>' + kids + '</b></div><div><span>Status</span><b>Estate settling</b></div></div>' +
+      (error ? '<p class="cause">A death panel failed to render, so the safe memorial screen loaded instead.</p>' : '') +
+      '<div class="death-actions"><button class="primary" onclick="continueAsHeir()">' + (kids ? "Continue the Legacy" : "Continue the Family Line") + '</button></div></section>';
+  }
+
+  if (!window.__ledgerDeathSafetyV1875Wrapped) {
+    window.__ledgerDeathSafetyV1875Wrapped = true;
+    var previousRenderDeathV1875 = window.renderDeath || (typeof renderDeath === "function" ? renderDeath : null);
+    window.renderDeath = function () {
+      try {
+        if (typeof previousRenderDeathV1875 === "function") return previousRenderDeathV1875.apply(this, arguments);
+      } catch (e) {
+        renderDeathFallbackV1875(e);
+        return;
+      }
+      renderDeathFallbackV1875(null);
+    };
+    try { renderDeath = window.renderDeath; } catch (e1) {}
+    var previousAgeUpV1875 = window.ageUp || (typeof ageUp === "function" ? ageUp : null);
+    if (typeof previousAgeUpV1875 === "function") {
+      window.ageUp = function () {
+        try {
+          var out = previousAgeUpV1875.apply(this, arguments);
+          if (stateNow() && stateNow().alive === false && !/In Memoriam/.test((document.getElementById("app") || {}).innerHTML || "")) {
+            window.renderDeath();
+          }
+          return out;
+        } catch (e2) {
+          if (stateNow() && stateNow().alive === false) {
+            renderDeathFallbackV1875(e2);
+            return;
+          }
+          throw e2;
+        }
+      };
+      try { ageUp = window.ageUp; } catch (e3) {}
+    }
+  }
+
   window.renderHubContent = function (hubId) {
     var id = String(hubId || "").toLowerCase();
     if (id === "law" || id === "legal" || id === "taxlaw") return renderLegalHub();

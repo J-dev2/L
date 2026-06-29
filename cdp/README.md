@@ -36,10 +36,10 @@ only pulls scripts referenced in `play.html` / `index.html`).
 | `ipo.js`        | IPO / public company / grants / scale graph | 17 |
 | `dashboard.js`  | Dashboard 2.0 tabs/panels, public gating, market signal | 32 |
 | `life.js`       | Life rebuild route, card popups, sinks, yearly status perk, overflow smoke | 22 |
-| `death.js`      | Death screen + continue-as-heir incl. no-child successor | 20 |
+| `death.js`      | Death screen + continue-as-heir incl. no-child successor and open-hub death | 22 |
 | `founderpay.js` | Founder salary + manual distribution + tax | 24 |
 | `stock.js`      | Share counts, buyback de-list, splits, dividends | 30 |
-| `entrepreneur-backlog.js` | Life/Entrepreneur backlog smoke: shared charts, day trading, hiring, sell paths | 13 |
+| `entrepreneur-backlog.js` | Life/Entrepreneur backlog smoke: shared charts, Investments live trading/funding, candles, hiring, sell paths | 17 |
 | `trust.js`      | Family trust create/fund, net worth, succession carry, death haircut | 18 |
 | `trust-holdings.js` | Trust Envelop titles Property + Entrepreneurship holdings, carries them without duplicate cash | 12 |
 | `family-office.js` | Family Office popup/operator/per-company founder titling + selected-company succession | 23 |

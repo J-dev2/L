@@ -31,6 +31,25 @@ page no longer computes or exposes the old rental catalog UI.
 `cdp/life.js` 22/22, `cdp/entrepreneur-backlog.js` 13/13, `cdp/stock.js` 30/30, `cdp/dashboard.js` 32/32, and
 `cdp/no-patches.js` 2/2 after syntax checks and rebuild. The exact "Sell button doesn't sell" screen/button was
 not provided, but the likely regular-stock custom sell and public-founder own-share custom sell paths are now covered.
+**Checkpoint 65 (2026-06-29):** Corrected the CP64 live-trading placement. Live trading now lives in Investments and
+ticks real `state.finance.stocksV18.prices` every second while the hub is open; Entrepreneurship no longer shows a
+Trading tab. Also added a death safety wrapper and open-hub death regression. Passed `cdp/entrepreneur-backlog.js`
+13/13, `cdp/death.js` 22/22, `cdp/stock.js` 30/30, `cdp/dashboard.js` 32/32, and `cdp/no-patches.js` 2/2.
+**Checkpoint 66 (2026-06-29):** Hardened the Investments live-button crash path by moving live market ownership into
+the base v18 stock runtime and deleting the duplicate wrapper live ticker from `pages/systems/stocks-investing.js`.
+Syntax checks and rebuild passed. In-app browser smoke opened Investments, started live mode, bought `$1K` AAPL while
+prices ticked, and stopped live mode with no console errors. Standalone CDP did not expose a debug port after this
+cleanup, so rerun `cdp/entrepreneur-backlog.js`, `cdp/stock.js`, `cdp/death.js`, and `cdp/no-patches.js` when CDP is
+available.
+**Checkpoint 67 (2026-06-29):** Fixed the visible Investments flow for saves with `Investment Cash $0`. Real Stocks
+now has `Fund $10K`, `Fund $100K`, and `Fund Max` buttons that move checking cash into Investment Cash, plus a clear
+live status strip under the action row. `play.html` runtime/Investments cache stamps were bumped to
+`20260629-livefund1`. Syntax checks and rebuild passed; in-app browser smoke verified funding, buying `$1K` AAPL,
+starting live ticks, visible status, and stopping live mode.
+**Checkpoint 68 (2026-06-29):** Real Stocks now defaults live mode on, renders candlestick mini charts and pattern
+labels per stock, and includes `Buy Max` so a player can put all current Investment Cash into one stock. Cache stamps
+were bumped to `20260629-livecandle1`; syntax checks and rebuild passed; in-app browser smoke verified live default
+on, 15 candle charts, 15 `Buy Max` buttons, and AAPL `Buy Max` while ticks continued.
 Historical note only: the sandbox/Node warning below was from an older session and is retired by CP62. Current
 status: the old verification-debt checklist is paid down; start new sessions from fresh user repros or the backlog.
 The sandbox/Node was **down the entire last session**, so NONE of the recent JS was `node --check`'d or
@@ -140,12 +159,19 @@ Implemented in `pages/systems/entrepreneur.js` and re-verified 2026-06-29. The L
 retain tax counsel, pays upfront and annual legal fees from company cash, lowers the effective corporate tax rate,
 and records yearly tax savings. Passed `cdp/entrepreneur-legal.js` 11/11 in CP63.
 
-**Entrepreneurship backlog (from CP14 / CURRENT_STATE) - SHIPPED + VERIFIED CP64:**
-- **Day-trading desk** - added to the Entrepreneurship dashboard Trading panel.
+**Entrepreneurship backlog (from CP14 / CURRENT_STATE) - SHIPPED + VERIFIED CP64, corrected CP65:**
+- **Live/day-trading desk** - corrected home is Investments, not Entrepreneurship. The Investments live tape now
+  ticks real stock prices and owned stock values while the hub is open.
 - **Team hiring** - existing interview + hire role-based staff flow confirmed and covered.
 - **Shared chart module** - added `pages/systems/charts.js`; used by Stocks + Entrepreneurship.
 - **"Sell button doesn't sell" repro** - exact screen/button still unknown, but regular-stock custom sell and
   public-founder own-share custom sell now have CDP coverage in `cdp/entrepreneur-backlog.js`.
+
+**Investments 2.0 redesign - BACKLOG (requested 2026-06-29):**
+- Rework Investments around a first-screen Asset Summary instead of the current long stacked page.
+- Split sections into clearer areas: Live Trading / Real Stocks, Investment Cash transfers, Outside Managers, Personal Firm, Fund Investor Economics, and history.
+- Expand the live stock experience beyond CP68 mini candles: larger chart view, ticker tape, stronger candle pattern readouts, clearer risk/position sizing, and better mobile scanning.
+- Keep CP68 behavior as the current bridge: live defaults on, cards show candle charts/patterns, and `Buy Max` can put all Investment Cash into a single stock.
 
 ---
 

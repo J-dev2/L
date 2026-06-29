@@ -55,6 +55,15 @@
     ok("nochild_keeps_family", (state.legacy || {}).familyName === famB, "fam=" + (state.legacy || {}).familyName);
     ok("nochild_render_life", !isDeathScreen(appHtml()));
 
+    // ===== C) death from an open hub should still replace the screen, not freeze on stale hub markup =====
+    freshLife(true);
+    try { if (typeof window.setTabV16 === "function") window.setTabV16("brokerage"); else if (typeof window.setTab === "function") window.setTab("brokerage"); } catch (eHub) { out.notes.push("open hub threw " + eHub); }
+    var hadHub = /hub-brokerage|v18-brokerage-hub|Investments/.test(appHtml());
+    killToDeath();
+    var hC = appHtml();
+    ok("openhub_setup_before_death", hadHub);
+    ok("openhub_death_screen_replaces_hub", state.alive === false && isDeathScreen(hC) && hasContinueBtn(hC), hC.slice(0, 240));
+
     out.summary = { total: Object.keys(out.pass).length, passed: Object.keys(out.pass).filter(function (k) { return out.pass[k]; }).length, failed: out.fail.length };
   } catch (e) { out.error = String(e) + " | " + (e && e.stack ? e.stack.split("\n").slice(0, 6).join(" || ") : ""); }
   return out;

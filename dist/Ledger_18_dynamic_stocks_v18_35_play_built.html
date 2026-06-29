@@ -5999,7 +5999,7 @@ body {
 })();
 
 </script>
-<script data-source="pages/runtime/00-core-app-runtime.js?v=20260628-absorbedpatches1">
+<script data-source="pages/runtime/00-core-app-runtime.js?v=20260629-livecandle1">
 const $ = (sel) => document.querySelector(sel);
 const SAVE_KEY_PREFIX = "ledger-life-slot-";
 const ACTIVE_SLOT_KEY = "ledger-active-slot";
@@ -17691,9 +17691,14 @@ getSuggestedActions = function(s) {
     if (!Array.isArray(m.holdings)) m.holdings = [];
     if (!m.prices) m.prices = {};
     if (!m.history) m.history = {};
+    if (!m.candles) m.candles = {};
+    if (!m.liveV18 || typeof m.liveV18 !== "object") m.liveV18 = { enabled:true, ticks:0, trends:{} };
+    if (!m.liveV18.trends) m.liveV18.trends = {};
+    if (m.liveV18.enabled === false && !m.liveV18.userPausedV18) m.liveV18.enabled = true;
     STOCKS18.forEach(function (s) {
       if (!m.prices[s.id]) m.prices[s.id] = s.price;
       if (!Array.isArray(m.history[s.id])) m.history[s.id] = [m.prices[s.id]];
+      seedCandles18(s.id);
     });
     if (!m.cycle) m.cycle = "normal";
     if (state.finance.brokerage > 0) state.finance.brokerageOpened = true;
@@ -17711,6 +17716,52 @@ getSuggestedActions = function(s) {
   function holdingValue18(h) {
     var m = state.finance.stocksV18;
     return (Number(h.shares) || 0) * (Number(m.prices[h.id]) || 0);
+  }
+  function seedCandles18(id) {
+    if (!state || !state.finance || !state.finance.stocksV18) return [];
+    var m = state.finance.stocksV18;
+    if (!m.candles) m.candles = {};
+    if (Array.isArray(m.candles[id]) && m.candles[id].length) return m.candles[id];
+    var s = stock18(id) || { price:1, beta:1 };
+    var hist = (m.history && Array.isArray(m.history[id]) ? m.history[id] : [m.prices && m.prices[id] || s.price]).map(Number).filter(function (v) { return v > 0; });
+    if (!hist.length) hist = [s.price || 1];
+    var out = [];
+    for (var i = 0; i < hist.length; i++) {
+      var open = i ? hist[i - 1] : hist[i];
+      var close = hist[i];
+      var spread = Math.max(.001, Math.abs(close - open) / Math.max(open, 1) + .004 * Math.max(.4, Number(s.beta) || 1));
+      out.push({ o:open, h:Math.max(open, close) * (1 + spread), l:Math.max(.01, Math.min(open, close) * (1 - spread)), c:close });
+    }
+    m.candles[id] = out.slice(-72);
+    return m.candles[id];
+  }
+  function candleChart18(id, compact) {
+    var candles = seedCandles18(id).slice(compact ? -26 : -38);
+    if (window.LedgerChartsV1874 && typeof window.LedgerChartsV1874.candleSVG === "function") {
+      return window.LedgerChartsV1874.candleSVG(candles, { className:"v18-candle-chart", w:compact ? 180 : 270, h:compact ? 46 : 70, max:compact ? 26 : 38 });
+    }
+    return '<div class="v18-candle-fallback">Price history loading.</div>';
+  }
+  function pattern18(id) {
+    if (!ensure18()) return "Watching";
+    var m = state.finance.stocksV18;
+    var hist = (m.history[id] || []).map(Number).filter(function (v) { return v > 0; }).slice(-14);
+    if (hist.length < 4) return "Fresh tape";
+    var last = hist[hist.length - 1];
+    var prev = hist[hist.length - 2];
+    var high = Math.max.apply(null, hist);
+    var low = Math.min.apply(null, hist);
+    var fromLow = low ? (last - low) / low : 0;
+    var offHigh = high ? (high - last) / high : 0;
+    var one = prev ? (last - prev) / prev : 0;
+    var first = hist[0] || last;
+    var run = first ? (last - first) / first : 0;
+    if (offHigh > .12 && one > .006) return "Rebound watch";
+    if (fromLow > .18 && one < -.004) return "Pullback risk";
+    if (run > .15) return "Momentum run";
+    if (run < -.12) return "Falling knife";
+    if (Math.abs(one) > .025) return one > 0 ? "Breakout spike" : "Sharp selloff";
+    return one >= 0 ? "Green tick" : "Red tick";
   }
   function stockValue18() {
     if (!ensure18()) return 0;
@@ -17870,6 +17921,157 @@ getSuggestedActions = function(s) {
     save18();
     refreshHub18();
   };
+  window.fundStockCashV18 = function (amount) {
+    if (!ensure18()) return;
+    var available = Math.max(0, Math.round(Number(state.money) || 0));
+    var amt = amount === "max" ? available : Math.max(0, Math.round(Number(amount) || 0));
+    amt = Math.min(available, amt);
+    if (!amt) return toast18("No checking cash available to fund investments.");
+    state.money = available - amt;
+    state.finance.brokerageOpened = true;
+    state.finance.brokerage = Math.max(0, Math.round(Number(state.finance.brokerage) || 0)) + amt;
+    log18("Moved " + money18(amt) + " from checking into investment cash.", { money:-amt, brokerage:amt });
+    save18();
+    refreshHub18();
+  };
+  function liveStatusText18() {
+    if (!ensure18()) return "Live market unavailable.";
+    var m = state.finance.stocksV18;
+    var live = m.liveV18 || {};
+    var cash = Math.max(0, Number(state.finance.brokerage) || 0);
+    var value = stockValue18();
+    if (live.enabled) {
+      return "Live market running - tick " + Math.max(0, Number(live.ticks) || 0) + ". Prices move every second. Investment cash " + money18(cash) + "; holdings " + money18(value) + ".";
+    }
+    return "Live market paused. Fund Investment Cash from checking, then buy stocks below; prices move when Live Market is on.";
+  }
+  function liveMove18(s, old) {
+    var m = state.finance.stocksV18;
+    var live = m.liveV18 || {};
+    if (!live.trends) live.trends = {};
+    var beta = Math.max(0.25, Number(s.beta) || 1);
+    var hist = (m.history[s.id] || [old]).map(Number).filter(function (v) { return v > 0; }).slice(-18);
+    if (!hist.length) hist = [old];
+    var high = Math.max.apply(null, hist);
+    var low = Math.min.apply(null, hist);
+    var trend = Number(live.trends[s.id]) || 0;
+    var pressure = 0;
+    if (high && old < high * (1 - .055 * beta)) pressure += .55;
+    if (low && old > low * (1 + .075 * beta)) pressure -= .42;
+    var baseNoise = (Math.random() - .49) * .011 * beta;
+    var move = baseNoise + trend * .0045 + pressure * .006;
+    var shockChance = s.id === "BTC-USD" ? .095 : s.sector === "Speculative" ? .06 : s.id === "NVDA" ? .045 : .028;
+    if (Math.random() < shockChance) {
+      var direction = Math.random() < .5 ? -1 : 1;
+      var minShock = s.id === "BTC-USD" ? .025 : .012;
+      var maxShock = s.id === "BTC-USD" ? .135 : s.sector === "Speculative" ? .075 : .045;
+      move += direction * rand18(minShock, maxShock) * Math.min(2.2, beta);
+    }
+    var capDown = s.id === "BTC-USD" ? -.24 : -.12;
+    var capUp = s.id === "BTC-USD" ? .30 : .16;
+    move = Math.max(capDown, Math.min(capUp, move));
+    live.trends[s.id] = Math.max(-1, Math.min(1, trend * .82 + move * 14 + (Math.random() - .5) * .10));
+    return move;
+  }
+  function appendLiveCandle18(s, open, close, move) {
+    var m = state.finance.stocksV18;
+    if (!m.candles) m.candles = {};
+    var beta = Math.max(.35, Number(s.beta) || 1);
+    var wick = Math.max(.0025, Math.abs(move) * .45 + Math.random() * .010 * beta);
+    var high = Math.max(open, close) * (1 + wick);
+    var low = Math.max(.01, Math.min(open, close) * (1 - wick * (.65 + Math.random() * .55)));
+    m.candles[s.id] = (seedCandles18(s.id) || []).concat([{ o:open, h:high, l:low, c:close }]).slice(-96);
+  }
+  function updateLiveMarketDom18() {
+    if (!ensure18()) return;
+    refreshMoney18();
+    try {
+      STOCKS18.forEach(function (s) {
+        var m = state.finance.stocksV18;
+        var price = Number(m.prices[s.id]) || s.price;
+        var hist = m.history[s.id] || [price];
+        var prev = hist.length > 1 ? hist[hist.length - 2] : price;
+        var ch = prev ? (price - prev) / prev : 0;
+        document.querySelectorAll('[data-stock18-id="' + s.id + '"]').forEach(function (card) {
+          var priceEl = card.querySelector(".v18-price b");
+          var moveEl = card.querySelector(".v18-price span");
+          var ownedEl = card.querySelector("[data-stock18-owned]");
+          var chartEl = card.querySelector("[data-stock18-chart]");
+          var patternEl = card.querySelector("[data-stock18-pattern]");
+          var h = m.holdings.find(function (x) { return x.id === s.id; });
+          if (priceEl) priceEl.textContent = priceText18(price);
+          if (moveEl) { moveEl.textContent = pct18(ch); moveEl.className = ch >= 0 ? "up" : "down"; }
+          if (ownedEl) ownedEl.textContent = "Owned " + money18(h ? holdingValue18(h) : 0);
+          if (chartEl) chartEl.innerHTML = candleChart18(s.id, false);
+          if (patternEl) patternEl.textContent = pattern18(s.id);
+        });
+        document.querySelectorAll('[data-stock18-holding-chart="' + s.id + '"]').forEach(function (el) {
+          el.innerHTML = candleChart18(s.id, true);
+        });
+      });
+      var live = state.finance.stocksV18.liveV18 || {};
+      document.querySelectorAll("[data-stock18-live]").forEach(function (el) {
+        el.textContent = live.enabled ? "Live: ON" : "Live: OFF";
+        el.className = live.enabled ? "up" : "";
+      });
+      document.querySelectorAll("[data-stock18-live-panel]").forEach(function (el) {
+        el.textContent = liveStatusText18();
+        el.className = "v18-live-status" + (live.enabled ? " running" : "");
+      });
+    } catch (e) {}
+  }
+  function liveMarketTick18() {
+    if (!ensure18()) return;
+    var m = state.finance.stocksV18;
+    if (!m.liveV18 || !m.liveV18.enabled) return;
+    var before = stockValue18();
+    STOCKS18.forEach(function (s) {
+      var old = Number(m.prices[s.id]) || s.price;
+      var move = liveMove18(s, old);
+      var floor = s.id === "BTC-USD" ? 1000 : 1;
+      var next = Math.max(floor, old * (1 + move));
+      m.prices[s.id] = Math.round(next * 100) / 100;
+      appendLiveCandle18(s, old, m.prices[s.id], move);
+      m.history[s.id] = (m.history[s.id] || [old]).concat([m.prices[s.id]]).slice(-96);
+    });
+    m.liveV18.ticks = Math.max(0, Number(m.liveV18.ticks) || 0) + 1;
+    m.lastMarketGain = Math.round(stockValue18() - before);
+    updateLiveMarketDom18();
+    if (m.liveV18.ticks % 10 === 0) save18();
+  }
+  function stopLiveMarket18() {
+    if (window.__ledgerLiveMarketTimer18) {
+      clearInterval(window.__ledgerLiveMarketTimer18);
+      window.__ledgerLiveMarketTimer18 = null;
+    }
+    if (state && state.finance && state.finance.stocksV18 && state.finance.stocksV18.liveV18) {
+      state.finance.stocksV18.liveV18.enabled = false;
+    }
+    updateLiveMarketDom18();
+  }
+  function ensureLiveMarketTimer18() {
+    if (!ensure18()) return;
+    var m = state.finance.stocksV18;
+    if (!m.liveV18 || !m.liveV18.enabled) return;
+    if (!window.__ledgerLiveMarketTimer18) window.__ledgerLiveMarketTimer18 = setInterval(liveMarketTick18, 1000);
+  }
+  window.toggleLiveMarketV18 = function () {
+    if (!ensure18()) return;
+    var m = state.finance.stocksV18;
+    if (!m.liveV18 || typeof m.liveV18 !== "object") m.liveV18 = { enabled:true, ticks:0, trends:{} };
+    m.liveV18.enabled = !m.liveV18.enabled;
+    m.liveV18.userPausedV18 = !m.liveV18.enabled;
+    if (m.liveV18.enabled && !window.__ledgerLiveMarketTimer18) {
+      ensureLiveMarketTimer18();
+      liveMarketTick18();
+    } else if (!m.liveV18.enabled) {
+      stopLiveMarket18();
+    }
+    save18();
+    refreshHub18();
+  };
+  window.liveMarketTickV18 = liveMarketTick18;
+  window.stopLiveMarketV18 = stopLiveMarket18;
 
   function stockCard18(s) {
     var m = state.finance.stocksV18;
@@ -17880,7 +18082,7 @@ getSuggestedActions = function(s) {
     var h = m.holdings.find(function (x) { return x.id === s.id; });
     var owned = h ? holdingValue18(h) : 0;
     var inputId = "v18-" + s.id.replace(/[^a-z0-9]/gi, "-").toLowerCase();
-    return '<div class="v18-stock-card"><div class="v18-stock-top"><div><div class="v18-ticker">' + esc18(s.id) + '</div><div class="v18-stock-name">' + esc18(s.name) + '</div></div><div class="v18-price"><b>' + priceText18(price) + '</b><span class="' + (ch >= 0 ? 'up' : 'down') + '">' + pct18(ch) + '</span></div></div><div class="v18-stock-note">' + esc18(s.sector) + ' - ' + esc18(s.note) + '</div><div class="v18-chip-row"><span class="money-chip">Yield ' + (s.dividend * 100).toFixed(1) + '%</span><span class="money-chip ' + (owned ? 'good' : '') + '">Owned ' + money18(owned) + '</span></div><div class="v18-actions">' + btn18('Buy $1K','green','buyStockV18(\'' + esc18(s.id) + '\',1000)', (state.finance.brokerage || 0) < 1000) + btn18('Buy $5K','green','buyStockV18(\'' + esc18(s.id) + '\',5000)', (state.finance.brokerage || 0) < 5000) + btn18('Sell $1K','','sellStockV18(\'' + esc18(s.id) + '\',1000)', owned < 1000) + btn18('Sell All','','sellStockV18(\'' + esc18(s.id) + '\',\'all\')', owned <= 0) + '</div><div class="v18-input-row"><input class="v17-money-input" id="' + esc18(inputId) + '" inputmode="numeric" placeholder="$ custom"><button class="money-btn green" onclick="event.preventDefault();event.stopPropagation();buyCustomStockV18(\'' + esc18(s.id) + '\',\'' + esc18(inputId) + '\')" ' + ((state.finance.brokerage || 0) <= 0 ? 'disabled' : '') + '>Buy</button><button class="money-btn" onclick="event.preventDefault();event.stopPropagation();sellCustomStockV18(\'' + esc18(s.id) + '\',\'' + esc18(inputId) + '\')" ' + (owned <= 0 ? 'disabled' : '') + '>Sell</button></div></div>';
+    return '<div class="v18-stock-card" data-stock18-id="' + esc18(s.id) + '"><div class="v18-stock-top"><div><div class="v18-ticker">' + esc18(s.id) + '</div><div class="v18-stock-name">' + esc18(s.name) + '</div></div><div class="v18-price"><b>' + priceText18(price) + '</b><span class="' + (ch >= 0 ? 'up' : 'down') + '">' + pct18(ch) + '</span></div></div><div class="v18-candle-wrap" data-stock18-chart="' + esc18(s.id) + '">' + candleChart18(s.id, false) + '</div><div class="v18-pattern"><b>Pattern</b><span data-stock18-pattern>' + esc18(pattern18(s.id)) + '</span></div><div class="v18-stock-note">' + esc18(s.sector) + ' - ' + esc18(s.note) + '</div><div class="v18-chip-row"><span class="money-chip">Yield ' + (s.dividend * 100).toFixed(1) + '%</span><span data-stock18-owned class="money-chip ' + (owned ? 'good' : '') + '">Owned ' + money18(owned) + '</span></div><div class="v18-actions">' + btn18('Buy $1K','green','buyStockV18(\'' + esc18(s.id) + '\',1000)', (state.finance.brokerage || 0) < 1000) + btn18('Buy $5K','green','buyStockV18(\'' + esc18(s.id) + '\',5000)', (state.finance.brokerage || 0) < 5000) + btn18('Buy Max','green','buyStockV18(\'' + esc18(s.id) + '\',\'all\')', (state.finance.brokerage || 0) <= 0) + btn18('Sell $1K','','sellStockV18(\'' + esc18(s.id) + '\',1000)', owned < 1000) + btn18('Sell All','','sellStockV18(\'' + esc18(s.id) + '\',\'all\')', owned <= 0) + '</div><div class="v18-input-row"><input class="v17-money-input" id="' + esc18(inputId) + '" inputmode="numeric" placeholder="$ custom amount"><button class="money-btn green" onclick="event.preventDefault();event.stopPropagation();buyCustomStockV18(\'' + esc18(s.id) + '\',\'' + esc18(inputId) + '\')" ' + ((state.finance.brokerage || 0) <= 0 ? 'disabled' : '') + '>Buy</button><button class="money-btn" onclick="event.preventDefault();event.stopPropagation();sellCustomStockV18(\'' + esc18(s.id) + '\',\'' + esc18(inputId) + '\')" ' + (owned <= 0 ? 'disabled' : '') + '>Sell</button></div></div>';
   }
   function holdingRows18() {
     if (!ensure18()) return "";
@@ -17889,9 +18091,9 @@ getSuggestedActions = function(s) {
       var val = holdingValue18(h);
       var cost = (Number(h.shares) || 0) * (Number(h.avgCost) || 0);
       var gain = val - cost;
-      return '<div class="v18-holding-row"><div><b>' + esc18(s.id) + '</b><span>' + esc18(s.name) + '</span></div><div><b>' + money18(val) + '</b><span class="' + (gain >= 0 ? 'up' : 'down') + '">' + signedMoney18(gain) + '</span></div></div>';
+      return '<div class="v18-holding-row"><div><b>' + esc18(s.id) + '</b><span>' + esc18(s.name) + '</span><em data-stock18-holding-chart="' + esc18(s.id) + '">' + candleChart18(s.id, true) + '</em></div><div><b>' + money18(val) + '</b><span class="' + (gain >= 0 ? 'up' : 'down') + '">' + signedMoney18(gain) + '</span></div></div>';
     }).join("");
-    return rows || '<div class="v18-empty">No stocks yet. Move cash into brokerage, then buy from the market list.</div>';
+    return rows || '<div class="v18-empty">No stocks yet. Fund Investment Cash from checking, then buy from the market list.</div>';
   }
   function btn18(label, cls, code, disabled) {
     return '<button class="money-btn ' + esc18(cls || "") + '" onclick="event.preventDefault();event.stopPropagation();v18StockAction(function(){' + code + '})" ' + (disabled ? 'disabled' : '') + '>' + esc18(label) + '</button>';
@@ -17910,7 +18112,9 @@ getSuggestedActions = function(s) {
     var cost = investedCost18();
     var unrealized = stockVal - cost;
     var cycle = CYCLES18[m.cycle] || CYCLES18.normal;
-    return '<section class="v18-stock-desk"><div class="money-section-title">Real Stocks <span>v18 dynamic market</span></div><div class="v18-summary-grid"><div class="v18-summary-card v18-checking-card"><div class="k">Checking</div><div class="v" data-ledger-money="checking">' + money18(state.money || 0) + '</div><span>Your spendable cash outside brokerage.</span></div><div class="v18-summary-card"><div class="k">Total Brokerage</div><div class="v" data-ledger-money="brokerage-total">' + money18(total) + '</div><span>Cash plus stock market value.</span></div><div class="v18-summary-card"><div class="k">Brokerage Cash</div><div class="v" data-ledger-money="brokerage-cash">' + money18(state.finance.brokerage || 0) + '</div><span>Use this to buy stocks or withdraw.</span></div><div class="v18-summary-card"><div class="k">Stocks</div><div class="v" data-ledger-money="stock-value">' + money18(stockVal) + '</div><span class="' + (unrealized >= 0 ? 'up' : 'down') + '">Unrealized ' + signedMoney18(unrealized) + '</span></div><div class="v18-summary-card"><div class="k">Cycle</div><div class="v">' + esc18(cycle.label) + '</div><span>' + esc18(cycle.desc) + '</span></div></div><div class="v18-actions">' + btn18('Sim Market Year','blue','runMarketYearV18()', false) + btn18('Sell All Stocks','','sellAllStocksV18()', stockVal <= 0) + btn18('Withdraw Cash','','withdrawBrokerageV17(\'all\')', (state.finance.brokerage || 0) <= 0) + '</div><div class="v18-grid"><section class="v18-panel"><div class="v18-title">Holdings</div>' + holdingRows18() + '</section><section class="v18-panel"><div class="v18-title">Market List</div><div class="v18-stock-list">' + STOCKS18.map(stockCard18).join("") + '</div></section></div></section>';
+    var live = m.liveV18 && m.liveV18.enabled;
+    if (live) ensureLiveMarketTimer18();
+    return '<section class="v18-stock-desk"><div class="money-section-title">Real Stocks <span>v18 dynamic market</span></div><div class="v18-summary-grid"><div class="v18-summary-card v18-checking-card"><div class="k">Checking</div><div class="v" data-ledger-money="checking">' + money18(state.money || 0) + '</div><span>Your spendable cash outside brokerage.</span></div><div class="v18-summary-card"><div class="k">Total Brokerage</div><div class="v" data-ledger-money="brokerage-total">' + money18(total) + '</div><span>Cash plus stock market value.</span></div><div class="v18-summary-card"><div class="k">Brokerage Cash</div><div class="v" data-ledger-money="brokerage-cash">' + money18(state.finance.brokerage || 0) + '</div><span>Use this to buy stocks or withdraw.</span></div><div class="v18-summary-card"><div class="k">Stocks</div><div class="v" data-ledger-money="stock-value">' + money18(stockVal) + '</div><span class="' + (unrealized >= 0 ? 'up' : 'down') + '">Unrealized ' + signedMoney18(unrealized) + '</span></div><div class="v18-summary-card"><div class="k">Cycle</div><div class="v">' + esc18(cycle.label) + '</div><span data-stock18-live class="' + (live ? 'up' : '') + '">' + (live ? 'Live: ON' : esc18(cycle.desc)) + '</span></div></div><div class="v18-actions">' + btn18('Fund $10K','green','fundStockCashV18(10000)', (state.money || 0) < 10000) + btn18('Fund $100K','green','fundStockCashV18(100000)', (state.money || 0) < 100000) + btn18('Fund Max','green','fundStockCashV18(\'max\')', (state.money || 0) <= 0) + btn18(live ? 'Stop Live' : 'Live Market','blue','toggleLiveMarketV18()', false) + btn18('Sim Market Year','blue','runMarketYearV18()', false) + btn18('Sell All Stocks','','sellAllStocksV18()', stockVal <= 0) + btn18('Withdraw Cash','','withdrawBrokerageV17(\'all\')', (state.finance.brokerage || 0) <= 0) + '</div><div class="v18-live-status' + (live ? ' running' : '') + '" data-stock18-live-panel>' + esc18(liveStatusText18()) + '</div><div class="v18-grid"><section class="v18-panel"><div class="v18-title">Holdings</div>' + holdingRows18() + '</section><section class="v18-panel"><div class="v18-title">Market List</div><div class="v18-stock-list">' + STOCKS18.map(stockCard18).join("") + '</div></section></div></section>';
   }
 
   var previousRenderBrokerageSection18 = window.renderBrokerageSection || (typeof renderBrokerageSection === "function" ? renderBrokerageSection : null);
@@ -17993,11 +18197,18 @@ getSuggestedActions = function(s) {
     ".v18-stock-name,.v18-holding-row b{color:#fff1dc;font-size:14px}",
     ".v18-price{text-align:right;font-family:'JetBrains Mono',monospace;font-size:10px}",
     ".v18-price b{display:block;color:#f2e7d6;font-size:13px}",
+    ".v18-candle-wrap{height:72px;margin-top:10px;border:1px solid rgba(255,255,255,.09);border-radius:10px;background:linear-gradient(180deg,rgba(4,9,10,.66),rgba(13,14,12,.92));padding:5px;overflow:hidden}",
+    ".v18-candle-chart{width:100%;height:100%;display:block}",
+    ".v18-pattern{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:8px;font-family:'JetBrains Mono',monospace;font-size:9px;color:#b9a98d;text-transform:uppercase;letter-spacing:.08em}",
+    ".v18-pattern span{color:#f0ca7b;text-align:right}",
     ".v18-chip-row,.v18-actions{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-top:9px}",
+    ".v18-live-status{border:1px solid rgba(143,196,215,.34);border-radius:12px;background:linear-gradient(135deg,rgba(19,35,38,.86),rgba(34,26,18,.88));color:#cbd6cf;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.45;padding:10px 12px;overflow-wrap:anywhere}",
+    ".v18-live-status.running{border-color:rgba(185,220,138,.52);color:#dff0bf;box-shadow:0 0 0 1px rgba(185,220,138,.10) inset}",
     ".v18-input-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:7px;margin-top:9px;align-items:center}",
     ".v18-holding-row{border-bottom:1px solid rgba(255,255,255,.08);padding:9px 0}",
     ".v18-holding-row:last-child{border-bottom:0}",
     ".v18-holding-row span{display:block;color:#b9a98d;font-family:'JetBrains Mono',monospace;font-size:9.5px;margin-top:2px}",
+    ".v18-holding-row em{display:block;width:145px;height:34px;margin-top:6px;border:1px solid rgba(255,255,255,.08);border-radius:8px;background:rgba(0,0,0,.18);padding:3px}",
     "@media(max-width:920px){.v18-grid{grid-template-columns:1fr}.v18-input-row{grid-template-columns:1fr}.v18-input-row .money-btn{width:100%}}"
   ].join("\n");
   document.head.appendChild(style);
@@ -36810,7 +37021,7 @@ getSuggestedActions = function(s) {
 })();
 
 </script>
-<script data-source="pages/systems/stocks-investing.js">
+<script data-source="pages/systems/stocks-investing.js?v=20260629-livecandle1">
 /* Investments system bridge and label normalization. */
 (function () {
   if (window.__ledgerInvestmentsLabelV1837Loaded) return;
@@ -37070,8 +37281,8 @@ getSuggestedActions = function(s) {
     if (String(html || "").indexOf("v1838-investment-pulse") >= 0) return html;
     var source = String(html || "");
     var end = source.indexOf("</section>");
-    var pulse = investmentsPulseHtml();
-    return end >= 0 ? source.slice(0, end + 10) + pulse + source.slice(end + 10) : pulse + source;
+    var panels = investmentsPulseHtml();
+    return end >= 0 ? source.slice(0, end + 10) + panels + source.slice(end + 10) : panels + source;
   }
 
   function relabelHub(hub) {
@@ -37225,7 +37436,7 @@ getSuggestedActions = function(s) {
       file: "pages/systems/stocks-investing.js",
       status: "active",
       globals: ["renderBrokerageHubV11", "buyStock", "sellStock", "investBrokerage", "openInvestmentsV1837", "decorateMoneyInputsV1838", "clampInvestmentInputV1838", "fixInvestmentLabelsV1838"],
-      notes: "The underlying route remains brokerage for compatibility, but visible UI labels now say Investments. v18.38.1 adds the investment command ledger, horizontal firm rails, smart max readouts, and header/nav label cleanup."
+      notes: "The underlying route remains brokerage for compatibility, but visible UI labels now say Investments. v18.38.1 adds the investment command ledger, horizontal firm rails, smart max readouts, and header/nav label cleanup. Live stock ticks are owned by the base v18 stock runtime."
     });
   }
 })();
@@ -38730,6 +38941,59 @@ getSuggestedActions = function(s) {
   window.continueAsHeirV1846 = continueAsHeirV1846;
   window.continueAsHeir = continueAsHeirV1846;
   try { continueAsHeir = continueAsHeirV1846; } catch (e0) {}
+
+  function renderDeathFallbackV1875(error) {
+    if (typeof document === "undefined") return;
+    var app = document.getElementById("app");
+    if (!app) return;
+    var s = stateNow();
+    var kids = Object.values((s && s.relationships) || {}).filter(function (r) { return r && r.role === "Child" && r.alive !== false; }).length;
+    var name = esc(s && s.name || "Your character");
+    var ageText = esc(s && s.age != null ? s.age : "?");
+    var net = 0;
+    try { if (typeof legacyNetWorth === "function") net = legacyNetWorth(); } catch (e) {}
+    app.innerHTML = '<div class="masthead"><div class="title">The Ledger</div><div class="vol">Final Entry</div></div>' +
+      '<section class="death"><div class="mono">In Memoriam</div><h1>' + name + '</h1>' +
+      '<p class="cause">Age ' + ageText + '. The final ledger is ready for the next generation.</p>' +
+      '<div class="legacy"><div><span>Net Worth</span><b>' + moneyText(net) + '</b></div><div><span>Children</span><b>' + kids + '</b></div><div><span>Status</span><b>Estate settling</b></div></div>' +
+      (error ? '<p class="cause">A death panel failed to render, so the safe memorial screen loaded instead.</p>' : '') +
+      '<div class="death-actions"><button class="primary" onclick="continueAsHeir()">' + (kids ? "Continue the Legacy" : "Continue the Family Line") + '</button></div></section>';
+  }
+
+  if (!window.__ledgerDeathSafetyV1875Wrapped) {
+    window.__ledgerDeathSafetyV1875Wrapped = true;
+    var previousRenderDeathV1875 = window.renderDeath || (typeof renderDeath === "function" ? renderDeath : null);
+    window.renderDeath = function () {
+      try {
+        if (typeof previousRenderDeathV1875 === "function") return previousRenderDeathV1875.apply(this, arguments);
+      } catch (e) {
+        renderDeathFallbackV1875(e);
+        return;
+      }
+      renderDeathFallbackV1875(null);
+    };
+    try { renderDeath = window.renderDeath; } catch (e1) {}
+    var previousAgeUpV1875 = window.ageUp || (typeof ageUp === "function" ? ageUp : null);
+    if (typeof previousAgeUpV1875 === "function") {
+      window.ageUp = function () {
+        try {
+          var out = previousAgeUpV1875.apply(this, arguments);
+          if (stateNow() && stateNow().alive === false && !/In Memoriam/.test((document.getElementById("app") || {}).innerHTML || "")) {
+            window.renderDeath();
+          }
+          return out;
+        } catch (e2) {
+          if (stateNow() && stateNow().alive === false) {
+            renderDeathFallbackV1875(e2);
+            return;
+          }
+          throw e2;
+        }
+      };
+      try { ageUp = window.ageUp; } catch (e3) {}
+    }
+  }
+
   window.renderHubContent = function (hubId) {
     var id = String(hubId || "").toLowerCase();
     if (id === "law" || id === "legal" || id === "taxlaw") return renderLegalHub();
@@ -45679,7 +45943,7 @@ getSuggestedActions = function(s) {
     rerender();
   }
   window.bizSetActiveV1861 = setActiveBiz;
-  var DASHBOARD_PANELS_V1862 = ["overview", "product", "growth", "team", "funding", "budget", "legal", "trading", "public", "exit"];
+  var DASHBOARD_PANELS_V1862 = ["overview", "product", "growth", "team", "funding", "budget", "legal", "public", "exit"];
   function dashboardPanelV1862(biz) {
     var B = initBiz();
     var p = String(B.activePanelV1862 || "overview").toLowerCase();
@@ -45767,7 +46031,6 @@ getSuggestedActions = function(s) {
       ["funding", "Funding"],
       ["budget", "Budget"],
       ["legal", "Legal"],
-      ["trading", "Trading"],
       ["public", "Public Market"],
       ["exit", "Exit"]
     ];
@@ -46280,7 +46543,6 @@ getSuggestedActions = function(s) {
     if (panel === "funding") return renderFundingPanelV1862(biz);
     if (panel === "budget") return renderBudgetPanelV1862(biz);
     if (panel === "legal") return renderLegalPanelV1872(biz);
-    if (panel === "trading") return renderTradingPanelV1874(biz);
     if (panel === "public") return '<div class="biz1862-panel">' + renderPublicDeskV1861(biz) + '</div>';
     if (panel === "exit") return '<div class="biz1862-panel">' + renderExitDeskV1861(biz) + '</div>';
     return renderOverviewPanelV1862(biz);
@@ -47354,7 +47616,7 @@ getSuggestedActions = function(s) {
       id: "entrepreneur",
       file: "pages/systems/entrepreneur.js",
       status: "active-port",
-      globals: ["EntrepreneurV1861", "renderEntrepreneurHubV1861", "runEntrepreneurYearV1861", "migrateOldBusinessesV1861", "repairDuplicateBusinessesV1861", "oldBusinessCheckV1861", "bizDayTradeBuyV1874", "bizDayTradeSellV1874", "bizDayTradeTapeV1874"],
+      globals: ["EntrepreneurV1861", "renderEntrepreneurHubV1861", "runEntrepreneurYearV1861", "migrateOldBusinessesV1861", "repairDuplicateBusinessesV1861", "oldBusinessCheckV1861"],
       notes: "Phases A-E complete: ported Verdant catalogs + business factory + founder state, 6-step wizard, yearly engine, modular hub render owns the Business route, and legacy retirement — old businesses migrate into bizV1860 with full legacy stage mapping, legacy yearly/income hooks are gated against migrated firms (no double-tick), and duplicate-company repair tooling is available from the Old Business Check card."
     });
   }

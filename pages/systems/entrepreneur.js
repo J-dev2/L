@@ -994,7 +994,7 @@
     rerender();
   }
   window.bizSetActiveV1861 = setActiveBiz;
-  var DASHBOARD_PANELS_V1862 = ["overview", "product", "growth", "team", "funding", "budget", "legal", "trading", "public", "exit"];
+  var DASHBOARD_PANELS_V1862 = ["overview", "product", "growth", "team", "funding", "budget", "legal", "public", "exit"];
   function dashboardPanelV1862(biz) {
     var B = initBiz();
     var p = String(B.activePanelV1862 || "overview").toLowerCase();
@@ -1082,7 +1082,6 @@
       ["funding", "Funding"],
       ["budget", "Budget"],
       ["legal", "Legal"],
-      ["trading", "Trading"],
       ["public", "Public Market"],
       ["exit", "Exit"]
     ];
@@ -1595,7 +1594,6 @@
     if (panel === "funding") return renderFundingPanelV1862(biz);
     if (panel === "budget") return renderBudgetPanelV1862(biz);
     if (panel === "legal") return renderLegalPanelV1872(biz);
-    if (panel === "trading") return renderTradingPanelV1874(biz);
     if (panel === "public") return '<div class="biz1862-panel">' + renderPublicDeskV1861(biz) + '</div>';
     if (panel === "exit") return '<div class="biz1862-panel">' + renderExitDeskV1861(biz) + '</div>';
     return renderOverviewPanelV1862(biz);
@@ -2669,7 +2667,7 @@
       id: "entrepreneur",
       file: "pages/systems/entrepreneur.js",
       status: "active-port",
-      globals: ["EntrepreneurV1861", "renderEntrepreneurHubV1861", "runEntrepreneurYearV1861", "migrateOldBusinessesV1861", "repairDuplicateBusinessesV1861", "oldBusinessCheckV1861", "bizDayTradeBuyV1874", "bizDayTradeSellV1874", "bizDayTradeTapeV1874"],
+      globals: ["EntrepreneurV1861", "renderEntrepreneurHubV1861", "runEntrepreneurYearV1861", "migrateOldBusinessesV1861", "repairDuplicateBusinessesV1861", "oldBusinessCheckV1861"],
       notes: "Phases A-E complete: ported Verdant catalogs + business factory + founder state, 6-step wizard, yearly engine, modular hub render owns the Business route, and legacy retirement — old businesses migrate into bizV1860 with full legacy stage mapping, legacy yearly/income hooks are gated against migrated firms (no double-tick), and duplicate-company repair tooling is available from the Old Business Check card."
     });
   }

@@ -82,10 +82,38 @@ tax savings.
 
 2026-06-29 update: **Checkpoint 64** shipped the Life page polish and Entrepreneurship backlog. Life activity popups
 for Body & Mind, Fun, and Side Money now use card-style layouts; luxury/experience pricing and Status thresholds were
-tuned upward. Entrepreneurship now has a Day-trading dashboard panel, a shared chart module
-(`pages/systems/charts.js`) used by Stocks and Entrepreneurship, and CDP coverage for the existing hiring/interview
-flow plus the likely regular-stock and founder-own-share sell paths. Verified by `cdp/life.js` 22/22,
+tuned upward. CP64 also added the shared chart module (`pages/systems/charts.js`) used by Stocks and
+Entrepreneurship, and CDP coverage for the existing hiring/interview flow plus the likely regular-stock and
+founder-own-share sell paths. Verified by `cdp/life.js` 22/22,
 `cdp/entrepreneur-backlog.js` 13/13, `cdp/stock.js` 30/30, `cdp/dashboard.js` 32/32, and `cdp/no-patches.js` 2/2.
+
+2026-06-29 correction: **Checkpoint 65** moved the live-trading player surface out of Entrepreneurship and into
+Investments. The Investments live tape now ticks real `state.finance.stocksV18.prices` every second while the hub is
+open, so actual owned stock values move with the tape. Entrepreneurship no longer shows a Trading tab. A death safety
+wrapper now forces the In Memoriam screen if age-up leaves the character dead while stale hub markup or a decorated
+death panel would otherwise freeze the screen. Verified by `cdp/entrepreneur-backlog.js` 13/13, `cdp/death.js` 22/22,
+`cdp/stock.js` 30/30, `cdp/dashboard.js` 32/32, and `cdp/no-patches.js` 2/2.
+
+2026-06-29 correction: **Checkpoint 66** hardened the Investments live-button crash path. Live market mode is now
+owned by the base v18 stock runtime in `pages/runtime/00-core-app-runtime.js` (`toggleLiveMarketV18`,
+`liveMarketTickV18`, `stopLiveMarketV18`) and uses the same `stocksV18` price/history/value path as normal stock
+buy/sell. `pages/systems/stocks-investing.js` no longer carries the duplicate wrapper ticker; it only decorates the
+Investments route and input/readout UX. Syntax checks and rebuild passed, and an in-app browser smoke test opened
+Investments, started live mode, bought `$1K` AAPL while ticks were running, and stopped live mode with no console
+errors. Standalone CDP launch was unavailable after this cleanup, so rerun the focused CDP probes when CDP is available.
+
+2026-06-29 correction: **Checkpoint 67** fixed the user-facing Investments flow when a save has `Investment Cash $0`.
+The Real Stocks desk now has `Fund $10K`, `Fund $100K`, and `Fund Max` controls that move checking cash into
+Investment Cash through `fundStockCashV18`, plus a visible live status strip under the action buttons. `play.html`
+cache stamps were bumped to `20260629-livefund1`. Syntax checks and rebuild passed, and in-app browser smoke verified
+funding, buying `$1K` AAPL, starting live ticks, visible tick status, and stopping live mode with no console errors.
+
+2026-06-29 correction: **Checkpoint 68** made Real Stocks live by default and closer to a day-trading board. The
+stock runtime now stores OHLC candle history under `state.finance.stocksV18.candles`, renders candlestick mini charts
+and pattern labels per stock, and adds `Buy Max` so all current Investment Cash can go into one stock. Live ticks now
+model momentum, pullback/rebound pressure, random breakouts/selloffs, and larger Bitcoin/speculative-stock spikes.
+`play.html` cache stamps are `20260629-livecandle1`. Full Investments 2.0 is still backlog: rebuild around an Asset
+Summary and separated Live Trading, manager, personal firm, and fund-economics sections.
 
 Property-specific context from **Checkpoint 29 (2026-06-22)**: `pages/systems/property-estate.js` is now **v18.66**.
 CP27 added property class/prestige tiers (Economy→Prestige, net-worth-gated); CP28 fixed the Flip-plan
@@ -160,10 +188,10 @@ full detail per checkpoint in `dev-notes/SESSION_SUMMARY.md` (checkpoints 2–14
   `initBiz()`. Keep dev-only utilities here so the playable build stays clean.
 
 ### Open backlog (requested, not yet built)
-- **Day-trading desk**: live/short-term trading of select stocks (the natural home for a
-  real candlestick chart). Needs a design pass.
-- **Shared chart module**: extract our SVG charts into a reusable `charts.js` (recommended)
-  used by Stocks + Entrepreneurship; uPlot (MIT) only if a heavy interactive chart is wanted.
+- **Investments 2.0 redesign**: CP68 shipped the bridge version (live default-on Real Stocks,
+  mini candlesticks, pattern labels, and `Buy Max`). Still needed: a proper Investments redesign
+  with first-screen Asset Summary, separated Live Trading / managers / personal firm / fund
+  economics areas, and a larger chart/ticker experience.
 - General "work on the graphs" polish.
 - "Sell button doesn't sell" report: Sell All works in `cdp/stock.js`; needs the exact
   screen/button from the user to reproduce.
