@@ -2,16 +2,42 @@
 
 > Single consolidated list of everything still open, written so a new chat can start cold.
 > Detail for finished work lives in `SESSION_SUMMARY.md` (checkpoints, latest on top).
-> Last updated 2026-06-28.
+> Last updated 2026-06-29.
 
 ---
 
 ## 0. VERIFICATION DEBT (do this first in a fresh session)
 
+**2026-06-29 update:** Family Office / trust-envelop verification is no longer part of this debt. Checkpoint 56
+finished the current Family Office request and verified `cdp/family-office.js` 23/23, `cdp/trust.js` 18/18, and
+`cdp/trust-holdings.js` 12/12 after rebuilding. Checkpoint 57 finished the mobile Money height and platform emoji
+fallback follow-ups, with `cdp/money-mobile.js` 10/10, `cdp/platform-compat.js` 8/8, and `cdp/flicker.js` 18/18.
+The Life rebuild probe exists and is green (`cdp/life.js` 19/19 after rebuild). Remaining verification debt below
+is for older non-Family-Office modules.
+
+**Checkpoint 59 (2026-06-29):** CP49 trust/death and older Entrepreneurship/core verification are now green on the
+current build. Passed: `cdp/death.js` 20/20, `cdp/networth-genetics.js` 9/9, `cdp/trust.js` 18/18,
+`cdp/estate-trust.js` 4/4, `cdp/trust-nav.js` 2/2, `cdp/wayback.js` 11/11, `cdp/separation.js` 20/20,
+`cdp/features.js` 17/17, `cdp/ipo.js` 17/17, `cdp/dashboard.js` 32/32, `cdp/founderpay.js` 24/24,
+`cdp/stock.js` 30/30, and `cdp/entrepreneur-legal.js` 11/11 after syntax checks and rebuild.
+
+**Checkpoint 60 (2026-06-29):** Property/Vehicles verification is now green on the current build. Passed:
+`cdp/property.js` 78/78 and `cdp/cars.js` 23/23 after syntax checks and rebuild.
+
+**Checkpoint 61 (2026-06-29):** Patch cleanup audit is current. `pages/patches/` is empty, `play.html` has no active
+`pages/patches` script tags, and `docs/build-report.json` has no patch script entries. Added `cdp/no-patches.js` as
+a future browser guard. The browser guard was not run because the app rejected starting a temporary headless Edge
+session due usage limits; static checks passed.
+
 The sandbox/Node was **down the entire last session**, so NONE of the recent JS was `node --check`'d or
 rebuilt into `dist/`. The game runs live from `play.html` (source), but the built files are stale.
 
 **Do first:**
+
+2026-06-29 note: Life rebuild verification is paid down. `pages/systems/life-wellbeing.js`,
+`pages/systems/life-rebuild.js`, `pages/systems/life-command.js`, and `cdp/life.js` passed `node --check`; the
+bundle rebuilt; `cdp/life.js` passed 19/19.
+
 1. `node --check` every file touched recently:
    - `pages/systems/entrepreneur.js`  (huge changes — see §A)
    - `pages/runtime/00-core-app-runtime.js`  (cents formatter `priceText18` + `stockCard18`)
@@ -19,12 +45,13 @@ rebuilt into `dist/`. The game runs live from `play.html` (source), but the buil
    - `pages/systems/life-rebuild.js`  (NEW module — heavily extended through CP49; cache-stamp now `liferebuild12`)
    - `pages/systems/tax-legal.js`  (CP49 — trust protection fix in `protectedAssets()`)
    - `pages/systems/finance-ledger.js`  (CP49 — Finance trust-tile display match)
-   - `pages/patches/15-patch-v18-33-6.js`  (reverted a mobile nav rule)
+   - `cdp/no-patches.js`  (retired patch-script guard)
    - `styles/ledger-ui.css`  (nav-dock + budget button grid — CSS, no node check)
 2. Rebuild the bundle: `node build/build-ledger18.js`  (regenerates `dist/` from current source).
-3. Run the CDP probes (`cdp/driver.js` + `cdp/*.js`) to smoke-test — add a new `cdp/life.js` for the Life page, and
-   run `cdp/death.js` / `cdp/trust.js` / `cdp/networth-genetics.js` for the CP49 trust fix (assert net worth is
-   UNCHANGED on titling, heir keeps the titled-business value across death).
+3. Run the remaining CDP probes (`cdp/driver.js` + `cdp/*.js`) to smoke-test older debt. `cdp/no-patches.js` is
+   present with static checks clean but still needs a browser run when CDP is available. `cdp/life.js`,
+   `cdp/death.js`, `cdp/networth-genetics.js`, the main Entrepreneurship/core probes, `cdp/property.js`, and
+   `cdp/cars.js` are present and green; remaining debt should move to fresh user repros or lower-priority cleanup.
 
 Cache-stamps currently in `play.html` (bump again after any further edit): `entrepreneur.js?v=…-bizdeck13`,
 `00-core-app-runtime.js?v=…-cents`, `life-wellbeing.js?v=…-wb3`, `ledger-ui.css?v=…-navdock5`,
@@ -33,26 +60,27 @@ Cache-stamps currently in `play.html` (bump again after any further edit): `entr
 Note: the 4 `dist/*.html` files got the nav-dock CSS patched in by hand but are otherwise STALE (missing all the
 entrepreneurship + wellbeing work). A clean rebuild fixes that.
 
-Mobile QA note from user (2026-06-28, corrected): On the GitHub-hosted/mobile build, the Money page is the hub that
-appears to use the wrong vertical height. Its content extends down under the browser chrome/bottom area, so the user
-cannot reliably see or touch controls at the bottom. Earlier report said Finance, but user re-checked and corrected
-it to Money. Hosted site may be one or two versions behind current source, so verify against latest `play.html`/
-rebuilt `dist` first. Likely affected file: `pages/systems/money-banking.js` (and possibly hub-sheet/mobile CSS if
-the issue reproduces).
+Mobile Money height note from user (2026-06-28, corrected) - SHIPPED CP57: The Money page used the wrong mobile
+height and could extend under browser chrome/bottom UI. Fixed in `pages/systems/money-banking.js` with dynamic
+viewport height, safe-area-aware bottom padding, and internal Money-body scrolling. Verified by `cdp/money-mobile.js`
+10/10 after rebuild.
 
-Emoji/platform QA note from user (2026-06-28): On an Apple phone, some emojis/icons do not show correctly. Future
-work should add a verification/fallback layer that detects Apple/iOS, Android, or desktop and swaps to symbols known
-to render on that platform. If emoji rendering still fails, fall back to plain text/sign characters so controls remain
-readable. Do not implement yet; capture for a later UI compatibility pass.
+Emoji/platform QA note from user (2026-06-28) - SHIPPED CP57: Added `pages/systems/platform-compat.js` to detect
+iOS/Android/desktop, check emoji rendering, and swap key emoji icons to readable symbol text when needed. Verified by
+`cdp/platform-compat.js` 8/8 after rebuild.
 
 ---
 
-## 1. BIG: Rebuild the Life page (top to bottom) — ✅ SHIPPED (CP48), verification pending
+## 1. BIG: Rebuild the Life page (top to bottom) — ✅ SHIPPED + VERIFIED (CP48/CP50, re-run 2026-06-29)
+
+2026-06-29 verification update: this is now verified. `cdp/life.js` covers route rendering, popups, Decompress,
+luxury/experience pure sinks, yearly status perk, and overflow smoke. Re-run result: 19/19 after `node --check`
+and rebuild.
 
 Done in `pages/systems/life-rebuild.js` (v18.71), wired into `play.html` after `life-wellbeing.js`. Full detail
 in `SESSION_SUMMARY.md` **Checkpoint 48**. Popup-driven Life hub + luxury/experiences/status money-sinks, all
-reusing the existing action openers. **Still owed:** in-browser QA + `node --check` + `dist` rebuild + a
-`cdp/life.js` probe (sandbox was down — see §0). Original spec kept below for reference.
+reusing the existing action openers. Verification is complete for the current Life rebuild. Original spec kept below
+for reference.
 
 Full spec in `SESSION_SUMMARY.md` **Checkpoint 47**. Summary:
 - Clean, **popup-driven** Life page (save screen space, more dynamic). Compact status header
@@ -72,15 +100,20 @@ Full spec in `SESSION_SUMMARY.md` **Checkpoint 47**. Summary:
 
 ## 2. Trust: Repair-Carry "never recovers" / balance persistence  (task #20 — ROOT CAUSE FOUND + FIX SHIPPED, VERIFY)
 
+**2026-06-29 update:** The trust regressions tied to the current Family Office path are now green:
+`cdp/trust.js` 18/18, `cdp/trust-holdings.js` 12/12, and `cdp/family-office.js` 23/23. Keep this section as
+historical context for the original repair/carry bug and only reopen it if the user can reproduce a fresh
+repair/carry failure on the current build.
+
 **Update CP49 (2026-06-27):** root cause found + fix applied (untested). The titled business was left OUT of the
 estate-tax shield (`protectedAssets()` / `legalProtectedValue` omitted `trustBusinessCarryValueV1846`), so it got
 taxed + probated on death every succession. Fixed in `tax-legal.js protectedAssets()` (+ a Finance-page display
 match in `finance-ledger.js`). Both are display + death-tax-calc only, capped at gross (no net-worth change, no
-phantom cash). **Still owed:** verify on the tested side (`cdp/death.js`, `cdp/trust.js`, `cdp/networth-genetics.js`)
-— title a business to trust, assert net worth unchanged + protection up, die, confirm heir keeps the value and it
-persists next year. Full detail in `SESSION_SUMMARY.md` CP49.
+phantom cash). **Verified 2026-06-29:** `cdp/death.js`, `cdp/trust.js`, `cdp/networth-genetics.js`,
+`cdp/estate-trust.js`, and `cdp/trust-nav.js` are green on the current build. Full detail in `SESSION_SUMMARY.md`
+CP49 and CP59.
 
-**Also check (related paths, NOT changed in CP49 — verify on the tested side):**
+**Also check (related paths, NOT changed in CP49 — keep as future audit notes, not current blockers):**
 - `personalInheritanceCashV1846` (the continue-as-heir CASH path) uses a protection % (`trustProt`), not
   `protectedAssets()` — confirm it handles the titled business consistently so there isn't a second leak there.
 - `08-patch-v18-31.js estateSettlement` still computes `businessTrustValue` (~L204) but never uses it now that
@@ -98,6 +131,11 @@ fix needs a tested environment. Key code in `pages/systems/tax-legal.js`: `trust
 ---
 
 ## 3. Trust envelop: title Property + Entrepreneurship portfolios into the trust  (task #22 — NOW UNBLOCKED, verify #2 first)
+
+**2026-06-29 update:** The current Family Office/trust-envelop path is implemented and verified for titled property,
+per-company founder-company titling, net-worth-neutral protection, succession carry, operator carry, and operator
+salary/fee negotiation. See `SESSION_SUMMARY.md` Checkpoints 53 and 56. Keep future work here only for new trust
+asset categories or fresh repro bugs.
 
 Full design in `dev-notes/TRUST_ENVELOP_PLAN.md`. Mark property + entrepreneurship portfolios as
 trust-protected WITHOUT re-adding them to net worth (avoid double-count). **#2's protection fix shipped in CP49**,
@@ -123,9 +161,11 @@ Add a **Legal** tab to the entrepreneurship hub with a **tax-attorney** hire tha
 
 ---
 
-## 5. dist rebuild + property CDP probe  (task #6 — was blocked by sandbox)
+## 5. dist rebuild + property/vehicles CDP probe  (task #6 — VERIFIED CP60)
 
-Covered by §0. Run the property probe (`cdp/property.js`) after rebuild.
+Verified 2026-06-29. `node build/build-ledger18.js` succeeded, `cdp/property.js` passed 78/78, and `cdp/cars.js`
+passed 23/23 after syntax checks. Keep this section only as historical context; new work belongs in fresh repros or
+the CP26 legacy fold-in item below.
 
 ---
 

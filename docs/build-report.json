@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-06-28T16:49:00.242Z",
+  "builtAt": "2026-06-29T06:19:47.617Z",
   "source": "outputs/ledger18_modular_v18_35",
   "entries": [
     {
@@ -70,8 +70,8 @@
           "bytes": 102038
         },
         {
-          "src": "pages/systems/money-banking.js",
-          "bytes": 60829
+          "src": "pages/systems/money-banking.js?v=20260629-mobile1",
+          "bytes": 61334
         },
         {
           "src": "pages/systems/finance-ledger.js?v=20260627-trustprotect1",
@@ -130,8 +130,12 @@
           "bytes": 45857
         },
         {
-          "src": "pages/systems/family-office.js?v=20260628-familyoffice6",
-          "bytes": 34814
+          "src": "pages/systems/family-office.js?v=20260628-familyoffice7",
+          "bytes": 35080
+        },
+        {
+          "src": "pages/systems/platform-compat.js?v=20260629-platform1",
+          "bytes": 7973
         },
         {
           "src": "pages/hubs/00-hub-registry.js",
@@ -182,7 +186,7 @@
           "bytes": 15386
         }
       ],
-      "bytes": 3424427
+      "bytes": 3432480
     },
     {
       "entry": "index.html",

@@ -114,7 +114,7 @@
   /* ----------------------------- OPERATOR (feature 2) -----------------------------
      Hire an operator to RUN + GROW titled family-office holdings when you're not actively managing
      them. Each year the operator earns a return on the TITLED value (property + founder companies +
-     titled businesses), keeps a fee, and compounds the rest into the trust corpus — so protected
+     titled businesses), takes negotiated salary/fee compensation, and compounds the rest into the trust corpus — so protected
      family wealth grows across years and generations. State lives on the trust (carries to heirs).
      Writes ONLY to trust.corpus + cash on hire; never touches the asset engines, so no net-worth
      double-count. NOTE (tested side): the return/fee rates are a first pass — tune for balance. */
@@ -224,8 +224,8 @@
     log("Let the family-office operator go.");
     saveGame(); rerender();
   };
-  // Yearly: operator earns returnRate × titled value, keeps annualFeeRate of it, compounds the rest
-  // into trust corpus. Guarded once per year. Hooked onto resolveLifeAndFinanceYear below.
+  // Yearly: operator earns returnRate x titled value, pays salary/fee compensation from that gross,
+  // then compounds the rest into trust corpus. Guarded once per year.
   function applyOperatorYear() {
     var s = S(); if (!s || !s.alive) return;
     var trust = (s.finance || {}).familyTrustV1839; if (!trust || !trust.created) return;
@@ -259,7 +259,7 @@
     if (cur) {
       var opts = operatorCompOptions(cur).map(function (opt) {
         var selected = round(op.salary) === clampOperatorSalary(cur, opt.salary) && Math.round(num(op.feeRate) * 1000) === Math.round(clampFeeRate(opt.feeRate) * 1000);
-        return '<button class="money-btn ' + (selected ? "blue" : "gold") + '" onclick="event.preventDefault();event.stopPropagation();setOperatorCompPresetV1872(\'' + opt.id + '\')">' + esc(opt.name) + '</button>';
+        return '<button class="money-btn ' + (selected ? "blue" : "gold") + '" onclick="event.preventDefault();event.stopPropagation();setOperatorCompPresetV1872(\'' + opt.id + '\')">' + esc(opt.name + " " + money(clampOperatorSalary(cur, opt.salary)) + " + " + Math.round(clampFeeRate(opt.feeRate) * 100) + "%") + '</button>';
       }).join("");
       compControls = '<div class="fo72-comp-box"><div class="fo72-comp-line"><b>Compensation</b><span>Salary ' + esc(money(op.salary)) + ' + ' + Math.round(num(op.feeRate) * 100) + '% fee</span></div>' +
         '<div class="row-sub">Negotiate higher salary for a lower fee percentage, or lower salary for more upside fee. Total annual operator compensation is capped at ' + money(OPERATOR_COMP_CAP) + '.</div>' +
@@ -367,7 +367,7 @@
     if (h.outsideManager > 0) rows += row("📈", "Outside manager capital", h.outsideManager, "Carries", "Externally managed capital — carries into the trust on succession. Move it into the corpus from the Trust hub to protect it now.");
     var op72 = operatorState() || {};
     var op72Def = op72.hired ? operatorDef(op72.tier) : null;
-    if (op72Def) rows += row("🤝", "Operator", op72.totalGrown, "Active", op72Def.name + " · grew the office " + money(op72.lastReturn) + " last year.");
+    if (op72Def) rows += row("🤝", "Operator", op72.totalGrown, "Active", op72Def.name + " · salary " + money(op72.salary) + " + " + Math.round(num(op72.feeRate) * 100) + "% fee · grew " + money(op72.lastReturn) + " last year.");
 
     var hero =
       '<div class="fo72-hero">' +
@@ -531,7 +531,7 @@
       file: "pages/systems/family-office.js",
       status: "active",
       globals: ["openFamilyOfficeV1872", "closeFamilyOfficeV1872", "setOperatorCompPresetV1872"],
-      notes: "v18.72 Family Office. Holdings popup, negotiable operator compensation, and per-company founder-company titling are active."
+      notes: "v18.72 Family Office. Holdings popup, titled-asset operator with salary/fee negotiation, and per-company founder-company titling are active."
     });
   }
 })();

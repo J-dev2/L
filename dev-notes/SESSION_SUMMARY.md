@@ -5,6 +5,226 @@
 
 ---
 
+## Checkpoint 61 - 2026-06-29 (Codex) - Patch cleanup audit corrected + no-patches guard added
+
+Cleaned up the remaining patch-script audit state after the functional verification passes.
+
+Changed:
+
+- `play.html`
+  - Replaced the long list of retired patch comments with one concise retired-patches note.
+- `README.md`
+  - Updated `pages/patches/` wording to say it is historical and no longer runtime-loaded.
+- `dev-notes/PATCH_AUDIT.md`
+  - Corrected the stale audit: `pages/patches/` is empty, no `pages/patches` scripts are in `play.html`, and the build report has no patch entries.
+  - Documented where the absorbed behavior now lives: runtime, `business-entities.js`, `tax-legal.js`, `save-recovery.js`, `life-command.js`, and `scroll-nav.js`.
+- `cdp/no-patches.js`
+  - Added a browser guard that checks runtime script tags for accidental `pages/patches` reintroduction.
+- `cdp/README.md`
+  - Added `no-patches.js` to the probe index.
+- `dev-notes/OUTSTANDING_TODO.md`
+  - Replaced the stale old-patch checklist item with the new retired patch-script guard.
+
+Verification:
+
+- `node --check cdp/no-patches.js`
+- `node build\build-ledger18.js`
+- Static `play.html` check: no active `<script ... pages/patches/...>` tags.
+- Static `docs/build-report.json` check: no `pages/patches` script entries.
+- Static source-tree check: `pages/patches` has 0 entries.
+
+Not run:
+
+- `cdp/no-patches.js` in a browser. Starting the temporary headless Edge CDP session was rejected by the app usage limit, so the static checks above were used instead.
+
+Notes:
+
+- No gameplay source changes were needed.
+- There were no remaining live patch scripts to remove; the cleanup was correcting stale audit/docs and adding a future guard.
+
+---
+
+## Checkpoint 60 - 2026-06-29 (Codex) - Property/Vehicles verification debt paid down
+
+Ran the Property and Vehicles verification batch from the outstanding debt list.
+
+Changed:
+
+- `cdp/README.md`
+  - Updated `property.js` from its stale 30-check listing to the current 78-check contract.
+  - Added `cars.js` to the probe index with its 23-check Vehicles contract.
+- `dev-notes/OUTSTANDING_TODO.md`
+  - Marked Property/Vehicles verification as green for the current build.
+- `dev-notes/ai-handoff/CURRENT_STATE.md`
+  - Added the CP60 Property/Vehicles verification status.
+
+Verification:
+
+- `node --check pages/systems/property-estate.js`
+- `node --check pages/systems/car-collection.js`
+- `node --check cdp/property.js`
+- `node --check cdp/cars.js`
+- `node build\build-ledger18.js`
+- `cdp/property.js`: 78/78
+- `cdp/cars.js`: 23/23
+
+Notes:
+
+- No gameplay source changes were needed.
+- Property covers mortgage/cash purchase, strategy, rent, yearly cashflow, renovation, paydown/refi, sale flow, finance rows, migration, class/prestige gates, tenant screening/relationships/personas/events, evict/renewal, flips, and residence bonus.
+- Vehicles covers cash/finance purchase, road/marine/air categories, yearly depreciation/appreciation, condition decay, loan amortization, repair, loan paydown, garage equity/net worth, daily driver, sale, market render, and legacy `state.car` migration.
+
+---
+
+## Checkpoint 59 - 2026-06-29 (Codex) - CP49 trust/death + Entrepreneurship/core verification paid down
+
+Ran the next requested verification batch: CP49 trust/death coverage plus older Entrepreneurship/core smoke checks.
+
+Changed:
+
+- `cdp/ipo.js`
+  - Made the green-company grant assertion deterministic by temporarily forcing the grant roll during that check.
+- `cdp/stock.js`
+  - Updated the budget donut assertion to open the current Budget tab and look for the current "Where the money goes" label.
+- `dev-notes/OUTSTANDING_TODO.md`
+  - Marked CP49 trust/death verification and the older Entrepreneurship/core smoke debt as paid down for the current build.
+- `dev-notes/ai-handoff/CURRENT_STATE.md`
+  - Added the CP59 verification status.
+
+Verification:
+
+- `node --check pages/systems/tax-legal.js`
+- `node --check pages/systems/finance-ledger.js`
+- `node --check pages/systems/entrepreneur.js`
+- `node --check pages/runtime/00-core-app-runtime.js`
+- `node --check cdp/death.js`
+- `node --check cdp/networth-genetics.js`
+- `node --check cdp/separation.js`
+- `node --check cdp/features.js`
+- `node --check cdp/ipo.js`
+- `node --check cdp/dashboard.js`
+- `node --check cdp/founderpay.js`
+- `node --check cdp/stock.js`
+- `node --check cdp/entrepreneur-legal.js`
+- `node build\build-ledger18.js`
+- `cdp/death.js`: 20/20
+- `cdp/networth-genetics.js`: 9/9
+- `cdp/trust.js`: 18/18
+- `cdp/estate-trust.js`: 4/4
+- `cdp/trust-nav.js`: 2/2
+- `cdp/wayback.js`: 11/11
+- `cdp/separation.js`: 20/20
+- `cdp/features.js`: 17/17
+- `cdp/ipo.js`: 17/17
+- `cdp/dashboard.js`: 32/32
+- `cdp/founderpay.js`: 24/24
+- `cdp/stock.js`: 30/30
+- `cdp/entrepreneur-legal.js`: 11/11
+
+Notes:
+
+- No gameplay source changes were needed for this batch; only stale probe expectations were updated.
+- CP49 death/inheritance/trust protection and the older Entrepreneurship/core checks are green on the current build.
+
+---
+
+## Checkpoint 58 - 2026-06-29 (Codex) - Life rebuild verification debt paid down
+
+Verified the next outstanding task from the backlog: the v18.71 Life page rebuild.
+
+Changed:
+
+- `cdp/README.md`
+  - Added `cdp/life.js` to the probe index.
+- `dev-notes/OUTSTANDING_TODO.md`
+  - Marked the Life rebuild as shipped + verified instead of pending a new probe.
+  - Noted that the Life syntax checks, rebuild, and CDP probe are green.
+
+Verification:
+
+- `node --check pages/systems/life-command.js`
+- `node --check pages/systems/life-wellbeing.js`
+- `node --check pages/systems/life-rebuild.js`
+- `node --check cdp/life.js`
+- `node build\build-ledger18.js`
+- `cdp/life.js`: 19/19
+
+Notes:
+
+- No Life source behavior change was needed. The existing Life rebuild and probe passed against the current build.
+- Remaining verification debt should move to older non-Life items, especially the CP49 death/net-worth coverage that is still called out in the TODO.
+
+---
+
+## Checkpoint 57 - 2026-06-29 (Codex) - Money mobile height + platform emoji fallback verified
+
+Finished the two requested mobile/UI compatibility items before moving back to the backlog.
+
+Changed:
+
+- `pages/systems/money-banking.js`
+  - Money hub overlay and sheet now use `100dvh` with a flex-column sheet, internal scrolling body, safe-area-aware bottom padding, and touch scrolling.
+  - The bottom Money controls are kept reachable instead of disappearing under mobile browser chrome/bottom UI.
+- `pages/systems/platform-compat.js`
+  - Added a platform compatibility layer that detects iOS, Android, or desktop, checks emoji canvas rendering, and sets `data-ledger-platform` / `data-ledger-emoji-mode` on the document.
+  - Added `ledgerIconV1875()` and symbol-mode fallback so important emoji icons become readable text labels when emoji rendering is unreliable, especially on iOS.
+  - Added an opt-in local override through `setLedgerEmojiModeV1875("emoji" | "symbols" | "auto")`.
+- `play.html`
+  - Loaded `platform-compat.js` and bumped the Money cache stamp.
+- `cdp/money-mobile.js`
+  - New mobile viewport probe for Money hub height, safe-area padding, internal scrolling, and bottom-control reachability.
+- `cdp/platform-compat.js`
+  - New probe for platform detection, document attrs, icon helper behavior, and symbol fallback in the Money hub.
+- `cdp/README.md`
+  - Documented the two new probes.
+
+Verification:
+
+- `node --check pages/systems/money-banking.js`
+- `node --check pages/systems/platform-compat.js`
+- `node --check cdp/money-mobile.js`
+- `node --check cdp/platform-compat.js`
+- `node build\build-ledger18.js`
+- `cdp/money-mobile.js`: 10/10
+- `cdp/platform-compat.js`: 8/8
+- `cdp/flicker.js`: 18/18
+
+Notes:
+
+- This closes the user-reported Money mobile height bug and the Apple/iOS emoji compatibility item for the current build.
+- Hosted GitHub Pages can still appear one build behind until the rebuilt output is deployed.
+
+---
+
+## Checkpoint 56 - 2026-06-29 (Codex) - Family Office finished: operator compensation polish + verified trust regressions
+
+Finished the Family Office operator follow-up before moving to other backlog.
+
+Changed:
+
+- `pages/systems/family-office.js`
+  - Updated stale operator wording so the feature consistently describes negotiated salary + fee compensation, not fee-only comp.
+  - Family Office compensation preset buttons now show the actual salary/fee terms, e.g. lower salary plus higher fee, balanced, and higher salary plus lower fee.
+  - Holdings popup operator row now shows the active operator's salary and fee percentage alongside last-year growth.
+  - Registry note now calls out the titled-asset operator with salary/fee negotiation.
+- `play.html`
+  - Bumped Family Office cache stamp to `familyoffice7`.
+
+Verification:
+
+- `node --check pages/systems/family-office.js`
+- `node --check cdp/family-office.js`
+- `node build\build-ledger18.js`
+- `cdp/family-office.js`: 23/23
+- `cdp/trust.js`: 18/18
+- `cdp/trust-holdings.js`: 12/12
+
+Notes:
+
+- Family Office is now considered complete for the current request: holdings popup, per-company founder titling, operator placement near the top of Trust controls, operator salary/fee negotiation, $1B compensation cap, and succession carry are all covered by CDP probes.
+
+---
+
 ## Checkpoint 55 - 2026-06-28 (Codex) - Business cash reserves, franchise unlock, patch audit
 
 User reported old patch scripts piling up, business profit not showing in company cash, business expenses hitting checking despite company cash, and franchise systems feeling broken.

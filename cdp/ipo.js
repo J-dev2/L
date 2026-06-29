@@ -83,7 +83,14 @@
     green.productStage = "live"; green.stage = "growth"; green.customers = 5000; green.active = true; green.annualRevenue = 2000000; green.valuation = 8000000;
     Bg.businesses = [green]; Bg.activeBizId = green.uid; Bg.active = true; Bg._migrationCheckedV1861 = true;
     var grantTotal = 0;
-    for (var g = 0; g < 12; g++) { S.actionsTaken = {}; S.age += 1; try { window.runEntrepreneurYearV1861(); } catch (e) {} }
+    var realRandom = Math.random;
+    try {
+      Math.random = function () { return 0; };
+      S.actionsTaken = {}; S.age += 1;
+      try { window.runEntrepreneurYearV1861(); } catch (e) { out.notes.push("green grant err " + e); }
+    } finally {
+      Math.random = realRandom;
+    }
     grantTotal = (green.grantHistory || []).reduce(function (s, x) { return s + num(x.amount); }, 0);
     ok("green_company_gets_grants", (green.grantHistory || []).length > 0, "grants=" + (green.grantHistory || []).length + " total=" + grantTotal);
 

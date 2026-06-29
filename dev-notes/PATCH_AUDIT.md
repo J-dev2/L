@@ -1,23 +1,26 @@
 # Patch Script Audit
 
-Last reviewed: 2026-06-28
+Last reviewed: 2026-06-29
 
 ## Runtime Load List
 
-The old `pages/patches/*.js` files are still part of the boot path, but they are not all equal:
+The old `pages/patches/*.js` files are no longer part of the `play.html` boot path.
 
-- Retired from `play.html`: `10-patch-v18-33.js`
-  - Reason: family trust / family enterprise / business trust controls are now owned by `pages/systems/business-entities.js` and `pages/systems/tax-legal.js`.
-  - The file stays on disk as historical backup, but it is no longer executed during normal play.
+- `pages/patches/` is currently empty in the source tree.
+- `play.html` has no active `<script src="pages/patches/...">` tags.
+- `docs/build-report.json` has no `pages/patches` script entries after rebuild.
+- `cdp/no-patches.js` guards the runtime contract so a future cleanup pass can catch accidental reintroduction.
 
-- Kept loaded for now: `01` through `09`, `11` through `16`
-  - `07-patch-v18-30.js` still provides the legacy entity cash/tax action globals used by the current Business UI.
-  - `11-patch-v18-33-2.js`, `13-patch-v18-33-4.js`, and `16-patch-v18-33-7.js` still protect save recovery, partial-save handling, and the Enter flow.
-  - `12-patch-v18-33-3.js` still owns Wayback checkpoint globals used by Life Command and CDP coverage.
-  - `14-patch-v18-33-5.js` and `15-patch-v18-33-6.js` still stabilize old hub navigation wrappers.
+Absorbed behavior:
+
+- Patch chunks `01` through `09` are embedded into `pages/runtime/00-core-app-runtime.js` under `BEGIN absorbed ...` markers.
+- Patch `10` family enterprise / business-trust behavior is owned by `pages/systems/business-entities.js` and `pages/systems/tax-legal.js`.
+- Patch `11`, `13`, and `16` recovery / partial-save / Enter-flow behavior is owned by `pages/systems/save-recovery.js` and related current systems.
+- Patch `12` Wayback behavior is owned by `pages/systems/life-command.js`.
+- Patch `14` and `15` navigation behavior is owned by `pages/systems/scroll-nav.js` and current hub modules.
 
 ## Next Cleanup Candidates
 
-- Move the remaining `07-patch-v18-30.js` action globals into `business-entities.js`, then remove patch 07 from the page load list.
-- Move Wayback and recovery globals into `pages/systems/save-recovery.js` / `pages/systems/life-command.js`, then revisit patches 12, 13, and 16.
-- Only remove a patch after the matching CDP probe passes with the script tag disabled.
+- Keep `pages/patches/` empty unless a historical snapshot is intentionally restored for reference.
+- If a future branch reintroduces a patch script, require a matching audit note plus a CDP probe showing why it cannot live in a current owner module.
+- Continue favoring current owner modules (`business-entities.js`, `tax-legal.js`, `save-recovery.js`, `life-command.js`, `scroll-nav.js`) over new patch files.

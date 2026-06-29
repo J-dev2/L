@@ -35,6 +35,7 @@ only pulls scripts referenced in `play.html` / `index.html`).
 | `features.js`   | Business models make revenue, wizard, graphs across tabs | 17 |
 | `ipo.js`        | IPO / public company / grants / scale graph | 17 |
 | `dashboard.js`  | Dashboard 2.0 tabs/panels, public gating, market signal | 32 |
+| `life.js`       | Life rebuild route, popups, sinks, yearly status perk, overflow smoke | 19 |
 | `death.js`      | Death screen + continue-as-heir incl. no-child successor | 20 |
 | `founderpay.js` | Founder salary + manual distribution + tax | 24 |
 | `stock.js`      | Share counts, buyback de-list, splits, dividends | 30 |
@@ -47,11 +48,15 @@ only pulls scripts referenced in `play.html` / `index.html`).
 | `devtools.js`   | Hidden dev-tools gate/unlock + panel tools (run with `&dev=1`) | 17 |
 | `business-locations.js` | Business #10 locations/franchises/rival share | 25 |
 | `business-income.js` | Old/drifted-catalog business still earns + company cash reserve sweep | 7 |
+| `money-mobile.js` | Money hub mobile viewport/safe-area scroll contract | 10 |
+| `platform-compat.js` | iOS/Android/desktop detection + emoji-to-symbol fallback | 8 |
+| `no-patches.js` | Confirms retired `pages/patches` scripts are not runtime-loaded | 2 |
 | `estate-trust.js` | Death settlement honors the Legal family trust (plan/protected/tax) | 4 |
 | `trust-nav.js` | Trust/business actions re-render the current hub (no hub jump) | 2 |
 | `networth-genetics.js` | Net worth consistent across hubs (fund counted, bridge once) + child IQ inheritance | 9 |
 | `heir-age.js` | Continue-as-heir starts at the child's age (not 0) + UI size buttons drive CSS vars | 6 |
-| `property.js` | Real-estate: mortgage/cash buy, appreciation, paydown, renovate, sell, equity, migration, living popup, limited rotating market, improvements | 30 |
+| `property.js` | Real-estate: mortgage/cash buy, appreciation, paydown, renovate, sell, equity, migration, tenants, residence, flipping | 78 |
+| `cars.js` | Vehicles: cash/finance buy, garage equity, repairs, loans, daily driver, marine/aircraft, migration | 23 |
 | `business-tabs.js` | Mini-tabs (Overview/Trends/Capital/Network), New Business btn, entrepreneur-bridge hidden | 16 |
 | `business-modals.js` | Popups: per-company + global (family/new) + rotating acquisition market (≥3) | 23 |
 | `pacing.js`, `fundgrad.js` | Older startup-founder pacing/grant probes | — |

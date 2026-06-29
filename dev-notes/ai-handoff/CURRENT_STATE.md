@@ -40,7 +40,36 @@ Checkpoints 2–14 (2026-06-20) are current and reflect shipped source. The old
 Checkpoint 1 (bottom) is historical — e.g. it says scroll-nav Part E was not done,
 but that work is implemented. Trust the newest checkpoint and verify against source.
 
-Latest is **Checkpoint 29 (2026-06-22)**: `pages/systems/property-estate.js` is now **v18.66**.
+2026-06-29 update: the latest reliable Family Office checkpoint is **Checkpoint 56** in
+`dev-notes/SESSION_SUMMARY.md`. Family Office is complete for the current request: holdings popup,
+per-company founder titling, top-of-Trust operator placement, salary/fee negotiation, $1B operator
+compensation cap, and succession carry are verified by `cdp/family-office.js` 23/23 plus trust regressions.
+
+2026-06-29 update: **Checkpoint 57** completed the mobile Money height and emoji/platform compatibility follow-ups.
+Money now uses dynamic viewport sizing plus safe-area-aware internal scrolling, and `platform-compat.js` provides
+iOS/Android/desktop detection with symbol fallback for unreliable emoji rendering. Verified by `cdp/money-mobile.js`
+10/10, `cdp/platform-compat.js` 8/8, and `cdp/flicker.js` 18/18 after rebuild.
+
+2026-06-29 update: **Checkpoint 58** paid down the Life rebuild verification debt. `pages/systems/life-command.js`,
+`pages/systems/life-wellbeing.js`, `pages/systems/life-rebuild.js`, and `cdp/life.js` passed syntax checks; the
+bundle rebuilt; `cdp/life.js` passed 19/19. No Life behavior changes were needed.
+
+2026-06-29 update: **Checkpoint 59** paid down CP49 trust/death verification and older Entrepreneurship/core smoke
+debt. Trust/death probes are green (`death` 20/20, `networth-genetics` 9/9, `trust` 18/18, `estate-trust` 4/4,
+`trust-nav` 2/2, `wayback` 11/11). Entrepreneurship/core probes are green (`separation` 20/20, `features` 17/17,
+`ipo` 17/17, `dashboard` 32/32, `founderpay` 24/24, `stock` 30/30, `entrepreneur-legal` 11/11). No gameplay source
+changes were needed; only stale probe expectations in `cdp/ipo.js` and `cdp/stock.js` were updated.
+
+2026-06-29 update: **Checkpoint 60** paid down Property/Vehicles verification debt. `pages/systems/property-estate.js`,
+`pages/systems/car-collection.js`, `cdp/property.js`, and `cdp/cars.js` passed syntax checks; the bundle rebuilt;
+`cdp/property.js` passed 78/78 and `cdp/cars.js` passed 23/23. No gameplay source changes were needed.
+
+2026-06-29 update: **Checkpoint 61** corrected patch cleanup state. `pages/patches/` is empty, `play.html` has no
+active `pages/patches` script tags, and `docs/build-report.json` has no patch script entries. Added
+`cdp/no-patches.js` as a future browser guard and updated `dev-notes/PATCH_AUDIT.md`. The browser guard itself was
+not run because the app rejected starting a temporary headless Edge session due usage limits; static checks passed.
+
+Property-specific context from **Checkpoint 29 (2026-06-22)**: `pages/systems/property-estate.js` is now **v18.66**.
 CP27 added property class/prestige tiers (Economy→Prestige, net-worth-gated); CP28 fixed the Flip-plan
 button (real flip project) and added **tenant screening / background checks**; CP29 added **tenant
 relationships + romance** (visit tenants to build a relationship that renews their lease, gifts/encounter
@@ -54,9 +83,8 @@ migrates the legacy `state.car` once. CP33 grew the catalog to **100 cars (emoji
 colour-coded classes** (added Off-Road + Electric), added **tenant persona emojis**, **class-coloured
 card accents** across both systems, and a **tenant Evict** action (`reEvictTenantV1866`). The property system is well ahead of the older
 notes (CP26 says v18.62; source was already v18.63 before CP27) — **verify source, not the notes**. CP27–CP32
-`dist` rebuild and the CDP probes were NOT run (node/headless-Chrome sandbox out of disk space) — run
-`node build/build-ledger18.js` (now also bundles `car-collection.js` — note the new `<script>` in play.html),
-then `cdp/property.js` (~73 checks) and `cdp/cars.js` (~22 checks). CP26 #4 (fully fold the legacy
+`dist` rebuild and CDP debt is now paid down by CP60: `cdp/property.js` 78/78 and `cdp/cars.js` 23/23. CP26 #4
+(fully fold the legacy
 `homes`/`rentals` catalogs into the property system) is the main remaining property item. CP34 split
 **Vehicles into its own hub/page** (out of Real Estate) and renamed the leftover **"Home" hub label to
 "Real Estate"** across the active nav/title sources (15/14/11 patches + runtime + More menu). Future

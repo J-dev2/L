@@ -16,7 +16,7 @@ Groups:
 - `state/` documents current state/storage shape.
 - `pages/landing/` owns the save-selection landing page.
 - `pages/runtime/` owns the legacy core runtime.
-- `pages/patches/` preserves ordered patch chunks.
+- `pages/patches/` is historical; current patch chunks are absorbed into runtime/system modules and are not loaded from this folder.
 - `pages/hubs/` names the playable hubs and bridges to current global renderers.
 - `pages/systems/` maps gameplay systems to future files.
 - `build/` can generate a single bundled HTML.

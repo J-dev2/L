@@ -28928,14 +28928,7 @@ getSuggestedActions = function(s) {
 
 
 </script>
-<!-- Retired 2026-06-28: pages/patches/01-patch-v18-24.js through 09-patch-v18-32.js are absorbed by pages/runtime/00-core-app-runtime.js. -->
-<!-- Retired 2026-06-28: pages/patches/10-patch-v18-33.js is absorbed by pages/systems/business-entities.js. -->
-<!-- Retired 2026-06-28: pages/patches/11-patch-v18-33-2.js moved into pages/systems/save-recovery.js and pages/systems/scroll-nav.js. -->
-<!-- Retired 2026-06-28: pages/patches/12-patch-v18-33-3.js moved into pages/systems/life-command.js. -->
-<!-- Retired 2026-06-28: pages/patches/13-patch-v18-33-4.js moved into pages/systems/save-recovery.js. -->
-<!-- Retired 2026-06-28: pages/patches/14-patch-v18-33-5.js moved into pages/systems/scroll-nav.js. -->
-<!-- Retired 2026-06-28: pages/patches/15-patch-v18-33-6.js moved into pages/systems/scroll-nav.js. -->
-<!-- Retired 2026-06-28: pages/patches/16-patch-v18-33-7.js moved into pages/systems/save-recovery.js. -->
+<!-- Retired patch scripts are no longer runtime-loaded; absorbed behavior now lives in the runtime and systems modules. -->
 <script data-source="state/state-map.js">
 /* Ledger state map.
    This documents the current global state shape before deeper refactoring. */
@@ -38633,7 +38626,7 @@ getSuggestedActions = function(s) {
 })();
 
 </script>
-<script data-source="pages/systems/money-banking.js">
+<script data-source="pages/systems/money-banking.js?v=20260629-mobile1">
 /* Money / banking command center. */
 (function () {
   if (window.__ledgerMoneyBankingSystemV1837Loaded) return;
@@ -39500,10 +39493,11 @@ getSuggestedActions = function(s) {
   if (typeof document !== "undefined" && document.createElement && document.head) {
     var style = document.createElement("style");
     style.textContent = [
-      ".hub-overlay.hub-money .hub-sheet-money{width:min(100vw,980px)!important;max-width:980px!important;height:100vh!important;max-height:100vh!important;border-radius:0!important;margin:0 auto!important;overflow-x:hidden!important;background:radial-gradient(circle at 15% 0%,rgba(185,220,138,.10),transparent 24%),radial-gradient(circle at 88% 10%,rgba(126,160,172,.13),transparent 26%),linear-gradient(180deg,#15110d 0%,#0f0c09 70%,#0b0907 100%)!important}",
+      ".hub-overlay.hub-money{height:100dvh!important;max-height:100dvh!important;align-items:stretch!important;overflow:hidden!important;padding:0!important}",
+      ".hub-overlay.hub-money .hub-sheet-money{width:min(100vw,980px)!important;max-width:980px!important;height:100dvh!important;max-height:100dvh!important;min-height:0!important;display:flex!important;flex-direction:column!important;border-radius:0!important;margin:0 auto!important;overflow:hidden!important;background:radial-gradient(circle at 15% 0%,rgba(185,220,138,.10),transparent 24%),radial-gradient(circle at 88% 10%,rgba(126,160,172,.13),transparent 26%),linear-gradient(180deg,#15110d 0%,#0f0c09 70%,#0b0907 100%)!important}",
       ".hub-overlay.hub-money .hub-head{position:sticky!important;top:0!important;z-index:8!important;background:linear-gradient(180deg,rgba(18,14,10,1),rgba(18,14,10,.92))!important;box-shadow:0 1px 0 rgba(255,255,255,.05)}",
-      ".hub-overlay.hub-money .v16-hub-body,.hub-overlay.hub-money .v11-hub-body,.hub-overlay.hub-money [data-hub-body='money']{overflow-x:hidden!important}",
-      ".v1837-money-shell{display:grid;gap:14px;padding:4px 0 90px;min-width:0;color:#f6ead8}.v1837-money-shell *{box-sizing:border-box}.v1837-money-shell .panel{min-width:0;overflow:hidden;border:1px solid rgba(216,173,109,.22);border-radius:12px;background:linear-gradient(135deg,rgba(36,30,23,.96),rgba(23,19,15,.96));padding:14px}.v1837-money-shell .section-label{color:#d8b16e;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:9px}.v1837-note{margin:0;color:#d6c5aa;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.5}",
+      ".hub-overlay.hub-money .v16-hub-body,.hub-overlay.hub-money .v11-hub-body,.hub-overlay.hub-money [data-hub-body='money']{flex:1 1 auto!important;min-height:0!important;overflow-x:hidden!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;overscroll-behavior:contain!important;padding-bottom:calc(132px + env(safe-area-inset-bottom,0px))!important}",
+      ".v1837-money-shell{display:grid;gap:14px;padding:4px 0 calc(150px + env(safe-area-inset-bottom,0px));min-width:0;color:#f6ead8}.v1837-money-shell *{box-sizing:border-box}.v1837-money-shell .panel{min-width:0;overflow:hidden;border:1px solid rgba(216,173,109,.22);border-radius:12px;background:linear-gradient(135deg,rgba(36,30,23,.96),rgba(23,19,15,.96));padding:14px}.v1837-money-shell .section-label{color:#d8b16e;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:9px}.v1837-note{margin:0;color:#d6c5aa;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.5}",
       ".v1837-money-hero{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;border:1px solid rgba(185,220,138,.42);border-radius:16px;background:linear-gradient(135deg,rgba(26,51,34,.92),rgba(42,34,23,.95) 52%,rgba(24,39,45,.90));padding:18px;min-width:0;overflow:hidden}.v1837-money-hero h2{margin:2px 0 7px;color:#fff3df;font-size:32px;line-height:1}.v1837-money-hero p{max-width:680px;margin:0;color:#d6c5aa;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.5}.v1837-money-hero strong{display:block;text-align:right;color:#b9dc8a;font-size:32px;line-height:1;white-space:nowrap}.v1837-money-hero strong span{display:block;margin-top:5px;color:#d8b16e;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase}.v1837-money-chip-row{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}.v1837-money-chip-row span{border:1px solid rgba(255,255,255,.12);border-radius:999px;background:rgba(255,255,255,.05);padding:6px 9px;color:#d6c5aa;font-family:'JetBrains Mono',monospace;font-size:10px}.v1837-money-chip-row span.good{color:#b9dc8a;border-color:rgba(185,220,138,.38)}.v1837-money-chip-row span.bad{color:#e9927d;border-color:rgba(233,146,125,.42)}.v1837-money-chip-row span.gold{color:#f0ca7b;border-color:rgba(240,202,123,.36)}",
       ".v1837-money-kpis{display:flex;gap:9px;overflow-x:auto;overflow-y:hidden;padding-bottom:10px;scrollbar-color:rgba(216,177,110,.75) rgba(255,255,255,.05);scrollbar-width:thin}.v1837-money-kpis.compact .v1837-money-metric{flex-basis:165px}.v1837-money-metric{flex:0 0 164px;border:1px solid rgba(255,255,255,.11);border-radius:12px;background:rgba(255,255,255,.045);padding:11px;min-height:95px;min-width:0}.v1837-money-metric span,.v1837-account span,.v1837-shortcut span,.v1837-tax-grid span{display:block;color:#d8b16e;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase}.v1837-money-metric b,.v1837-account b,.v1837-shortcut b{display:block;color:#fff3df;font-size:18px;line-height:1.1;margin-top:5px;overflow-wrap:anywhere}.v1837-money-metric em,.v1837-account em,.v1837-shortcut em{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;line-height:1.4;font-style:normal;margin-top:6px}.v1837-money-metric.good b,.v1837-panel-head strong.good{color:#b9dc8a}.v1837-money-metric.bad b,.v1837-panel-head strong.bad{color:#e9927d}.v1837-money-metric.gold b,.v1837-panel-head strong.gold{color:#f0ca7b}.v1837-money-metric.blue b,.v1837-panel-head strong.blue{color:#9cc7d4}",
       ".v1837-money-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,.95fr);gap:12px;align-items:start}.v1837-money-col{display:grid;gap:12px;min-width:0}.v1837-panel-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:10px}.v1837-panel-head h3{margin:0 0 6px;color:#fff3df;font-size:22px;line-height:1.08}.v1837-panel-head p{margin:0;color:#d6c5aa;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.45}.v1837-panel-head strong{font-family:'JetBrains Mono',monospace;font-size:27px;text-align:right;white-space:nowrap}.v1837-panel-head strong span{display:block;color:#d8b16e;font-size:9px;letter-spacing:.15em;text-transform:uppercase}",
@@ -50851,7 +50845,7 @@ getSuggestedActions = function(s) {
 })();
 
 </script>
-<script data-source="pages/systems/family-office.js?v=20260628-familyoffice6">
+<script data-source="pages/systems/family-office.js?v=20260628-familyoffice7">
 /* ============================================================================
    FAMILY OFFICE  (v18.72)
    Sits on top of Codex's Trust Envelop (familyTrustV1839.holdingsV1868). Adds, as a
@@ -50968,7 +50962,7 @@ getSuggestedActions = function(s) {
   /* ----------------------------- OPERATOR (feature 2) -----------------------------
      Hire an operator to RUN + GROW titled family-office holdings when you're not actively managing
      them. Each year the operator earns a return on the TITLED value (property + founder companies +
-     titled businesses), keeps a fee, and compounds the rest into the trust corpus — so protected
+     titled businesses), takes negotiated salary/fee compensation, and compounds the rest into the trust corpus — so protected
      family wealth grows across years and generations. State lives on the trust (carries to heirs).
      Writes ONLY to trust.corpus + cash on hire; never touches the asset engines, so no net-worth
      double-count. NOTE (tested side): the return/fee rates are a first pass — tune for balance. */
@@ -51078,8 +51072,8 @@ getSuggestedActions = function(s) {
     log("Let the family-office operator go.");
     saveGame(); rerender();
   };
-  // Yearly: operator earns returnRate × titled value, keeps annualFeeRate of it, compounds the rest
-  // into trust corpus. Guarded once per year. Hooked onto resolveLifeAndFinanceYear below.
+  // Yearly: operator earns returnRate x titled value, pays salary/fee compensation from that gross,
+  // then compounds the rest into trust corpus. Guarded once per year.
   function applyOperatorYear() {
     var s = S(); if (!s || !s.alive) return;
     var trust = (s.finance || {}).familyTrustV1839; if (!trust || !trust.created) return;
@@ -51094,11 +51088,10 @@ getSuggestedActions = function(s) {
     var net = comp.net;
     trust.corpus = Math.max(0, round(num(trust.corpus) + net));
     op.lastReturn = net; op.lastGross = comp.gross; op.lastSalary = comp.salary; op.lastFee = comp.fee; op.lastComp = comp.comp; op.totalGrown = round(num(op.totalGrown) + net);
-    var fee = comp.comp;
     if (!Array.isArray(trust.history)) trust.history = [];
     trust.history.unshift({ age: round(num(s.age)), event: def.name + " grew the family office", amount: net });
     trust.history = trust.history.slice(0, 10);
-    log("🏛️ " + def.name + " grew the family office by " + money(net) + " (after " + money(fee) + " operator fee).");
+    log("🏛️ " + def.name + " grew the family office by " + money(net) + " (after " + money(comp.salary) + " salary and " + money(comp.fee) + " fee).");
   }
   function operatorDesk() {
     var s = S(); if (!s) return "";
@@ -51108,13 +51101,13 @@ getSuggestedActions = function(s) {
     var titled = titledManagedValue();
     var cur = op.hired ? operatorDef(op.tier) : null;
     var status = cur
-      ? '<div class="row-sub">Current: <b style="color:var(--accent-2)">' + esc(cur.name) + '</b> · last year grew the office ' + money(op.lastReturn) + ' (fee ' + money(op.lastFee) + ') · total grown ' + money(op.totalGrown) + '.</div>'
+      ? '<div class="row-sub">Current: <b style="color:var(--accent-2)">' + esc(cur.name) + '</b> · last year grew the office ' + money(op.lastReturn) + ' after salary ' + money(op.lastSalary) + ' and fee ' + money(op.lastFee) + ' · total grown ' + money(op.totalGrown) + '.</div>'
       : '<div class="row-sub">No operator. Your titled holdings (' + money(titled) + ') sit protected but aren\'t actively grown — hire someone to run + compound them into the trust each year.</div>';
     var compControls = "";
     if (cur) {
       var opts = operatorCompOptions(cur).map(function (opt) {
         var selected = round(op.salary) === clampOperatorSalary(cur, opt.salary) && Math.round(num(op.feeRate) * 1000) === Math.round(clampFeeRate(opt.feeRate) * 1000);
-        return '<button class="money-btn ' + (selected ? "blue" : "gold") + '" onclick="event.preventDefault();event.stopPropagation();setOperatorCompPresetV1872(\'' + opt.id + '\')">' + esc(opt.name) + '</button>';
+        return '<button class="money-btn ' + (selected ? "blue" : "gold") + '" onclick="event.preventDefault();event.stopPropagation();setOperatorCompPresetV1872(\'' + opt.id + '\')">' + esc(opt.name + " " + money(clampOperatorSalary(cur, opt.salary)) + " + " + Math.round(clampFeeRate(opt.feeRate) * 100) + "%") + '</button>';
       }).join("");
       compControls = '<div class="fo72-comp-box"><div class="fo72-comp-line"><b>Compensation</b><span>Salary ' + esc(money(op.salary)) + ' + ' + Math.round(num(op.feeRate) * 100) + '% fee</span></div>' +
         '<div class="row-sub">Negotiate higher salary for a lower fee percentage, or lower salary for more upside fee. Total annual operator compensation is capped at ' + money(OPERATOR_COMP_CAP) + '.</div>' +
@@ -51222,7 +51215,7 @@ getSuggestedActions = function(s) {
     if (h.outsideManager > 0) rows += row("📈", "Outside manager capital", h.outsideManager, "Carries", "Externally managed capital — carries into the trust on succession. Move it into the corpus from the Trust hub to protect it now.");
     var op72 = operatorState() || {};
     var op72Def = op72.hired ? operatorDef(op72.tier) : null;
-    if (op72Def) rows += row("🤝", "Operator", op72.totalGrown, "Active", op72Def.name + " · grew the office " + money(op72.lastReturn) + " last year.");
+    if (op72Def) rows += row("🤝", "Operator", op72.totalGrown, "Active", op72Def.name + " · salary " + money(op72.salary) + " + " + Math.round(num(op72.feeRate) * 100) + "% fee · grew " + money(op72.lastReturn) + " last year.");
 
     var hero =
       '<div class="fo72-hero">' +
@@ -51386,7 +51379,237 @@ getSuggestedActions = function(s) {
       file: "pages/systems/family-office.js",
       status: "active",
       globals: ["openFamilyOfficeV1872", "closeFamilyOfficeV1872", "setOperatorCompPresetV1872"],
-      notes: "v18.72 Family Office. Holdings popup, negotiable operator compensation, and per-company founder-company titling are active."
+      notes: "v18.72 Family Office. Holdings popup, titled-asset operator with salary/fee negotiation, and per-company founder-company titling are active."
+    });
+  }
+})();
+
+</script>
+<script data-source="pages/systems/platform-compat.js?v=20260629-platform1">
+/* Platform compatibility: mobile safe labels + emoji fallbacks. */
+(function () {
+  "use strict";
+  if (window.__ledgerPlatformCompatV1875) return;
+  window.__ledgerPlatformCompatV1875 = true;
+
+  var STORAGE_KEY = "ledger_emoji_mode_v1875";
+  var lastTimer = null;
+  var observer = null;
+
+  function ua() {
+    try { return String(navigator.userAgent || ""); } catch (e) { return ""; }
+  }
+  function platformString() {
+    try { return String(navigator.platform || ""); } catch (e) { return ""; }
+  }
+  function isIOS() {
+    var u = ua();
+    var p = platformString();
+    return /iPad|iPhone|iPod/i.test(u) || (p === "MacIntel" && Number(navigator.maxTouchPoints || 0) > 1);
+  }
+  function isAndroid() {
+    return /Android/i.test(ua());
+  }
+  function platform() {
+    if (isIOS()) return "ios";
+    if (isAndroid()) return "android";
+    return "desktop";
+  }
+  function storedMode() {
+    try { return localStorage.getItem(STORAGE_KEY) || ""; } catch (e) { return ""; }
+  }
+  function canvasEmojiCheck() {
+    try {
+      var canvas = document.createElement("canvas");
+      canvas.width = 64;
+      canvas.height = 64;
+      var ctx = canvas.getContext("2d");
+      if (!ctx) return true;
+      ctx.textBaseline = "top";
+      ctx.font = "32px Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif";
+      ctx.fillText("💼", 0, 0);
+      var data = ctx.getImageData(0, 0, 64, 64).data;
+      for (var i = 3; i < data.length; i += 4) if (data[i] > 0) return true;
+    } catch (e) {
+      return true;
+    }
+    return false;
+  }
+  function desiredMode() {
+    var forced = storedMode();
+    if (forced === "emoji" || forced === "symbols") return forced;
+    if (!canvasEmojiCheck()) return "symbols";
+    return platform() === "ios" ? "symbols" : "emoji";
+  }
+
+  var ICONS = {
+    "🏦": "BANK",
+    "💓": "PULSE",
+    "💵": "CASH",
+    "💳": "CARD",
+    "💼": "LINE",
+    "🔒": "SECURE",
+    "🛡️": "SHIELD",
+    "🛡": "SHIELD",
+    "🌍": "TAX",
+    "🧭": "NAV",
+    "📊": "CHART",
+    "📈": "MARKET",
+    "🏛️": "TRUST",
+    "🏛": "TRUST",
+    "🤝": "OPERATOR",
+    "🚀": "STARTUP",
+    "🏢": "BUSINESS",
+    "🏠": "HOME",
+    "👶": "HEIR",
+    "💾": "SAVED",
+    "⚖️": "LEGAL",
+    "⚖": "LEGAL",
+    "🔧": "TOOLS",
+    "🩹": "SAFE",
+    "🌳": "LEGACY",
+    "👑": "HEIR",
+    "🗺️": "MAP",
+    "🗺": "MAP"
+  };
+  var ICON_KEYS = Object.keys(ICONS).sort(function (a, b) { return b.length - a.length; });
+
+  function replaceText(text) {
+    for (var i = 0; i < ICON_KEYS.length; i++) {
+      var icon = ICON_KEYS[i];
+      if (text.indexOf(icon) >= 0) text = text.split(icon).join(ICONS[icon]);
+    }
+    return text;
+  }
+  function shouldSkip(node) {
+    var el = node && node.parentNode;
+    while (el && el.nodeType === 1) {
+      var tag = String(el.tagName || "").toUpperCase();
+      if (tag === "SCRIPT" || tag === "STYLE" || tag === "TEXTAREA" || tag === "INPUT" || tag === "SELECT") return true;
+      if (el.getAttribute && el.getAttribute("data-ledger-emoji-lock") === "1") return true;
+      el = el.parentNode;
+    }
+    return false;
+  }
+  function applyFallback(root) {
+    root = root || document.body;
+    if (!root || window.ledgerPlatformV1875.mode !== "symbols") return;
+    try {
+      var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+        acceptNode: function (node) {
+          if (!node || !node.nodeValue || shouldSkip(node)) return NodeFilter.FILTER_REJECT;
+          return /[\u2600-\u27BF\uD83C-\uDBFF]/.test(node.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+        }
+      });
+      var pending = [];
+      while (walker.nextNode()) pending.push(walker.currentNode);
+      pending.forEach(function (node) {
+        var next = replaceText(node.nodeValue);
+        if (next !== node.nodeValue) node.nodeValue = next;
+      });
+    } catch (e) {}
+  }
+  function schedule(root) {
+    if (lastTimer) clearTimeout(lastTimer);
+    lastTimer = setTimeout(function () { applyFallback(root || document.body); }, 0);
+  }
+  function setAttrs() {
+    var info = window.ledgerPlatformV1875;
+    try {
+      document.documentElement.setAttribute("data-ledger-platform", info.platform);
+      document.documentElement.setAttribute("data-ledger-emoji-mode", info.mode);
+      document.body && document.body.setAttribute("data-ledger-emoji-mode", info.mode);
+    } catch (e) {}
+  }
+  function installStyles() {
+    if (!document.head || document.getElementById("ledger-platform-compat-v1875")) return;
+    var st = document.createElement("style");
+    st.id = "ledger-platform-compat-v1875";
+    st.textContent = [
+      "html[data-ledger-emoji-mode='emoji'] body{font-family:Fraunces,Georgia,'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',serif}",
+      "html[data-ledger-emoji-mode='symbols'] .section-label,html[data-ledger-emoji-mode='symbols'] button{letter-spacing:0!important}",
+      "html[data-ledger-platform='ios'] .hub-overlay{padding-bottom:env(safe-area-inset-bottom,0px)}"
+    ].join("\n");
+    document.head.appendChild(st);
+  }
+  function wrapRenderers() {
+    var prevRender = window.render || null;
+    if (typeof prevRender === "function" && !prevRender.__platformCompatV1875) {
+      var renderWrapped = function () {
+        var out = prevRender.apply(this, arguments);
+        schedule(document.body);
+        return out;
+      };
+      renderWrapped.__platformCompatV1875 = true;
+      window.render = renderWrapped;
+      try { render = renderWrapped; } catch (e) {}
+    }
+    var prevInPlace = window.renderHubInPlaceV16 || null;
+    if (typeof prevInPlace === "function" && !prevInPlace.__platformCompatV1875) {
+      var inPlaceWrapped = function () {
+        var out = prevInPlace.apply(this, arguments);
+        schedule(document.body);
+        return out;
+      };
+      inPlaceWrapped.__platformCompatV1875 = true;
+      window.renderHubInPlaceV16 = inPlaceWrapped;
+      try { renderHubInPlaceV16 = inPlaceWrapped; } catch (e2) {}
+    }
+  }
+  function installObserver() {
+    if (observer || !window.MutationObserver || !document.body) return;
+    observer = new MutationObserver(function (list) {
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].addedNodes && list[i].addedNodes.length) { schedule(document.body); return; }
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+  function refreshInfo(mode) {
+    window.ledgerPlatformV1875 = {
+      platform: platform(),
+      mode: mode || desiredMode(),
+      emojiCanvas: canvasEmojiCheck()
+    };
+    setAttrs();
+  }
+
+  window.ledgerIconV1875 = function (emoji, fallback) {
+    if ((window.ledgerPlatformV1875 || {}).mode === "symbols") return fallback || ICONS[emoji] || "";
+    return emoji;
+  };
+  window.setLedgerEmojiModeV1875 = function (mode) {
+    if (mode !== "emoji" && mode !== "symbols" && mode !== "auto") return;
+    try {
+      if (mode === "auto") localStorage.removeItem(STORAGE_KEY);
+      else localStorage.setItem(STORAGE_KEY, mode);
+    } catch (e) {}
+    refreshInfo(mode === "auto" ? null : mode);
+    schedule(document.body);
+  };
+  window.applyLedgerEmojiFallbackV1875 = function () { applyFallback(document.body); };
+
+  refreshInfo();
+  installStyles();
+  wrapRenderers();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function () {
+      setAttrs();
+      installObserver();
+      schedule(document.body);
+    });
+  } else {
+    installObserver();
+    schedule(document.body);
+  }
+
+  if (window.registerLedgerSystem) {
+    window.registerLedgerSystem({
+      id: "platform-compat",
+      file: "pages/systems/platform-compat.js",
+      status: "active",
+      globals: ["ledgerPlatformV1875", "ledgerIconV1875", "setLedgerEmojiModeV1875"],
+      notes: "Detects iOS, Android, and desktop. Falls back from emoji labels to readable symbols/text when platform emoji rendering is unreliable."
     });
   }
 })();

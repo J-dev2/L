@@ -25,12 +25,12 @@
     ok("css_red_metric", css.indexOf(".biz1861-metric.red b") >= 0);
     ok("css_donut", css.indexOf(".biz1862-donut") >= 0);
 
-    // ===== donut renders in budget (product panel) =====
+    // ===== donut renders in the dedicated Budget panel =====
     setupPublic(600000, 1000000, 20);
     state.finance.bizV1860.businesses[0]._mktgBudget = 250000; state.finance.bizV1860.businesses[0].headcount = 4;
-    window.bizSetPanelV1862("product");
+    window.bizSetPanelV1862("budget");
     var prod = window.renderEntrepreneurHubV1861();
-    ok("budget_donut_renders", prod.indexOf("biz1862-donut") >= 0 && prod.indexOf("Budget allocation") >= 0);
+    ok("budget_donut_renders", prod.indexOf("biz1862-donut") >= 0 && prod.indexOf("Where the money goes") >= 0);
 
     // ===== public desk shows share counts + real float =====
     window.bizSetPanelV1862("public");
