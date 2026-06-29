@@ -5,6 +5,115 @@
 
 ---
 
+## Checkpoint 64 - 2026-06-29 (Codex) - Life polish + Entrepreneurship backlog shipped
+
+Finished the requested Life page polish and Entrepreneurship backlog items.
+
+Changed:
+
+- `pages/systems/life-rebuild.js`
+  - Card-styled the Body & Mind, Fun, and Side Money activity popups so they match Luxury / Experiences.
+  - Tuned luxury and experience prices upward and raised Status thresholds/perk thresholds.
+- `pages/systems/charts.js`
+  - Added a shared SVG chart helper module for sparklines, donuts, and candlesticks.
+- `pages/systems/entrepreneur.js`
+  - Added a Day-trading panel to the Entrepreneurship dashboard.
+  - Reused the shared chart helpers for existing entrepreneur charts.
+  - Confirmed the existing role-based hiring/interview system is wired in the Team panel.
+- `pages/systems/stocks-investing.js`
+  - Added the shared donut chart tile to the Investments pulse rail.
+- `play.html`
+  - Loaded the shared charts module before Stocks and Entrepreneurship.
+- `cdp/life.js`, `cdp/entrepreneur-backlog.js`, `cdp/README.md`
+  - Updated Life probe expectations and added focused backlog coverage for shared charts, day trading, hiring, and the known sell paths.
+
+Verification:
+
+- `node --check pages\systems\life-rebuild.js`
+- `node --check pages\systems\charts.js`
+- `node --check pages\systems\entrepreneur.js`
+- `node --check pages\systems\stocks-investing.js`
+- `node --check cdp\life.js`
+- `node --check cdp\entrepreneur-backlog.js`
+- `node build\build-ledger18.js`
+- `cdp/life.js`: 22/22
+- `cdp/entrepreneur-backlog.js`: 13/13
+- `cdp/stock.js`: 30/30
+- `cdp/dashboard.js`: 32/32
+- `cdp/no-patches.js`: 2/2
+
+Notes:
+
+- The exact "Sell button doesn't sell" repro screen/button is still not known, but the likely regular stock custom sell and public-founder own-share custom sell paths are now covered and green.
+
+---
+
+## Checkpoint 63 - 2026-06-29 (Codex) - Trust Envelop + Entrepreneurship Legal verified
+
+Handled the requested backlog items 3 and 4. Source already had both systems implemented, so this pass verified them and corrected stale notes rather than duplicating code.
+
+Changed:
+
+- `dev-notes/OUTSTANDING_TODO.md`
+  - Marked Trust Envelop / Family Office holdings as shipped + verified.
+  - Marked Entrepreneurship Legal tab + tax attorney as shipped + verified.
+- `cdp/README.md`
+  - Updated `family-office.js` from the stale 20-check count to the current 23-check contract.
+- `dev-notes/ai-handoff/CURRENT_STATE.md`
+  - Added the CP63 verification status.
+
+Verification:
+
+- `node --check pages\systems\tax-legal.js`
+- `node --check pages\systems\family-office.js`
+- `node --check pages\systems\entrepreneur.js`
+- `node --check cdp\trust-holdings.js`
+- `node --check cdp\family-office.js`
+- `node --check cdp\entrepreneur-legal.js`
+- `cdp/trust-holdings.js`: 12/12
+- `cdp/family-office.js`: 23/23
+- `cdp/entrepreneur-legal.js`: 11/11
+
+Notes:
+
+- Trust Envelop verification covered titled property, titled founder-company holdings, net-worth neutrality, protected-assets increase, death carry, ledger records, and cash inheritance excluding titled holdings.
+- Entrepreneurship Legal verification covered the Legal tab, tax-attorney retention, company-cash fees, lowered effective corporate tax rate, yearly legal fee, and tax savings.
+- No gameplay source changes were needed for these two items.
+
+---
+
+## Checkpoint 62 - 2026-06-29 (Codex) - No-patches browser guard + property legacy fold-in
+
+Finished the two requested follow-ups from the outstanding list.
+
+Changed:
+
+- `pages/runtime/00-core-app-runtime.js`
+  - Legacy `buyRental(id)` now creates a current `finance.reV1863.portfolio` property when the Real Estate system is loaded, instead of writing new entries to `state.rentals`.
+  - Legacy `sellRental(id)` delegates matching legacy-rental portfolio entries to the current Real Estate sale path.
+  - Removed the old hidden rental-catalog calculations from `renderHome()` so the Home/Real Estate page is not carrying the duplicate rental UI path.
+- `cdp/property.js`
+  - Added regression coverage for the old rental compatibility path: `buyRental("rent_studio")` must leave `state.rentals` empty and create a Real Estate portfolio property.
+  - Added a guard that `renderHome()` does not expose the old rental catalog UI.
+- `dev-notes/OUTSTANDING_TODO.md`, `dev-notes/ai-handoff/CURRENT_STATE.md`, `dev-notes/PATCH_AUDIT.md`
+  - Updated the handoff/docs so CP61's no-patches browser caveat and CP26's property fold-in item no longer look open.
+
+Verification:
+
+- `node --check pages\runtime\00-core-app-runtime.js`
+- `node --check pages\systems\property-estate.js`
+- `node --check cdp\property.js`
+- `node build\build-ledger18.js`
+- `cdp/property.js`: 80/80
+- `cdp/no-patches.js`: 2/2
+
+Notes:
+
+- `pages/patches/` remains empty and `play.html` still has no active patch script tags.
+- The legacy `homes` catalog remains for residence selection / save compatibility; the rental investment path is now folded into the current property portfolio.
+
+---
+
 ## Checkpoint 61 - 2026-06-29 (Codex) - Patch cleanup audit corrected + no-patches guard added
 
 Cleaned up the remaining patch-script audit state after the functional verification passes.

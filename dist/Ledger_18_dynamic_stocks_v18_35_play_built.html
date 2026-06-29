@@ -8752,6 +8752,45 @@ function buyRental(id) {
   const r = rentals.find(x => x.id === id);
   if (!r) return;
   if (state.age < 18) return addToast("Rental properties unlock at 18.");
+  const ensureRealEstate = window.reEnsureV1863 || window.reEnsureV1862;
+  if (typeof ensureRealEstate === "function") {
+    const re = ensureRealEstate();
+    const tplId = `legacy_${r.id}`;
+    if (re.portfolio.some(p => p.legacyRentalId === r.id || p.tplId === tplId)) return addToast("You already own this property.");
+    if (state.money < r.price) return addToast(`Not enough cash. Needs ${money(r.price)}.`);
+    state.money -= r.price;
+    re.portfolio.push({
+      uid: `legacy_rental_${r.id}`,
+      tplId,
+      legacyRentalId: r.id,
+      name: r.name,
+      type: "house",
+      neighborhood: r.tier || "Legacy",
+      buyPrice: r.price,
+      currentValue: r.price,
+      basePrice: r.price,
+      mortgageLeft: 0,
+      mortgageRate: 0,
+      monthlyRent: Math.max(0, Math.round(r.rent / 12)),
+      askingRent: Math.max(0, Math.round(r.rent / 12)),
+      yearlyMaint: r.upkeep,
+      apprecMean: 0.032,
+      condition: 82,
+      purchaseAge: state.age,
+      purchaseStyle: "legacy_cash",
+      strategy: "rent",
+      rentedOut: true,
+      tenant: null,
+      renovations: []
+    });
+    state.rentals = (state.rentals || []).filter(rid => rid !== id);
+    ensureRealEstate();
+    addLog(`Bought ${r.name} through Real Estate for ${money(r.price)}. Projected net ${money(r.rent - r.upkeep)}/yr.`, { money: -r.price });
+    applyDeltas({ confidence: 3, happiness: 4 });
+    save();
+    render();
+    return;
+  }
   if (state.rentals.includes(id)) return addToast("You already own this property.");
   if (state.money < r.price) return addToast(`Not enough cash. Needs ${money(r.price)}.`);
   state.money -= r.price;
@@ -8764,6 +8803,13 @@ function buyRental(id) {
 
 function sellRental(id) {
   ensureStateShape();
+  const ensureRealEstate = window.reEnsureV1863 || window.reEnsureV1862;
+  if (typeof ensureRealEstate === "function") {
+    const re = ensureRealEstate();
+    const tplId = `legacy_${id}`;
+    const p = re.portfolio.find(x => x && (x.legacyRentalId === id || x.tplId === tplId));
+    if (p && typeof window.reSellV1863 === "function") return window.reSellV1863(p.uid);
+  }
   const idx = state.rentals.indexOf(id);
   if (idx === -1) return;
   const r = rentals.find(x => x.id === id);
@@ -9682,35 +9728,6 @@ function renderHome() {
     const locked = state.age < 16;
     const cantAfford = state.money < c.price;
     return `<div class="row"><div><div class="row-title">${c.name}${owned ? " ✓" : ""}</div><div class="row-sub">${money(c.price)} - Upkeep ${money(c.annualCost)}/yr - ${c.effect}</div></div><button class="icon-btn" onclick="buyCar('${c.id}')" ${owned || locked || cantAfford ? "disabled" : ""}>${owned ? "Owned" : locked ? "16+" : "Buy"}</button></div>`;
-  }).join("");
-
-  // Owned rentals
-  const ownedRentals = (state.rentals || []).map(rid => rentals.find(r => r.id === rid)).filter(Boolean);
-  const ownedRentalsHtml = ownedRentals.length
-    ? ownedRentals.map(r => `<div class="row">
-        <div>
-          <div class="row-title">${r.name}</div>
-          <div class="row-sub">${r.tier} - Rent ${money(r.rent)}/yr - Upkeep ${money(r.upkeep)}/yr - <span style="color:var(--good)">Net ${money(r.rent - r.upkeep)}/yr</span></div>
-        </div>
-        <button class="icon-btn" onclick="sellRental('${r.id}')">Sell</button>
-      </div>`).join("")
-    : `<div class="row-sub" style="padding:8px 0">You don't own any rental properties yet. Buy one below to start earning passive income.</div>`;
-
-  // Available rentals
-  const portfolio = ownedRentals.reduce((sum, r) => sum + r.rent - r.upkeep, 0);
-  const availableRentals = rentals.filter(r => !(state.rentals || []).includes(r.id));
-  const availRentalsHtml = availableRentals.map(r => {
-    const locked = state.age < 18;
-    const cantAfford = state.money < r.price;
-    const yieldPct = (((r.rent - r.upkeep) / r.price) * 100).toFixed(1);
-    return `<div class="row">
-      <div>
-        <div class="row-title">${r.name}</div>
-        <div class="row-sub">${r.tier} - ${money(r.price)} - Rent ${money(r.rent)}/yr - Upkeep ${money(r.upkeep)}/yr - <span style="color:var(--accent)">${yieldPct}% net yield</span></div>
-        <div class="row-sub" style="margin-top:3px">${r.desc}</div>
-      </div>
-      <button class="icon-btn" onclick="buyRental('${r.id}')" ${locked || cantAfford ? "disabled" : ""}>${locked ? "18+" : "Buy"}</button>
-    </div>`;
   }).join("");
 
   return `${typeof renderLivingSituationV1862 === "function" ? renderLivingSituationV1862() : `<section class="panel"><div class="section-label">🏠 Living Situation</div>${homeRows}</section>`}
@@ -36664,6 +36681,135 @@ getSuggestedActions = function(s) {
 })();
 
 </script>
+<script data-source="pages/systems/charts.js?v=20260629-shared1">
+/* Shared Ledger chart helpers (v18.74)
+ * Small SVG renderers for dashboards that need charts without bringing in a framework.
+ */
+(function () {
+  "use strict";
+  if (window.LedgerChartsV1874) return;
+
+  function n(v) { var x = Number(v); return Number.isFinite(x) ? x : 0; }
+  function esc(v) {
+    return String(v == null ? "" : v).replace(/[&<>"']/g, function (m) {
+      return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[m];
+    });
+  }
+  function compactMoney(v) {
+    v = n(v);
+    var sign = v < 0 ? "-" : "";
+    var a = Math.abs(v);
+    if (a >= 1e12) return sign + "$" + (a / 1e12).toFixed(a >= 1e13 ? 0 : 1) + "T";
+    if (a >= 1e9) return sign + "$" + (a / 1e9).toFixed(a >= 1e10 ? 0 : 1) + "B";
+    if (a >= 1e6) return sign + "$" + (a / 1e6).toFixed(a >= 1e7 ? 0 : 1) + "M";
+    if (a >= 1e3) return sign + "$" + (a / 1e3).toFixed(a >= 1e4 ? 0 : 1) + "K";
+    return sign + "$" + Math.round(a);
+  }
+  function seeded(seed) {
+    var h = 2166136261 >>> 0;
+    seed = String(seed || "ledger");
+    for (var i = 0; i < seed.length; i++) { h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    return function () {
+      h += 0x6D2B79F5;
+      var t = h;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function sparkSVG(values, opts) {
+    opts = opts || {};
+    var v = (values || []).map(n);
+    if (v.length < 2) return opts.empty || '<div class="biz1861-spark-empty">Not enough history yet.</div>';
+    var color = opts.color || "#d8b16e";
+    var W = opts.w || 240, H = opts.h || 46, pad = opts.pad || 3;
+    var mn = Math.min.apply(null, v), mx = Math.max.apply(null, v), rng = (mx - mn) || Math.abs(mx) || 1;
+    var step = (W - pad * 2) / (v.length - 1);
+    var pts = v.map(function (val, i) { return [pad + i * step, H - pad - ((val - mn) / rng) * (H - pad * 2)]; });
+    var line = pts.map(function (p, i) { return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" ");
+    var area = "M" + pts[0][0].toFixed(1) + " " + (H - pad) + " " + pts.map(function (p) { return "L" + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" ") + " L" + pts[pts.length - 1][0].toFixed(1) + " " + (H - pad) + " Z";
+    return '<svg class="' + esc(opts.className || "ledger-chart-spark") + '" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">' +
+      '<path d="' + area + '" fill="' + esc(color) + '" opacity="0.16"/>' +
+      '<path d="' + line + '" fill="none" stroke="' + esc(color) + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+  }
+
+  function donutSVG(segments, opts) {
+    opts = opts || {};
+    var segs = (segments || []).filter(function (s) { return n(s.value) > 0; });
+    var total = segs.reduce(function (sum, s) { return sum + n(s.value); }, 0);
+    if (total <= 0) return opts.empty || '<div class="biz1861-spark-empty">Nothing allocated yet.</div>';
+    var R = 42, C = 2 * Math.PI * R, cx = 60, cy = 60, sw = 17, off = 0;
+    var rings = segs.map(function (s) {
+      var len = (n(s.value) / total) * C;
+      var ring = '<circle cx="' + cx + '" cy="' + cy + '" r="' + R + '" fill="none" stroke="' + esc(s.color || "#d8b16e") + '" stroke-width="' + sw + '" stroke-dasharray="' + len.toFixed(2) + ' ' + (C - len).toFixed(2) + '" stroke-dashoffset="' + (-off).toFixed(2) + '" transform="rotate(-90 ' + cx + ' ' + cy + ')"></circle>';
+      off += len;
+      return ring;
+    }).join("");
+    var svg = '<svg class="' + esc(opts.svgClass || "biz1862-donut") + '" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><circle cx="' + cx + '" cy="' + cy + '" r="' + R + '" fill="none" stroke="rgba(0,0,0,.28)" stroke-width="' + sw + '"></circle>' + rings +
+      '<text x="' + cx + '" y="' + (cy - 1) + '" text-anchor="middle" fill="#fff3df" font-family="Fraunces,Georgia,serif" font-size="15">' + esc(compactMoney(total)) + '</text>' +
+      '<text x="' + cx + '" y="' + (cy + 13) + '" text-anchor="middle" fill="#b9a98e" font-family="JetBrains Mono,monospace" font-size="7" letter-spacing="1.5">' + esc(opts.centerLabel || "TOTAL") + '</text></svg>';
+    var legend = '<div class="' + esc(opts.legendClass || "biz1861-legend") + '">' + segs.map(function (s) {
+      return '<span><i style="background:' + esc(s.color || "#d8b16e") + '"></i>' + esc(s.label) + ' <b>' + Math.round((n(s.value) / total) * 100) + '%</b> <em>' + esc(compactMoney(s.value)) + '</em></span>';
+    }).join("") + '</div>';
+    return '<div class="' + esc(opts.wrapClass || "biz1862-donut-wrap") + '">' + svg + legend + '</div>';
+  }
+
+  function candlesFromCloses(closes, id, perYear) {
+    perYear = perYear || 12;
+    var v = (closes || []).map(n).filter(function (x) { return x > 0; });
+    var out = [];
+    if (!v.length) return out;
+    if (v.length === 1) v = [v[0], v[0] * 1.01];
+    for (var y = 1; y < v.length; y++) {
+      var start = v[y - 1], end = v[y], rnd = seeded(String(id || "x") + ":" + y);
+      var vol = Math.max(0.025, Math.abs(end - start) / (start || 1) * 0.5 + 0.03);
+      var prev = start;
+      for (var mo = 0; mo < perYear; mo++) {
+        var t = (mo + 1) / perYear;
+        var target = start + (end - start) * t;
+        var open = prev;
+        var close = Math.max(0.01, target * (1 + (rnd() - 0.5) * vol));
+        var hi = Math.max(open, close) * (1 + rnd() * vol * 0.6);
+        var lo = Math.min(open, close) * (1 - rnd() * vol * 0.6);
+        out.push({ o: open, h: hi, l: lo, c: close });
+        prev = close;
+      }
+    }
+    return out;
+  }
+
+  function candleSVG(candles, opts) {
+    opts = opts || {};
+    candles = (candles || []).slice();
+    var maxN = opts.max || 48;
+    if (candles.length > maxN) candles = candles.slice(candles.length - maxN);
+    if (candles.length < 2) return opts.empty || '<div class="biz1861-spark-empty">Not enough price history yet.</div>';
+    var W = opts.w || 320, H = opts.h || 90, pad = 4;
+    var mn = Infinity, mx = -Infinity;
+    candles.forEach(function (c) { if (n(c.l) < mn) mn = n(c.l); if (n(c.h) > mx) mx = n(c.h); });
+    var rng = (mx - mn) || Math.abs(mx) || 1;
+    var slot = (W - pad * 2) / candles.length, cw = Math.max(1.2, Math.min(slot * 0.66, 9));
+    function yv(v) { return H - pad - ((v - mn) / rng) * (H - pad * 2); }
+    var bars = candles.map(function (c, i) {
+      var x = pad + i * slot + slot / 2, up = n(c.c) >= n(c.o), col = up ? "#3fae5f" : "#d65b5b";
+      var yo = yv(n(c.o)), yc = yv(n(c.c)), top = Math.min(yo, yc), bh = Math.max(0.8, Math.abs(yc - yo));
+      return '<line x1="' + x.toFixed(1) + '" y1="' + yv(n(c.h)).toFixed(1) + '" x2="' + x.toFixed(1) + '" y2="' + yv(n(c.l)).toFixed(1) + '" stroke="' + col + '" stroke-width="1"/>' +
+        '<rect x="' + (x - cw / 2).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + cw.toFixed(1) + '" height="' + bh.toFixed(1) + '" fill="' + col + '"/>';
+    }).join("");
+    return '<svg class="' + esc(opts.className || "biz1862-candles") + '" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">' + bars + '</svg>';
+  }
+
+  window.LedgerChartsV1874 = {
+    sparkSVG: sparkSVG,
+    donutSVG: donutSVG,
+    candlesFromCloses: candlesFromCloses,
+    candleSVG: candleSVG,
+    candleFromClosesSVG: function (closes, id, opts) { return candleSVG(candlesFromCloses(closes, id, 12), opts || {}); }
+  };
+})();
+
+</script>
 <script data-source="pages/systems/stocks-investing.js">
 /* Investments system bridge and label normalization. */
 (function () {
@@ -36843,9 +36989,18 @@ getSuggestedActions = function(s) {
     var snap = investmentSnapshot();
     var cycle = m.cycle || ((s.market || {}).mood) || "normal";
     var last = round(n((m.lastMarketGain != null ? m.lastMarketGain : f.lastInvestmentReturn)));
+    var mix = "";
+    if (window.LedgerChartsV1874 && typeof window.LedgerChartsV1874.donutSVG === "function") {
+      mix = '<span class="v1838-chart-tile">' + window.LedgerChartsV1874.donutSVG([
+        { label: "Brokerage", value: snap.brokerage, color: "#d8b16e" },
+        { label: "Stocks", value: snap.stocks, color: "#7ea0ac" },
+        { label: "Managers", value: snap.manager, color: "#9b8cc2" },
+        { label: "Personal firm", value: snap.personal, color: "#9fd07d" }
+      ], { centerLabel: "MIX", wrapClass: "v1838-donut-wrap", svgClass: "biz1862-donut", legendClass: "biz1861-legend", empty: "" }) + '</span>';
+    }
     var cycleIcon = /bull/i.test(cycle) ? "📈" : /bear/i.test(cycle) ? "📉" : "➖";
     return '<section class="v1838-investment-pulse v1838-investments-pulse"><div><div class="v1838-kicker">📈 investment command ledger</div><h3>📈 Investments</h3><p>Stocks, brokerage cash, outside managers, and your personal firm stay in one scroll-friendly command desk. Custom money fields now show the playable max beside them.</p></div><div class="v1838-pulse-rail">' +
-      '<span><b>' + esc(compactMoney(snap.total || totalInvested())) + '</b><em>💰 Total invested</em></span>' +
+      '<span><b>' + esc(compactMoney(snap.total || totalInvested())) + '</b><em>💰 Total invested</em></span>' + mix +
       '<span><b>' + esc(compactMoney(snap.liquid)) + '</b><em>💵 Liquid available</em></span>' +
       '<span><b>' + esc(compactMoney(snap.brokerage)) + '</b><em>🏦 Brokerage cash</em></span>' +
       '<span><b>' + esc(compactMoney(snap.stocks)) + '</b><em>📊 Real stocks</em></span>' +
@@ -37048,6 +37203,7 @@ getSuggestedActions = function(s) {
       ".hub-overlay.hub-brokerage .v1838-kicker{font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.18em;color:#e6c178;font-size:9px}",
       ".hub-overlay.hub-brokerage .v1838-pulse-rail{display:flex;gap:9px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;padding:13px 2px 3px;margin-top:8px}",
       ".hub-overlay.hub-brokerage .v1838-pulse-rail span{flex:0 0 154px;scroll-snap-align:start;border:1px solid rgba(255,255,255,.12);border-radius:13px;background:rgba(255,255,255,.055);padding:10px;min-width:0}",
+      ".hub-overlay.hub-brokerage .v1838-pulse-rail .v1838-chart-tile{flex-basis:240px;padding:8px}.hub-overlay.hub-brokerage .v1838-donut-wrap{display:grid;grid-template-columns:82px 1fr;gap:6px;align-items:center}.hub-overlay.hub-brokerage .v1838-donut-wrap .biz1862-donut{width:82px;height:82px}.hub-overlay.hub-brokerage .v1838-donut-wrap .biz1861-legend{display:grid;gap:3px}.hub-overlay.hub-brokerage .v1838-donut-wrap .biz1861-legend span{border:0;background:transparent;padding:0;font-size:8px;line-height:1.25}",
       ".hub-overlay.hub-brokerage .v1838-pulse-rail b{display:block;color:#f2d089;font-size:20px;overflow-wrap:anywhere}.hub-overlay.hub-brokerage .v1838-pulse-rail em{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-style:normal;text-transform:uppercase;letter-spacing:.08em;font-size:8px;margin-top:4px}.hub-overlay.hub-brokerage .v1838-pulse-rail .good b{color:#b9dc8a}.hub-overlay.hub-brokerage .v1838-pulse-rail .bad b{color:#e9927d}",
       ".hub-overlay.hub-brokerage .v1838-money-readout{border:1px solid rgba(143,196,215,.38);border-radius:12px;background:linear-gradient(135deg,rgba(23,37,41,.92),rgba(44,35,22,.88));color:#dcecf0;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.04em;line-height:1.25;padding:9px 10px;min-height:38px;text-align:left;white-space:normal;overflow-wrap:anywhere;cursor:pointer}.hub-overlay.hub-brokerage .v1838-money-readout:disabled{opacity:.55;cursor:not-allowed}.hub-overlay.hub-brokerage .v1838-money-readout:hover:not(:disabled){border-color:rgba(240,202,123,.62);color:#f6dfaa}",
       ".hub-overlay.hub-brokerage .v18-input-row,.hub-overlay.hub-brokerage .v1829-custom-row{display:grid!important;grid-template-columns:minmax(150px,1fr) minmax(140px,auto) auto auto!important;gap:8px!important;align-items:stretch!important}.hub-overlay.hub-brokerage .v18-input-row input,.hub-overlay.hub-brokerage .v1829-custom-row input{min-width:0!important}",
@@ -44632,6 +44788,101 @@ getSuggestedActions = function(s) {
     return clampN(0.21 - num(plan.rateCut), 0.08, 0.21);
   }
 
+  var DAY_TRADE_TICKERS_V1874 = [
+    { id: "LGR", name: "Ledger Robotics", sector: "Automation", base: 42, vol: 0.085 },
+    { id: "NVA", name: "Nova Chips", sector: "Semiconductors", base: 88, vol: 0.105 },
+    { id: "HLX", name: "Helix Health", sector: "Biotech", base: 31, vol: 0.125 },
+    { id: "GRD", name: "GridCloud", sector: "Infrastructure", base: 56, vol: 0.075 },
+    { id: "VNT", name: "VentureMart", sector: "Consumer", base: 24, vol: 0.095 },
+    { id: "SPK", name: "Spark Media", sector: "Media", base: 17, vol: 0.115 }
+  ];
+  function tradeDefV1874(id) {
+    return DAY_TRADE_TICKERS_V1874.find(function (x) { return x.id === id; }) || DAY_TRADE_TICKERS_V1874[0];
+  }
+  function tradeStateV1874() {
+    var B = initBiz();
+    if (!B.dayTradingV1874 || typeof B.dayTradingV1874 !== "object") B.dayTradingV1874 = {};
+    var T = B.dayTradingV1874;
+    T.positions = Array.isArray(T.positions) ? T.positions : [];
+    T.prices = T.prices && typeof T.prices === "object" ? T.prices : {};
+    T.history = T.history && typeof T.history === "object" ? T.history : {};
+    T.realized = round(T.realized || 0);
+    if (T.tradeYear !== age()) { T.tradeYear = age(); T.tradesThisYear = 0; }
+    T.tradesThisYear = Math.max(0, round(T.tradesThisYear || 0));
+    DAY_TRADE_TICKERS_V1874.forEach(function (d) {
+      if (!T.prices[d.id]) T.prices[d.id] = d.base;
+      if (!Array.isArray(T.history[d.id]) || !T.history[d.id].length) T.history[d.id] = [d.base * 0.94, d.base * 0.98, d.base];
+    });
+    return T;
+  }
+  function tradePositionV1874(T, id) {
+    return (T.positions || []).find(function (p) { return p.id === id; }) || null;
+  }
+  function tradeMarketValueV1874(T) {
+    return (T.positions || []).reduce(function (sum, p) { return sum + num(p.shares) * num(T.prices[p.id]); }, 0);
+  }
+  function tradeCostBasisV1874(T) {
+    return (T.positions || []).reduce(function (sum, p) { return sum + num(p.shares) * num(p.avg); }, 0);
+  }
+  function tradeLimitLeftV1874(T) {
+    return Math.max(0, 12 - num(T.tradesThisYear));
+  }
+  function tradeSpendV1874(id, amount) {
+    var T = tradeStateV1874();
+    if (tradeLimitLeftV1874(T) <= 0) { toast("Day-trading desk is capped at 12 actions per age."); return; }
+    var d = tradeDefV1874(id), px = Math.max(0.01, num(T.prices[d.id], d.base));
+    var amt = amount === "max" ? wealth() : Math.max(0, round(amount));
+    amt = Math.min(amt, Math.max(0, round(wealth())));
+    if (amt <= 0) { toast("No cash available for that trade."); return; }
+    var shares = amt / px;
+    var p = tradePositionV1874(T, d.id);
+    if (!p) { p = { id: d.id, shares: 0, avg: px }; T.positions.push(p); }
+    var oldCost = num(p.shares) * num(p.avg);
+    p.shares = num(p.shares) + shares;
+    p.avg = (oldCost + amt) / p.shares;
+    S().money = round(wealth() - amt);
+    T.tradesThisYear++;
+    log("Day trade buy: " + d.id + " for " + moneyText(amt) + " at " + priceTextV1862(px) + ".", { money: -amt });
+    saveGame(); rerender();
+  }
+  function tradeSellV1874(id, pct) {
+    var T = tradeStateV1874();
+    if (tradeLimitLeftV1874(T) <= 0) { toast("Day-trading desk is capped at 12 actions per age."); return; }
+    var d = tradeDefV1874(id), p = tradePositionV1874(T, d.id);
+    if (!p || num(p.shares) <= 0) { toast("No position in " + d.id + "."); return; }
+    pct = pct === "all" ? 1 : clampN(pct, 0, 1);
+    var sh = num(p.shares) * pct;
+    var px = Math.max(0.01, num(T.prices[d.id], d.base));
+    var proceeds = round(sh * px);
+    var gain = round((px - num(p.avg)) * sh);
+    S().money = round(wealth() + proceeds);
+    T.realized = round(num(T.realized) + gain);
+    p.shares = Math.max(0, num(p.shares) - sh);
+    if (p.shares <= 0.000001) T.positions = T.positions.filter(function (x) { return x !== p; });
+    T.tradesThisYear++;
+    log("Day trade sell: " + d.id + " for " + moneyText(proceeds) + " (" + (gain >= 0 ? "+" : "") + moneyText(gain) + " realized).", { money: proceeds });
+    saveGame(); rerender();
+  }
+  function tradeAdvanceV1874() {
+    var T = tradeStateV1874();
+    if (tradeLimitLeftV1874(T) <= 0) { toast("Day-trading desk is capped at 12 actions per age."); return; }
+    DAY_TRADE_TICKERS_V1874.forEach(function (d) {
+      var px = Math.max(0.01, num(T.prices[d.id], d.base));
+      var drift = (Math.random() - 0.48) * d.vol;
+      var shock = Math.random() < 0.08 ? (Math.random() - 0.5) * d.vol * 2.4 : 0;
+      var next = Math.max(1, px * (1 + drift + shock));
+      T.prices[d.id] = Math.round(next * 100) / 100;
+      T.history[d.id].push(T.prices[d.id]);
+      T.history[d.id] = T.history[d.id].slice(-36);
+    });
+    T.tradesThisYear++;
+    log("Day-trading desk rolled the tape. Watchlist prices moved.");
+    saveGame(); rerender();
+  }
+  window.bizDayTradeBuyV1874 = tradeSpendV1874;
+  window.bizDayTradeSellV1874 = tradeSellV1874;
+  window.bizDayTradeTapeV1874 = tradeAdvanceV1874;
+
   var BIZ_MODEL_INFO = {
     saas:       { name:'SaaS / Subscription', emoji:'🔄', desc:'Monthly recurring revenue. Predictable. Churn kills you slowly.', kpis:['MRR','Churn%','NRR'] },
     d2c:        { name:'Direct-to-Consumer',  emoji:'🛒', desc:'Sell products or services directly. CAC/LTV ratio is survival.', kpis:['CAC','LTV','Conv%'] },
@@ -45183,6 +45434,9 @@ getSuggestedActions = function(s) {
   }
   // Inline-SVG area/line sparkline from a numeric series (own min/max scale).
   function sparkSVG(values, color) {
+    if (window.LedgerChartsV1874 && typeof window.LedgerChartsV1874.sparkSVG === "function") {
+      return window.LedgerChartsV1874.sparkSVG(values, { color: color, className: "biz1861-spark", empty: '<div class="biz1861-spark-empty">Age the company up to chart this.</div>' });
+    }
     var v = (values || []).map(function (x) { return num(x); });
     if (v.length < 2) return '<div class="biz1861-spark-empty">Age the company up to chart this.</div>';
     var W = 240, H = 46, pad = 3;
@@ -45222,6 +45476,9 @@ getSuggestedActions = function(s) {
   }
   // Donut/pie chart for a spend/allocation breakdown (SVG ring + legend).
   function donutSVG(segments, centerLabel) {
+    if (window.LedgerChartsV1874 && typeof window.LedgerChartsV1874.donutSVG === "function") {
+      return window.LedgerChartsV1874.donutSVG(segments, { centerLabel: centerLabel, wrapClass: "biz1862-donut-wrap", svgClass: "biz1862-donut", legendClass: "biz1861-legend", empty: '<div class="biz1861-spark-empty">Nothing allocated yet.</div>' });
+    }
     var segs = (segments || []).filter(function (s) { return num(s.value) > 0; });
     var total = segs.reduce(function (s, x) { return s + num(x.value); }, 0);
     if (total <= 0) return '<div class="biz1861-spark-empty">Nothing allocated yet.</div>';
@@ -45305,6 +45562,9 @@ getSuggestedActions = function(s) {
   }
   // Public entry: candlestick chart straight from an array of yearly closing prices.
   window.candleChartFromClosesV1862 = function (closes, id, opts) {
+    if (window.LedgerChartsV1874 && typeof window.LedgerChartsV1874.candleFromClosesSVG === "function") {
+      return window.LedgerChartsV1874.candleFromClosesSVG(closes, id || "x", opts || {});
+    }
     try { return candleChartSVGV1862(monthlyCandlesV1862(closes, id || "x", 12), opts || {}); } catch (e) { return ""; }
   };
 
@@ -45419,7 +45679,7 @@ getSuggestedActions = function(s) {
     rerender();
   }
   window.bizSetActiveV1861 = setActiveBiz;
-  var DASHBOARD_PANELS_V1862 = ["overview", "product", "growth", "team", "funding", "budget", "legal", "public", "exit"];
+  var DASHBOARD_PANELS_V1862 = ["overview", "product", "growth", "team", "funding", "budget", "legal", "trading", "public", "exit"];
   function dashboardPanelV1862(biz) {
     var B = initBiz();
     var p = String(B.activePanelV1862 || "overview").toLowerCase();
@@ -45507,6 +45767,7 @@ getSuggestedActions = function(s) {
       ["funding", "Funding"],
       ["budget", "Budget"],
       ["legal", "Legal"],
+      ["trading", "Trading"],
       ["public", "Public Market"],
       ["exit", "Exit"]
     ];
@@ -45942,6 +46203,46 @@ getSuggestedActions = function(s) {
   function renderFundingPanelV1862(biz) {
     return '<div class="biz1862-panel"><div class="biz1861-control-grid">' + renderFounderPayControlsV1862(biz) + renderCapitalControlsV1862(biz) + renderFundingControlsV1862(biz) + '</div>' + renderFundingHistoryV1862(biz) + renderBizGraphsV1861(biz, "funding") + '</div>';
   }
+  function renderTradingPanelV1874(biz) {
+    var T = tradeStateV1874();
+    var value = tradeMarketValueV1874(T);
+    var basis = tradeCostBasisV1874(T);
+    var unrealized = round(value - basis);
+    var left = tradeLimitLeftV1874(T);
+    var chart = window.LedgerChartsV1874 && typeof window.LedgerChartsV1874.candleFromClosesSVG === "function"
+      ? function (series, id) { return window.LedgerChartsV1874.candleFromClosesSVG(series, id, { w: 320, h: 88, max: 32, className: "biz1862-candles" }); }
+      : function (series, id) { return window.candleChartFromClosesV1862 ? window.candleChartFromClosesV1862(series, id, { w: 320, h: 88, max: 32 }) : ""; };
+    var cards = DAY_TRADE_TICKERS_V1874.map(function (d) {
+      var px = num(T.prices[d.id], d.base);
+      var hist = T.history[d.id] || [d.base];
+      var prev = hist.length > 1 ? num(hist[hist.length - 2]) : px;
+      var move = prev ? (px - prev) / prev : 0;
+      var p = tradePositionV1874(T, d.id);
+      var pos = p ? num(p.shares) * px : 0;
+      var pnl = p ? (px - num(p.avg)) * num(p.shares) : 0;
+      return '<div class="biz1874-trade-card">' +
+        '<div class="biz1874-trade-head"><div><b>' + escH(d.id) + '</b><span>' + escH(d.name) + ' · ' + escH(d.sector) + '</span></div><strong>' + escH(priceTextV1862(px)) + '<em class="' + (move >= 0 ? "good" : "bad") + '">' + (move >= 0 ? "+" : "") + (move * 100).toFixed(1) + '%</em></strong></div>' +
+        chart(hist, d.id) +
+        '<div class="biz1874-trade-foot"><span>Position ' + escH(moneyText(pos)) + '</span><span class="' + (pnl >= 0 ? "good" : "bad") + '">P/L ' + (pnl >= 0 ? "+" : "") + escH(moneyText(pnl)) + '</span></div>' +
+        '<div class="biz1861-actions">' +
+          actionBtn("Buy $1K", "bizDayTradeBuyV1874('" + d.id + "',1000)", "green", left <= 0 || wealth() < 1000) +
+          actionBtn("Buy $10K", "bizDayTradeBuyV1874('" + d.id + "',10000)", "green", left <= 0 || wealth() < 10000) +
+          actionBtn("Sell 25%", "bizDayTradeSellV1874('" + d.id + "',0.25)", "", left <= 0 || !p) +
+          actionBtn("Sell all", "bizDayTradeSellV1874('" + d.id + "','all')", "red", left <= 0 || !p) +
+        '</div></div>';
+    }).join("");
+    return '<div class="biz1862-panel biz1874-trading-panel">' +
+      '<div class="biz1862-callout"><span>Day-trading desk</span><b>Short-term trades use personal cash and stay separate from long-term brokerage holdings. Max 12 trading actions per age.</b></div>' +
+      '<div class="biz1861-metric-grid">' +
+        metric("Trading positions", moneyText(value), "Market value of open day trades.", value > 0 ? "blue" : "gold") +
+        metric("Unrealized P/L", (unrealized >= 0 ? "+" : "") + moneyText(unrealized), "Open position mark-to-market.", unrealized >= 0 ? "green" : "bad") +
+        metric("Realized P/L", (num(T.realized) >= 0 ? "+" : "") + moneyText(T.realized), "Closed day-trade results.", num(T.realized) >= 0 ? "green" : "bad") +
+        metric("Trades left", String(left), "Resets when you age up.", left > 3 ? "good" : left ? "gold" : "bad") +
+      '</div>' +
+      '<div class="biz1861-actions" style="margin:8px 0 10px">' + actionBtn("Roll trading tape", "bizDayTradeTapeV1874()", "blue", left <= 0) + '</div>' +
+      '<div class="biz1874-trade-grid">' + cards + '</div>' +
+      '</div>';
+  }
   function renderLegalPanelV1872(biz) {
     var legal = legalStateV1872(biz);
     var plan = bizTaxAttorneyPlanV1872(biz);
@@ -45979,6 +46280,7 @@ getSuggestedActions = function(s) {
     if (panel === "funding") return renderFundingPanelV1862(biz);
     if (panel === "budget") return renderBudgetPanelV1862(biz);
     if (panel === "legal") return renderLegalPanelV1872(biz);
+    if (panel === "trading") return renderTradingPanelV1874(biz);
     if (panel === "public") return '<div class="biz1862-panel">' + renderPublicDeskV1861(biz) + '</div>';
     if (panel === "exit") return '<div class="biz1862-panel">' + renderExitDeskV1861(biz) + '</div>';
     return renderOverviewPanelV1862(biz);
@@ -47012,7 +47314,8 @@ getSuggestedActions = function(s) {
         ".biz1862-roster{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;margin-top:8px}.biz1862-emp{display:flex;flex-direction:column;gap:8px;border:1px solid rgba(255,255,255,.10);border-radius:10px;background:rgba(255,255,255,.04);padding:11px;min-width:0}.biz1862-emp.founder{border-color:rgba(216,173,109,.35);background:rgba(216,173,109,.06)}.biz1862-emp-top{display:flex;align-items:center;gap:9px;min-width:0}.biz1862-emp-avatar{flex:none;width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:rgba(126,160,172,.16);border:1px solid rgba(126,160,172,.4);color:#cfe0e6;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700}.biz1862-emp-avatar.gold{background:rgba(216,173,109,.16);border-color:rgba(216,173,109,.45);color:#e9cf9c}.biz1862-emp-id{min-width:0;flex:1}.biz1862-emp-id b{display:block;color:#fff3df;font-family:'Fraunces',Georgia,serif;font-size:15px;line-height:1.15;overflow-wrap:anywhere}.biz1862-emp-id span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;margin-top:3px;overflow-wrap:anywhere}.biz1862-emp .money-btn{flex:none;padding:4px 9px;font-size:10px}",
         ".biz1862-perf{height:6px;border-radius:99px;background:rgba(0,0,0,.3);overflow:hidden}.biz1862-perf-bar{height:100%;border-radius:99px;background:#7ea0ac}.biz1862-perf-bar.good{background:#9fd07d}.biz1862-perf-bar.gold{background:#d8b16e}.biz1862-perf-bar.bad{background:#e9927d}.biz1862-emp-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}.biz1862-emp-foot span{color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;min-width:0;overflow-wrap:anywhere}.biz1862-emp-foot i.warn{color:#e9927d;font-style:normal}.biz1862-emp-foot em{color:#d8b16e;font-family:'JetBrains Mono',monospace;font-size:11px;font-style:normal;flex:none}",
         // dashboard 2.0 — color pass: semantic per-section accents + gradient pop
-        ".biz1861-active{--acc:216,173,109}.biz1862-accent-overview{--acc:216,173,109}.biz1862-accent-product{--acc:126,160,172}.biz1862-accent-growth{--acc:159,208,125}.biz1862-accent-team{--acc:195,155,211}.biz1862-accent-funding{--acc:216,173,109}.biz1862-accent-legal{--acc:120,170,185}.biz1862-accent-public{--acc:120,170,185}.biz1862-accent-exit{--acc:233,146,125}",
+        ".biz1861-active{--acc:216,173,109}.biz1862-accent-overview{--acc:216,173,109}.biz1862-accent-product{--acc:126,160,172}.biz1862-accent-growth{--acc:159,208,125}.biz1862-accent-team{--acc:195,155,211}.biz1862-accent-funding{--acc:216,173,109}.biz1862-accent-legal{--acc:120,170,185}.biz1862-accent-trading{--acc:143,196,215}.biz1862-accent-public{--acc:120,170,185}.biz1862-accent-exit{--acc:233,146,125}",
+        ".biz1874-trade-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}.biz1874-trade-card{border:1px solid rgba(143,196,215,.25);border-radius:12px;background:linear-gradient(160deg,rgba(21,33,35,.82),rgba(24,20,16,.92));padding:10px;min-width:0}.biz1874-trade-head,.biz1874-trade-foot{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.biz1874-trade-head b{display:block;color:#fff3df;font-size:15px}.biz1874-trade-head span,.biz1874-trade-foot span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:9px;line-height:1.35}.biz1874-trade-head strong{color:#f2d089;text-align:right}.biz1874-trade-head strong em{display:block;font-size:9px;font-style:normal;margin-top:2px}.biz1874-trade-card .biz1862-candles{width:100%;height:86px;margin:8px 0;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(0,0,0,.18)}",
         // semantic gradient tint on metric cards so status strips read in color, not grey
         ".biz1861-metric.good,.biz1861-metric.green{background:linear-gradient(135deg,rgba(159,208,125,.16),rgba(255,255,255,.025));border-color:rgba(159,208,125,.32)}.biz1861-metric.bad,.biz1861-metric.red{background:linear-gradient(135deg,rgba(233,146,125,.16),rgba(255,255,255,.025));border-color:rgba(233,146,125,.32)}.biz1861-metric.gold{background:linear-gradient(135deg,rgba(216,173,109,.16),rgba(255,255,255,.025));border-color:rgba(216,173,109,.32)}.biz1861-metric.blue{background:linear-gradient(135deg,rgba(126,160,172,.16),rgba(255,255,255,.025));border-color:rgba(126,160,172,.32)}",
         // section accent: panel wash, valuation badge, tabs, next-milestone, section labels
@@ -47039,6 +47342,8 @@ getSuggestedActions = function(s) {
     getActiveBiz: getActiveBiz,
     taxAttorneyByIdV1872: taxAttorneyByIdV1872,
     bizEffectiveTaxRateV1872: bizEffectiveTaxRateV1872,
+    tradeStateV1874: tradeStateV1874,
+    tradeMarketValueV1874: tradeMarketValueV1874,
     newBizObj: _newBizObj,
     genCompetitors: _genCompetitors,
     shim: { S: S, num: num, round: round, clampN: clampN, rnd: rnd, pick: pickOne, age: age, smarts: smarts, karma: karma, fame: fame, wealth: wealth, fin: fin, moneyText: moneyText, currencySymbol: currencySymbol }
@@ -47049,7 +47354,7 @@ getSuggestedActions = function(s) {
       id: "entrepreneur",
       file: "pages/systems/entrepreneur.js",
       status: "active-port",
-      globals: ["EntrepreneurV1861", "renderEntrepreneurHubV1861", "runEntrepreneurYearV1861", "migrateOldBusinessesV1861", "repairDuplicateBusinessesV1861", "oldBusinessCheckV1861"],
+      globals: ["EntrepreneurV1861", "renderEntrepreneurHubV1861", "runEntrepreneurYearV1861", "migrateOldBusinessesV1861", "repairDuplicateBusinessesV1861", "oldBusinessCheckV1861", "bizDayTradeBuyV1874", "bizDayTradeSellV1874", "bizDayTradeTapeV1874"],
       notes: "Phases A-E complete: ported Verdant catalogs + business factory + founder state, 6-step wizard, yearly engine, modular hub render owns the Business route, and legacy retirement — old businesses migrate into bizV1860 with full legacy stage mapping, legacy yearly/income hooks are gated against migrated firms (no double-tick), and duplicate-company repair tooling is available from the Old Business Check card."
     });
   }
@@ -50285,34 +50590,34 @@ getSuggestedActions = function(s) {
      ==================================================================== */
   // tier weight = tier^2 -> 1 / 4 / 9 / 16 (drives the Status ladder)
   var LUX = [
-    { id: "bag",       icon: "👜", name: "Designer bag",        tier: 1, cost: 8000,    deltas: { happiness: 4, looks: 3 },                 note: "A first taste of the good stuff." },
-    { id: "wardrobe",  icon: "🧥", name: "Bespoke wardrobe",    tier: 2, cost: 40000,   deltas: { looks: 6, confidence: 4, happiness: 3 },   note: "Tailored, head to toe." },
-    { id: "watch",     icon: "⌚", name: "Luxury watch",        tier: 2, cost: 25000,   deltas: { happiness: 5, looks: 2, confidence: 3 },   note: "Quiet, expensive timekeeping." },
-    { id: "wine",      icon: "🍷", name: "Rare wine cellar",    tier: 2, cost: 90000,   deltas: { happiness: 6, confidence: 3 },             note: "Vintages older than you." },
-    { id: "jewelry",   icon: "💎", name: "Fine jewelry",        tier: 3, cost: 160000,  deltas: { happiness: 7, looks: 6, confidence: 4 },   note: "It catches every light in the room." },
-    { id: "art",       icon: "🎨", name: "Original artwork",    tier: 3, cost: 220000,  deltas: { happiness: 7, creativity: 5, confidence: 4 }, note: "A signed original on your wall." },
-    { id: "instrument",icon: "🎻", name: "Antique instrument",  tier: 3, cost: 130000,  deltas: { creativity: 6, happiness: 5 },             note: "A voice that took centuries to find." },
-    { id: "yacht",     icon: "🛥️", name: "Yacht membership",    tier: 3, cost: 450000,  deltas: { happiness: 10, confidence: 6 },            note: "Open water, on call." },
-    { id: "diamond",   icon: "💍", name: "Statement diamond",   tier: 4, cost: 600000,  deltas: { happiness: 9, looks: 7, confidence: 6 },   note: "Flawless and frankly absurd." },
-    { id: "chip",      icon: "🖼️", name: "Blue-chip art piece", tier: 4, cost: 1500000, deltas: { happiness: 12, confidence: 8, creativity: 5 }, note: "Museum-grade. People know the name." },
-    { id: "heli",      icon: "🚁", name: "Private helicopter",  tier: 4, cost: 3500000, deltas: { happiness: 13, confidence: 10 },           note: "Traffic is now optional." },
-    { id: "island",    icon: "🏝️", name: "Private island share",tier: 4, cost: 6000000, deltas: { happiness: 18, confidence: 12 },           note: "Your name on a dot in the ocean." },
-    { id: "jet",       icon: "🛩️", name: "Private jet",         tier: 5, cost: 45000000,   deltas: { happiness: 15, confidence: 12 },             note: "The world shrinks to a few hours." },
-    { id: "foundation",icon: "🏛️", name: "Named foundation",    tier: 5, cost: 150000000,  deltas: { happiness: 12, karma: 15, confidence: 8 },    note: "Your name on something that does good." },
-    { id: "megayacht", icon: "🛥️", name: "Mega-yacht",          tier: 5, cost: 300000000,  deltas: { happiness: 18, confidence: 13, looks: 4 },    note: "A floating address with a helipad." },
-    { id: "team",      icon: "🏟️", name: "Pro sports team",     tier: 5, cost: 1200000000, deltas: { happiness: 20, confidence: 15, popularity: 12 }, note: "Game day is personal now." }
+    { id: "bag",       icon: "👜", name: "Designer bag",        tier: 1, cost: 12000,   deltas: { happiness: 4, looks: 3 },                 note: "A first taste of the good stuff." },
+    { id: "wardrobe",  icon: "🧥", name: "Bespoke wardrobe",    tier: 2, cost: 65000,   deltas: { looks: 6, confidence: 4, happiness: 3 },   note: "Tailored, head to toe." },
+    { id: "watch",     icon: "⌚", name: "Luxury watch",        tier: 2, cost: 35000,   deltas: { happiness: 5, looks: 2, confidence: 3 },   note: "Quiet, expensive timekeeping." },
+    { id: "wine",      icon: "🍷", name: "Rare wine cellar",    tier: 2, cost: 125000,  deltas: { happiness: 6, confidence: 3 },             note: "Vintages older than you." },
+    { id: "jewelry",   icon: "💎", name: "Fine jewelry",        tier: 3, cost: 240000,  deltas: { happiness: 7, looks: 6, confidence: 4 },   note: "It catches every light in the room." },
+    { id: "art",       icon: "🎨", name: "Original artwork",    tier: 3, cost: 325000,  deltas: { happiness: 7, creativity: 5, confidence: 4 }, note: "A signed original on your wall." },
+    { id: "instrument",icon: "🎻", name: "Antique instrument",  tier: 3, cost: 180000,  deltas: { creativity: 6, happiness: 5 },             note: "A voice that took centuries to find." },
+    { id: "yacht",     icon: "🛥️", name: "Yacht membership",    tier: 3, cost: 650000,  deltas: { happiness: 10, confidence: 6 },            note: "Open water, on call." },
+    { id: "diamond",   icon: "💍", name: "Statement diamond",   tier: 4, cost: 900000,  deltas: { happiness: 9, looks: 7, confidence: 6 },   note: "Flawless and frankly absurd." },
+    { id: "chip",      icon: "🖼️", name: "Blue-chip art piece", tier: 4, cost: 2400000, deltas: { happiness: 12, confidence: 8, creativity: 5 }, note: "Museum-grade. People know the name." },
+    { id: "heli",      icon: "🚁", name: "Private helicopter",  tier: 4, cost: 4800000, deltas: { happiness: 13, confidence: 10 },           note: "Traffic is now optional." },
+    { id: "island",    icon: "🏝️", name: "Private island share",tier: 4, cost: 9000000, deltas: { happiness: 18, confidence: 12 },           note: "Your name on a dot in the ocean." },
+    { id: "jet",       icon: "🛩️", name: "Private jet",         tier: 5, cost: 60000000,   deltas: { happiness: 15, confidence: 12 },             note: "The world shrinks to a few hours." },
+    { id: "foundation",icon: "🏛️", name: "Named foundation",    tier: 5, cost: 200000000,  deltas: { happiness: 12, karma: 15, confidence: 8 },    note: "Your name on something that does good." },
+    { id: "megayacht", icon: "🛥️", name: "Mega-yacht",          tier: 5, cost: 450000000,  deltas: { happiness: 18, confidence: 13, looks: 4 },    note: "A floating address with a helipad." },
+    { id: "team",      icon: "🏟️", name: "Pro sports team",     tier: 5, cost: 1500000000, deltas: { happiness: 20, confidence: 15, popularity: 12 }, note: "Game day is personal now." }
   ];
   var EXP = [
-    { id: "festival", icon: "🎟️", name: "VIP festival weekend",   cost: 15000,  deltas: { happiness: 8,  stress: -5, energy: -2 }, mem: "A blur of music, lights, and friends." },
-    { id: "track",    icon: "🏎️", name: "Supercar track day",     cost: 20000,  deltas: { happiness: 9,  confidence: 3, stress: -3 }, mem: "You finally found out what 200mph feels like." },
-    { id: "opera",    icon: "🎭", name: "A season at the opera",  cost: 30000,  deltas: { happiness: 7,  creativity: 3, stress: -4 }, mem: "A box seat and a year of grand nights out." },
-    { id: "food",     icon: "🍽️", name: "Michelin food tour",     cost: 45000,  deltas: { happiness: 10, stress: -4 }, mem: "You ate your way across three continents." },
-    { id: "safari",   icon: "🦁", name: "Luxury safari",          cost: 60000,  deltas: { happiness: 11, stress: -7, health: 2 }, mem: "Dawn over the savanna, lions in the grass." },
-    { id: "everest",  icon: "🏔️", name: "Everest base-camp trek", cost: 80000,  deltas: { happiness: 12, athleticism: 4, stress: -6 }, mem: "You stood where the air runs thin." },
-    { id: "world",    icon: "🌍", name: "Around-the-world trip",   cost: 120000, deltas: { happiness: 18, stress: -12, energy: 4 }, mem: "Months on the move; you came back different." },
-    { id: "space",    icon: "🚀", name: "Suborbital space flight", cost: 500000, deltas: { happiness: 25, confidence: 10, stress: -10 }, mem: "You saw the curve of the Earth with your own eyes." },
-    { id: "gala",     icon: "🎗️", name: "Host a charity gala",     cost: 5000000,  deltas: { happiness: 12, karma: 8, popularity: 6 }, mem: "A glittering night that raised millions for a cause." },
-    { id: "orbit",    icon: "🛰️", name: "A week on the space station", cost: 30000000, deltas: { happiness: 30, confidence: 15, stress: -15 }, mem: "You floated above the world for seven whole days." }
+    { id: "festival", icon: "🎟️", name: "VIP festival weekend",   cost: 18000,  deltas: { happiness: 8,  stress: -5, energy: -2 }, mem: "A blur of music, lights, and friends." },
+    { id: "track",    icon: "🏎️", name: "Supercar track day",     cost: 30000,  deltas: { happiness: 9,  confidence: 3, stress: -3 }, mem: "You finally found out what 200mph feels like." },
+    { id: "opera",    icon: "🎭", name: "A season at the opera",  cost: 45000,  deltas: { happiness: 7,  creativity: 3, stress: -4 }, mem: "A box seat and a year of grand nights out." },
+    { id: "food",     icon: "🍽️", name: "Michelin food tour",     cost: 65000,  deltas: { happiness: 10, stress: -4 }, mem: "You ate your way across three continents." },
+    { id: "safari",   icon: "🦁", name: "Luxury safari",          cost: 90000,  deltas: { happiness: 11, stress: -7, health: 2 }, mem: "Dawn over the savanna, lions in the grass." },
+    { id: "everest",  icon: "🏔️", name: "Everest base-camp trek", cost: 120000, deltas: { happiness: 12, athleticism: 4, stress: -6 }, mem: "You stood where the air runs thin." },
+    { id: "world",    icon: "🌍", name: "Around-the-world trip",   cost: 180000, deltas: { happiness: 18, stress: -12, energy: 4 }, mem: "Months on the move; you came back different." },
+    { id: "space",    icon: "🚀", name: "Suborbital space flight", cost: 750000, deltas: { happiness: 25, confidence: 10, stress: -10 }, mem: "You saw the curve of the Earth with your own eyes." },
+    { id: "gala",     icon: "🎗️", name: "Host a charity gala",     cost: 6500000,  deltas: { happiness: 12, karma: 8, popularity: 6 }, mem: "A glittering night that raised millions for a cause." },
+    { id: "orbit",    icon: "🛰️", name: "A week on the space station", cost: 45000000, deltas: { happiness: 30, confidence: 15, stress: -15 }, mem: "You floated above the world for seven whole days." }
   ];
   function luxDef(id) { for (var i = 0; i < LUX.length; i++) if (LUX[i].id === id) return LUX[i]; return null; }
   function expDef(id) { for (var i = 0; i < EXP.length; i++) if (EXP[i].id === id) return EXP[i]; return null; }
@@ -50332,11 +50637,11 @@ getSuggestedActions = function(s) {
   }
   function statusLabel() {
     var sc = statusScore();
-    if (sc >= 80) return "Legendary";
-    if (sc >= 40) return "Iconic";
-    if (sc >= 20) return "Elite";
-    if (sc >= 9) return "Affluent";
-    if (sc >= 3) return "Comfortable";
+    if (sc >= 100) return "Legendary";
+    if (sc >= 60) return "Iconic";
+    if (sc >= 32) return "Elite";
+    if (sc >= 14) return "Affluent";
+    if (sc >= 5) return "Comfortable";
     if (sc >= 1) return "Rising";
     return "Understated";
   }
@@ -50344,11 +50649,11 @@ getSuggestedActions = function(s) {
   // ladder. Pure stat perk (no money), applied once per year and surfaced in the Luxury popup + log.
   function statusYearlyPerk() {
     var sc = statusScore();
-    if (sc >= 80) return { label: "Legendary", deltas: { happiness: 4, popularity: 3, confidence: 3 } };
-    if (sc >= 40) return { label: "Iconic", deltas: { happiness: 3, popularity: 2, confidence: 2 } };
-    if (sc >= 20) return { label: "Elite", deltas: { happiness: 3, popularity: 2, confidence: 1 } };
-    if (sc >= 9)  return { label: "Affluent", deltas: { happiness: 2, popularity: 1, confidence: 1 } };
-    if (sc >= 3)  return { label: "Comfortable", deltas: { happiness: 2, popularity: 1 } };
+    if (sc >= 100) return { label: "Legendary", deltas: { happiness: 4, popularity: 3, confidence: 3 } };
+    if (sc >= 60) return { label: "Iconic", deltas: { happiness: 3, popularity: 2, confidence: 2 } };
+    if (sc >= 32) return { label: "Elite", deltas: { happiness: 3, popularity: 2, confidence: 1 } };
+    if (sc >= 14) return { label: "Affluent", deltas: { happiness: 2, popularity: 1, confidence: 1 } };
+    if (sc >= 5)  return { label: "Comfortable", deltas: { happiness: 2, popularity: 1 } };
     if (sc >= 1)  return { label: "Rising", deltas: { happiness: 1 } };
     return null;
   }
@@ -50440,15 +50745,27 @@ getSuggestedActions = function(s) {
       return !a.earn && WELLNESS_IDS.indexOf(a.id) < 0; // fun
     });
     if (!list.length) return '<div class="row"><div><div class="row-sub">Nothing here right now.</div></div></div>';
-    return list.map(function (a) {
+    return '<div class="life71-lux-grid life71-act-grid">' + list.map(function (a) {
       var done = !!actions()[a.id];
       var locked = age() < num(a.min);
       var cost = num(a.cost), earn = num(a.earn), net = earn - cost;
       var cantAfford = cash() < cost;
       var price = earn ? ((net >= 0 ? "+" : "") + money(net) + " net") : (cost ? money(cost) : "Free");
-      var sub = (locked ? "Age " + a.min + "+ · " : "") + esc(price) + " · " + esc(a.effect || "");
-      return row(a.icon, a.name, sub, done ? "Done" : (locked ? "Age " + a.min : "Do"), done || locked || cantAfford, "doActivity('" + a.id + "')");
-    }).join("");
+      var tone = earn ? "earn" : kind === "wellness" ? "mind" : "fun";
+      var tag = locked ? "Age " + a.min + "+" : earn ? "Side income" : kind === "wellness" ? "Wellbeing" : "Recreation";
+      return '<div class="life71-lux-card life71-act-card ' + tone + (done ? " owned" : "") + '">' +
+        '<div class="life71-lux-ico">' + esc(a.icon || "") + '</div>' +
+        '<div class="life71-lux-main">' +
+          '<div class="life71-lux-nm">' + esc(a.name || "") + '</div>' +
+          '<div class="life71-lux-desc">' + esc(a.effect || "") + '</div>' +
+          '<div class="lf-pill-row">' + effectPills(a.deltas || {}) + '</div>' +
+        '</div>' +
+        '<div class="life71-lux-right">' +
+          '<span class="life71-lux-badge">' + esc(tag) + '</span>' +
+          '<button class="life71-lux-buy" ' + (done || locked || cantAfford ? "disabled " : "") + 'onclick="event.preventDefault();event.stopPropagation();doActivity(\'' + a.id + '\')">' + (done ? "Done" : locked ? "Age " + a.min : price) + '</button>' +
+        '</div>' +
+      '</div>';
+    }).join("") + '</div>';
   }
 
   // On-page panels (brought back per request). Focus + Lifestyle are COLLAPSIBLE (default collapsed)
@@ -50820,6 +51137,9 @@ getSuggestedActions = function(s) {
       ".life71-lux-card.t5{border-color:rgba(242,201,120,.72);background:radial-gradient(circle at 90% 40%,rgba(242,201,120,.16),transparent 44%),linear-gradient(160deg,rgba(64,48,20,.72),rgba(34,28,20,.6));box-shadow:inset 0 0 0 1px rgba(242,201,120,.12),0 10px 28px rgba(0,0,0,.32)}.life71-lux-card.t5 .life71-lux-nm{color:#fff3df}",
       ".life71-lux-card.t5 .life71-lux-badge{color:#1a140c;border-color:transparent;background:linear-gradient(90deg,#f2c978,#d8ad6d)}",
       ".life71-lux-card.exp{border-color:rgba(126,160,172,.3)}.life71-lux-card.exp .life71-lux-badge{color:var(--money);border-color:rgba(197,180,95,.4)}",
+      ".life71-act-card.mind{border-color:rgba(126,160,172,.34)}.life71-act-card.mind .life71-lux-badge{color:var(--blue);border-color:rgba(126,160,172,.42)}",
+      ".life71-act-card.fun{border-color:rgba(201,155,85,.30)}.life71-act-card.fun .life71-lux-badge{color:var(--accent-2);border-color:rgba(201,155,85,.42)}",
+      ".life71-act-card.earn{border-color:rgba(143,175,108,.34)}.life71-act-card.earn .life71-lux-badge{color:var(--good);border-color:rgba(143,175,108,.42)}",
       ".life71-lux-card.owned{opacity:.72}.life71-lux-card.owned .life71-lux-buy{border-color:var(--good);color:var(--good);background:rgba(143,175,108,.12);cursor:default}",
       "@media(max-width:430px){.life71-lux-card{flex-wrap:wrap}.life71-lux-right{flex-direction:row;align-items:center;width:100%;justify-content:space-between}}",
       "@media(max-width:700px){.life71-two{grid-template-columns:1fr}}",

@@ -2750,6 +2750,45 @@ function buyRental(id) {
   const r = rentals.find(x => x.id === id);
   if (!r) return;
   if (state.age < 18) return addToast("Rental properties unlock at 18.");
+  const ensureRealEstate = window.reEnsureV1863 || window.reEnsureV1862;
+  if (typeof ensureRealEstate === "function") {
+    const re = ensureRealEstate();
+    const tplId = `legacy_${r.id}`;
+    if (re.portfolio.some(p => p.legacyRentalId === r.id || p.tplId === tplId)) return addToast("You already own this property.");
+    if (state.money < r.price) return addToast(`Not enough cash. Needs ${money(r.price)}.`);
+    state.money -= r.price;
+    re.portfolio.push({
+      uid: `legacy_rental_${r.id}`,
+      tplId,
+      legacyRentalId: r.id,
+      name: r.name,
+      type: "house",
+      neighborhood: r.tier || "Legacy",
+      buyPrice: r.price,
+      currentValue: r.price,
+      basePrice: r.price,
+      mortgageLeft: 0,
+      mortgageRate: 0,
+      monthlyRent: Math.max(0, Math.round(r.rent / 12)),
+      askingRent: Math.max(0, Math.round(r.rent / 12)),
+      yearlyMaint: r.upkeep,
+      apprecMean: 0.032,
+      condition: 82,
+      purchaseAge: state.age,
+      purchaseStyle: "legacy_cash",
+      strategy: "rent",
+      rentedOut: true,
+      tenant: null,
+      renovations: []
+    });
+    state.rentals = (state.rentals || []).filter(rid => rid !== id);
+    ensureRealEstate();
+    addLog(`Bought ${r.name} through Real Estate for ${money(r.price)}. Projected net ${money(r.rent - r.upkeep)}/yr.`, { money: -r.price });
+    applyDeltas({ confidence: 3, happiness: 4 });
+    save();
+    render();
+    return;
+  }
   if (state.rentals.includes(id)) return addToast("You already own this property.");
   if (state.money < r.price) return addToast(`Not enough cash. Needs ${money(r.price)}.`);
   state.money -= r.price;
@@ -2762,6 +2801,13 @@ function buyRental(id) {
 
 function sellRental(id) {
   ensureStateShape();
+  const ensureRealEstate = window.reEnsureV1863 || window.reEnsureV1862;
+  if (typeof ensureRealEstate === "function") {
+    const re = ensureRealEstate();
+    const tplId = `legacy_${id}`;
+    const p = re.portfolio.find(x => x && (x.legacyRentalId === id || x.tplId === tplId));
+    if (p && typeof window.reSellV1863 === "function") return window.reSellV1863(p.uid);
+  }
   const idx = state.rentals.indexOf(id);
   if (idx === -1) return;
   const r = rentals.find(x => x.id === id);
@@ -3680,35 +3726,6 @@ function renderHome() {
     const locked = state.age < 16;
     const cantAfford = state.money < c.price;
     return `<div class="row"><div><div class="row-title">${c.name}${owned ? " ✓" : ""}</div><div class="row-sub">${money(c.price)} - Upkeep ${money(c.annualCost)}/yr - ${c.effect}</div></div><button class="icon-btn" onclick="buyCar('${c.id}')" ${owned || locked || cantAfford ? "disabled" : ""}>${owned ? "Owned" : locked ? "16+" : "Buy"}</button></div>`;
-  }).join("");
-
-  // Owned rentals
-  const ownedRentals = (state.rentals || []).map(rid => rentals.find(r => r.id === rid)).filter(Boolean);
-  const ownedRentalsHtml = ownedRentals.length
-    ? ownedRentals.map(r => `<div class="row">
-        <div>
-          <div class="row-title">${r.name}</div>
-          <div class="row-sub">${r.tier} - Rent ${money(r.rent)}/yr - Upkeep ${money(r.upkeep)}/yr - <span style="color:var(--good)">Net ${money(r.rent - r.upkeep)}/yr</span></div>
-        </div>
-        <button class="icon-btn" onclick="sellRental('${r.id}')">Sell</button>
-      </div>`).join("")
-    : `<div class="row-sub" style="padding:8px 0">You don't own any rental properties yet. Buy one below to start earning passive income.</div>`;
-
-  // Available rentals
-  const portfolio = ownedRentals.reduce((sum, r) => sum + r.rent - r.upkeep, 0);
-  const availableRentals = rentals.filter(r => !(state.rentals || []).includes(r.id));
-  const availRentalsHtml = availableRentals.map(r => {
-    const locked = state.age < 18;
-    const cantAfford = state.money < r.price;
-    const yieldPct = (((r.rent - r.upkeep) / r.price) * 100).toFixed(1);
-    return `<div class="row">
-      <div>
-        <div class="row-title">${r.name}</div>
-        <div class="row-sub">${r.tier} - ${money(r.price)} - Rent ${money(r.rent)}/yr - Upkeep ${money(r.upkeep)}/yr - <span style="color:var(--accent)">${yieldPct}% net yield</span></div>
-        <div class="row-sub" style="margin-top:3px">${r.desc}</div>
-      </div>
-      <button class="icon-btn" onclick="buyRental('${r.id}')" ${locked || cantAfford ? "disabled" : ""}>${locked ? "18+" : "Buy"}</button>
-    </div>`;
   }).join("");
 
   return `${typeof renderLivingSituationV1862 === "function" ? renderLivingSituationV1862() : `<section class="panel"><div class="section-label">🏠 Living Situation</div>${homeRows}</section>`}

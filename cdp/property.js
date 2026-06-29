@@ -114,6 +114,14 @@
     ok("migration_imports_legacy_rentals", state.rentals.length === 0 && state.finance.reV1863.portfolio.some(function (x) { return /Studio/i.test(x.name); }));
     ok("migration_imports_reV1862", state.finance.reV1863.portfolio.some(function (x) { return x.name === "Old Duplex" && x.mortgageLeft === 180000; }));
 
+    reset();
+    var legacyCash0 = state.money;
+    window.buyRental("rent_studio");
+    var legacyRental = state.finance.reV1863.portfolio.find(function (x) { return x.legacyRentalId === "rent_studio" || x.tplId === "legacy_rent_studio"; });
+    ok("legacy_buy_rental_uses_real_estate", state.rentals.length === 0 && !!legacyRental && legacyRental.strategy === "rent" && state.money === legacyCash0 - 95000, JSON.stringify({ rentals: state.rentals, prop: legacyRental && legacyRental.name, money: state.money }));
+    var legacyHomeHtml = window.renderHome();
+    ok("legacy_home_hides_rental_catalog", legacyHomeHtml.indexOf("Available rentals") < 0 && legacyHomeHtml.indexOf("Owned rentals") < 0 && legacyHomeHtml.indexOf("buyRental('") < 0);
+
     html = window.renderRealEstateV1863();
     ok("portfolio_card_renders", /Portfolio cards/.test(html) && /Condition/.test(html) && /Mortgage/.test(html), html.slice(0, 260));
     ok("living_split_renders", typeof window.renderLivingSituationV1863 === "function" && /Living Situation/.test(window.renderLivingSituationV1863()));

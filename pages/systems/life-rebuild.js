@@ -94,34 +94,34 @@
      ==================================================================== */
   // tier weight = tier^2 -> 1 / 4 / 9 / 16 (drives the Status ladder)
   var LUX = [
-    { id: "bag",       icon: "👜", name: "Designer bag",        tier: 1, cost: 8000,    deltas: { happiness: 4, looks: 3 },                 note: "A first taste of the good stuff." },
-    { id: "wardrobe",  icon: "🧥", name: "Bespoke wardrobe",    tier: 2, cost: 40000,   deltas: { looks: 6, confidence: 4, happiness: 3 },   note: "Tailored, head to toe." },
-    { id: "watch",     icon: "⌚", name: "Luxury watch",        tier: 2, cost: 25000,   deltas: { happiness: 5, looks: 2, confidence: 3 },   note: "Quiet, expensive timekeeping." },
-    { id: "wine",      icon: "🍷", name: "Rare wine cellar",    tier: 2, cost: 90000,   deltas: { happiness: 6, confidence: 3 },             note: "Vintages older than you." },
-    { id: "jewelry",   icon: "💎", name: "Fine jewelry",        tier: 3, cost: 160000,  deltas: { happiness: 7, looks: 6, confidence: 4 },   note: "It catches every light in the room." },
-    { id: "art",       icon: "🎨", name: "Original artwork",    tier: 3, cost: 220000,  deltas: { happiness: 7, creativity: 5, confidence: 4 }, note: "A signed original on your wall." },
-    { id: "instrument",icon: "🎻", name: "Antique instrument",  tier: 3, cost: 130000,  deltas: { creativity: 6, happiness: 5 },             note: "A voice that took centuries to find." },
-    { id: "yacht",     icon: "🛥️", name: "Yacht membership",    tier: 3, cost: 450000,  deltas: { happiness: 10, confidence: 6 },            note: "Open water, on call." },
-    { id: "diamond",   icon: "💍", name: "Statement diamond",   tier: 4, cost: 600000,  deltas: { happiness: 9, looks: 7, confidence: 6 },   note: "Flawless and frankly absurd." },
-    { id: "chip",      icon: "🖼️", name: "Blue-chip art piece", tier: 4, cost: 1500000, deltas: { happiness: 12, confidence: 8, creativity: 5 }, note: "Museum-grade. People know the name." },
-    { id: "heli",      icon: "🚁", name: "Private helicopter",  tier: 4, cost: 3500000, deltas: { happiness: 13, confidence: 10 },           note: "Traffic is now optional." },
-    { id: "island",    icon: "🏝️", name: "Private island share",tier: 4, cost: 6000000, deltas: { happiness: 18, confidence: 12 },           note: "Your name on a dot in the ocean." },
-    { id: "jet",       icon: "🛩️", name: "Private jet",         tier: 5, cost: 45000000,   deltas: { happiness: 15, confidence: 12 },             note: "The world shrinks to a few hours." },
-    { id: "foundation",icon: "🏛️", name: "Named foundation",    tier: 5, cost: 150000000,  deltas: { happiness: 12, karma: 15, confidence: 8 },    note: "Your name on something that does good." },
-    { id: "megayacht", icon: "🛥️", name: "Mega-yacht",          tier: 5, cost: 300000000,  deltas: { happiness: 18, confidence: 13, looks: 4 },    note: "A floating address with a helipad." },
-    { id: "team",      icon: "🏟️", name: "Pro sports team",     tier: 5, cost: 1200000000, deltas: { happiness: 20, confidence: 15, popularity: 12 }, note: "Game day is personal now." }
+    { id: "bag",       icon: "👜", name: "Designer bag",        tier: 1, cost: 12000,   deltas: { happiness: 4, looks: 3 },                 note: "A first taste of the good stuff." },
+    { id: "wardrobe",  icon: "🧥", name: "Bespoke wardrobe",    tier: 2, cost: 65000,   deltas: { looks: 6, confidence: 4, happiness: 3 },   note: "Tailored, head to toe." },
+    { id: "watch",     icon: "⌚", name: "Luxury watch",        tier: 2, cost: 35000,   deltas: { happiness: 5, looks: 2, confidence: 3 },   note: "Quiet, expensive timekeeping." },
+    { id: "wine",      icon: "🍷", name: "Rare wine cellar",    tier: 2, cost: 125000,  deltas: { happiness: 6, confidence: 3 },             note: "Vintages older than you." },
+    { id: "jewelry",   icon: "💎", name: "Fine jewelry",        tier: 3, cost: 240000,  deltas: { happiness: 7, looks: 6, confidence: 4 },   note: "It catches every light in the room." },
+    { id: "art",       icon: "🎨", name: "Original artwork",    tier: 3, cost: 325000,  deltas: { happiness: 7, creativity: 5, confidence: 4 }, note: "A signed original on your wall." },
+    { id: "instrument",icon: "🎻", name: "Antique instrument",  tier: 3, cost: 180000,  deltas: { creativity: 6, happiness: 5 },             note: "A voice that took centuries to find." },
+    { id: "yacht",     icon: "🛥️", name: "Yacht membership",    tier: 3, cost: 650000,  deltas: { happiness: 10, confidence: 6 },            note: "Open water, on call." },
+    { id: "diamond",   icon: "💍", name: "Statement diamond",   tier: 4, cost: 900000,  deltas: { happiness: 9, looks: 7, confidence: 6 },   note: "Flawless and frankly absurd." },
+    { id: "chip",      icon: "🖼️", name: "Blue-chip art piece", tier: 4, cost: 2400000, deltas: { happiness: 12, confidence: 8, creativity: 5 }, note: "Museum-grade. People know the name." },
+    { id: "heli",      icon: "🚁", name: "Private helicopter",  tier: 4, cost: 4800000, deltas: { happiness: 13, confidence: 10 },           note: "Traffic is now optional." },
+    { id: "island",    icon: "🏝️", name: "Private island share",tier: 4, cost: 9000000, deltas: { happiness: 18, confidence: 12 },           note: "Your name on a dot in the ocean." },
+    { id: "jet",       icon: "🛩️", name: "Private jet",         tier: 5, cost: 60000000,   deltas: { happiness: 15, confidence: 12 },             note: "The world shrinks to a few hours." },
+    { id: "foundation",icon: "🏛️", name: "Named foundation",    tier: 5, cost: 200000000,  deltas: { happiness: 12, karma: 15, confidence: 8 },    note: "Your name on something that does good." },
+    { id: "megayacht", icon: "🛥️", name: "Mega-yacht",          tier: 5, cost: 450000000,  deltas: { happiness: 18, confidence: 13, looks: 4 },    note: "A floating address with a helipad." },
+    { id: "team",      icon: "🏟️", name: "Pro sports team",     tier: 5, cost: 1500000000, deltas: { happiness: 20, confidence: 15, popularity: 12 }, note: "Game day is personal now." }
   ];
   var EXP = [
-    { id: "festival", icon: "🎟️", name: "VIP festival weekend",   cost: 15000,  deltas: { happiness: 8,  stress: -5, energy: -2 }, mem: "A blur of music, lights, and friends." },
-    { id: "track",    icon: "🏎️", name: "Supercar track day",     cost: 20000,  deltas: { happiness: 9,  confidence: 3, stress: -3 }, mem: "You finally found out what 200mph feels like." },
-    { id: "opera",    icon: "🎭", name: "A season at the opera",  cost: 30000,  deltas: { happiness: 7,  creativity: 3, stress: -4 }, mem: "A box seat and a year of grand nights out." },
-    { id: "food",     icon: "🍽️", name: "Michelin food tour",     cost: 45000,  deltas: { happiness: 10, stress: -4 }, mem: "You ate your way across three continents." },
-    { id: "safari",   icon: "🦁", name: "Luxury safari",          cost: 60000,  deltas: { happiness: 11, stress: -7, health: 2 }, mem: "Dawn over the savanna, lions in the grass." },
-    { id: "everest",  icon: "🏔️", name: "Everest base-camp trek", cost: 80000,  deltas: { happiness: 12, athleticism: 4, stress: -6 }, mem: "You stood where the air runs thin." },
-    { id: "world",    icon: "🌍", name: "Around-the-world trip",   cost: 120000, deltas: { happiness: 18, stress: -12, energy: 4 }, mem: "Months on the move; you came back different." },
-    { id: "space",    icon: "🚀", name: "Suborbital space flight", cost: 500000, deltas: { happiness: 25, confidence: 10, stress: -10 }, mem: "You saw the curve of the Earth with your own eyes." },
-    { id: "gala",     icon: "🎗️", name: "Host a charity gala",     cost: 5000000,  deltas: { happiness: 12, karma: 8, popularity: 6 }, mem: "A glittering night that raised millions for a cause." },
-    { id: "orbit",    icon: "🛰️", name: "A week on the space station", cost: 30000000, deltas: { happiness: 30, confidence: 15, stress: -15 }, mem: "You floated above the world for seven whole days." }
+    { id: "festival", icon: "🎟️", name: "VIP festival weekend",   cost: 18000,  deltas: { happiness: 8,  stress: -5, energy: -2 }, mem: "A blur of music, lights, and friends." },
+    { id: "track",    icon: "🏎️", name: "Supercar track day",     cost: 30000,  deltas: { happiness: 9,  confidence: 3, stress: -3 }, mem: "You finally found out what 200mph feels like." },
+    { id: "opera",    icon: "🎭", name: "A season at the opera",  cost: 45000,  deltas: { happiness: 7,  creativity: 3, stress: -4 }, mem: "A box seat and a year of grand nights out." },
+    { id: "food",     icon: "🍽️", name: "Michelin food tour",     cost: 65000,  deltas: { happiness: 10, stress: -4 }, mem: "You ate your way across three continents." },
+    { id: "safari",   icon: "🦁", name: "Luxury safari",          cost: 90000,  deltas: { happiness: 11, stress: -7, health: 2 }, mem: "Dawn over the savanna, lions in the grass." },
+    { id: "everest",  icon: "🏔️", name: "Everest base-camp trek", cost: 120000, deltas: { happiness: 12, athleticism: 4, stress: -6 }, mem: "You stood where the air runs thin." },
+    { id: "world",    icon: "🌍", name: "Around-the-world trip",   cost: 180000, deltas: { happiness: 18, stress: -12, energy: 4 }, mem: "Months on the move; you came back different." },
+    { id: "space",    icon: "🚀", name: "Suborbital space flight", cost: 750000, deltas: { happiness: 25, confidence: 10, stress: -10 }, mem: "You saw the curve of the Earth with your own eyes." },
+    { id: "gala",     icon: "🎗️", name: "Host a charity gala",     cost: 6500000,  deltas: { happiness: 12, karma: 8, popularity: 6 }, mem: "A glittering night that raised millions for a cause." },
+    { id: "orbit",    icon: "🛰️", name: "A week on the space station", cost: 45000000, deltas: { happiness: 30, confidence: 15, stress: -15 }, mem: "You floated above the world for seven whole days." }
   ];
   function luxDef(id) { for (var i = 0; i < LUX.length; i++) if (LUX[i].id === id) return LUX[i]; return null; }
   function expDef(id) { for (var i = 0; i < EXP.length; i++) if (EXP[i].id === id) return EXP[i]; return null; }
@@ -141,11 +141,11 @@
   }
   function statusLabel() {
     var sc = statusScore();
-    if (sc >= 80) return "Legendary";
-    if (sc >= 40) return "Iconic";
-    if (sc >= 20) return "Elite";
-    if (sc >= 9) return "Affluent";
-    if (sc >= 3) return "Comfortable";
+    if (sc >= 100) return "Legendary";
+    if (sc >= 60) return "Iconic";
+    if (sc >= 32) return "Elite";
+    if (sc >= 14) return "Affluent";
+    if (sc >= 5) return "Comfortable";
     if (sc >= 1) return "Rising";
     return "Understated";
   }
@@ -153,11 +153,11 @@
   // ladder. Pure stat perk (no money), applied once per year and surfaced in the Luxury popup + log.
   function statusYearlyPerk() {
     var sc = statusScore();
-    if (sc >= 80) return { label: "Legendary", deltas: { happiness: 4, popularity: 3, confidence: 3 } };
-    if (sc >= 40) return { label: "Iconic", deltas: { happiness: 3, popularity: 2, confidence: 2 } };
-    if (sc >= 20) return { label: "Elite", deltas: { happiness: 3, popularity: 2, confidence: 1 } };
-    if (sc >= 9)  return { label: "Affluent", deltas: { happiness: 2, popularity: 1, confidence: 1 } };
-    if (sc >= 3)  return { label: "Comfortable", deltas: { happiness: 2, popularity: 1 } };
+    if (sc >= 100) return { label: "Legendary", deltas: { happiness: 4, popularity: 3, confidence: 3 } };
+    if (sc >= 60) return { label: "Iconic", deltas: { happiness: 3, popularity: 2, confidence: 2 } };
+    if (sc >= 32) return { label: "Elite", deltas: { happiness: 3, popularity: 2, confidence: 1 } };
+    if (sc >= 14) return { label: "Affluent", deltas: { happiness: 2, popularity: 1, confidence: 1 } };
+    if (sc >= 5)  return { label: "Comfortable", deltas: { happiness: 2, popularity: 1 } };
     if (sc >= 1)  return { label: "Rising", deltas: { happiness: 1 } };
     return null;
   }
@@ -249,15 +249,27 @@
       return !a.earn && WELLNESS_IDS.indexOf(a.id) < 0; // fun
     });
     if (!list.length) return '<div class="row"><div><div class="row-sub">Nothing here right now.</div></div></div>';
-    return list.map(function (a) {
+    return '<div class="life71-lux-grid life71-act-grid">' + list.map(function (a) {
       var done = !!actions()[a.id];
       var locked = age() < num(a.min);
       var cost = num(a.cost), earn = num(a.earn), net = earn - cost;
       var cantAfford = cash() < cost;
       var price = earn ? ((net >= 0 ? "+" : "") + money(net) + " net") : (cost ? money(cost) : "Free");
-      var sub = (locked ? "Age " + a.min + "+ · " : "") + esc(price) + " · " + esc(a.effect || "");
-      return row(a.icon, a.name, sub, done ? "Done" : (locked ? "Age " + a.min : "Do"), done || locked || cantAfford, "doActivity('" + a.id + "')");
-    }).join("");
+      var tone = earn ? "earn" : kind === "wellness" ? "mind" : "fun";
+      var tag = locked ? "Age " + a.min + "+" : earn ? "Side income" : kind === "wellness" ? "Wellbeing" : "Recreation";
+      return '<div class="life71-lux-card life71-act-card ' + tone + (done ? " owned" : "") + '">' +
+        '<div class="life71-lux-ico">' + esc(a.icon || "") + '</div>' +
+        '<div class="life71-lux-main">' +
+          '<div class="life71-lux-nm">' + esc(a.name || "") + '</div>' +
+          '<div class="life71-lux-desc">' + esc(a.effect || "") + '</div>' +
+          '<div class="lf-pill-row">' + effectPills(a.deltas || {}) + '</div>' +
+        '</div>' +
+        '<div class="life71-lux-right">' +
+          '<span class="life71-lux-badge">' + esc(tag) + '</span>' +
+          '<button class="life71-lux-buy" ' + (done || locked || cantAfford ? "disabled " : "") + 'onclick="event.preventDefault();event.stopPropagation();doActivity(\'' + a.id + '\')">' + (done ? "Done" : locked ? "Age " + a.min : price) + '</button>' +
+        '</div>' +
+      '</div>';
+    }).join("") + '</div>';
   }
 
   // On-page panels (brought back per request). Focus + Lifestyle are COLLAPSIBLE (default collapsed)
@@ -629,6 +641,9 @@
       ".life71-lux-card.t5{border-color:rgba(242,201,120,.72);background:radial-gradient(circle at 90% 40%,rgba(242,201,120,.16),transparent 44%),linear-gradient(160deg,rgba(64,48,20,.72),rgba(34,28,20,.6));box-shadow:inset 0 0 0 1px rgba(242,201,120,.12),0 10px 28px rgba(0,0,0,.32)}.life71-lux-card.t5 .life71-lux-nm{color:#fff3df}",
       ".life71-lux-card.t5 .life71-lux-badge{color:#1a140c;border-color:transparent;background:linear-gradient(90deg,#f2c978,#d8ad6d)}",
       ".life71-lux-card.exp{border-color:rgba(126,160,172,.3)}.life71-lux-card.exp .life71-lux-badge{color:var(--money);border-color:rgba(197,180,95,.4)}",
+      ".life71-act-card.mind{border-color:rgba(126,160,172,.34)}.life71-act-card.mind .life71-lux-badge{color:var(--blue);border-color:rgba(126,160,172,.42)}",
+      ".life71-act-card.fun{border-color:rgba(201,155,85,.30)}.life71-act-card.fun .life71-lux-badge{color:var(--accent-2);border-color:rgba(201,155,85,.42)}",
+      ".life71-act-card.earn{border-color:rgba(143,175,108,.34)}.life71-act-card.earn .life71-lux-badge{color:var(--good);border-color:rgba(143,175,108,.42)}",
       ".life71-lux-card.owned{opacity:.72}.life71-lux-card.owned .life71-lux-buy{border-color:var(--good);color:var(--good);background:rgba(143,175,108,.12);cursor:default}",
       "@media(max-width:430px){.life71-lux-card{flex-wrap:wrap}.life71-lux-right{flex-direction:row;align-items:center;width:100%;justify-content:space-between}}",
       "@media(max-width:700px){.life71-two{grid-template-columns:1fr}}",

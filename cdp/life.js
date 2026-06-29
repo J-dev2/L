@@ -48,6 +48,12 @@
 
     window.openLifePopV1871("luxury");
     ok("luxury_popup_opens", !!document.getElementById("life-pop-v1871") && hasLuxuryText(document.body.innerHTML) && /Lifetime bonus/.test(document.body.innerHTML));
+    window.openLifePopV1871("bodymind");
+    ok("bodymind_popup_uses_activity_cards", !!document.getElementById("life-pop-v1871") && /life71-act-card mind/.test(document.body.innerHTML) && /doActivity\('/.test(document.body.innerHTML));
+    window.openLifePopV1871("fun");
+    ok("fun_popup_uses_activity_cards", !!document.getElementById("life-pop-v1871") && /life71-act-card fun/.test(document.body.innerHTML));
+    window.openLifePopV1871("earn");
+    ok("side_money_popup_uses_activity_cards", !!document.getElementById("life-pop-v1871") && /life71-act-card earn/.test(document.body.innerHTML));
 
     var cash0 = num(state.money);
     var stress0 = num(state.stats.stress);
@@ -60,8 +66,8 @@
     var nwBeforeLux = nw();
     window.buyLuxuryV1871("bag");
     ok("luxury_records_owned", state.luxuryV1871 && state.luxuryV1871.owned.indexOf("bag") >= 0);
-    ok("luxury_spends_cash", num(state.money) === moneyBeforeLux - 8000, "money=" + num(state.money));
-    ok("luxury_is_pure_sink", nw() <= nwBeforeLux - 7900, "nw " + nwBeforeLux + " -> " + nw());
+    ok("luxury_spends_cash", num(state.money) === moneyBeforeLux - 12000, "money=" + num(state.money));
+    ok("luxury_is_pure_sink", nw() <= nwBeforeLux - 11900, "nw " + nwBeforeLux + " -> " + nw());
 
     var moneyBeforeRepeat = num(state.money);
     window.buyLuxuryV1871("bag");
@@ -70,7 +76,7 @@
     var moneyBeforeExp = num(state.money);
     var memBefore = (state.life.memories || []).length;
     window.bookExperienceV1871("festival");
-    ok("experience_spends_and_marks_year", num(state.money) === moneyBeforeExp - 15000 && state.actionsTaken.exp_festival === true, "money=" + num(state.money) + " action=" + state.actionsTaken.exp_festival);
+    ok("experience_spends_and_marks_year", num(state.money) === moneyBeforeExp - 18000 && state.actionsTaken.exp_festival === true, "money=" + num(state.money) + " action=" + state.actionsTaken.exp_festival);
     ok("experience_adds_memory", (state.life.memories || []).length > memBefore, "memories=" + (state.life.memories || []).length);
     var moneyBeforeExpRepeat = num(state.money);
     window.bookExperienceV1871("festival");

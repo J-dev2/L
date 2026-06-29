@@ -10,6 +10,7 @@ The old `pages/patches/*.js` files are no longer part of the `play.html` boot pa
 - `play.html` has no active `<script src="pages/patches/...">` tags.
 - `docs/build-report.json` has no `pages/patches` script entries after rebuild.
 - `cdp/no-patches.js` guards the runtime contract so a future cleanup pass can catch accidental reintroduction.
+  Browser verification passed 2/2 on 2026-06-29.
 
 Absorbed behavior:
 

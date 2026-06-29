@@ -176,9 +176,18 @@
     var snap = investmentSnapshot();
     var cycle = m.cycle || ((s.market || {}).mood) || "normal";
     var last = round(n((m.lastMarketGain != null ? m.lastMarketGain : f.lastInvestmentReturn)));
+    var mix = "";
+    if (window.LedgerChartsV1874 && typeof window.LedgerChartsV1874.donutSVG === "function") {
+      mix = '<span class="v1838-chart-tile">' + window.LedgerChartsV1874.donutSVG([
+        { label: "Brokerage", value: snap.brokerage, color: "#d8b16e" },
+        { label: "Stocks", value: snap.stocks, color: "#7ea0ac" },
+        { label: "Managers", value: snap.manager, color: "#9b8cc2" },
+        { label: "Personal firm", value: snap.personal, color: "#9fd07d" }
+      ], { centerLabel: "MIX", wrapClass: "v1838-donut-wrap", svgClass: "biz1862-donut", legendClass: "biz1861-legend", empty: "" }) + '</span>';
+    }
     var cycleIcon = /bull/i.test(cycle) ? "📈" : /bear/i.test(cycle) ? "📉" : "➖";
     return '<section class="v1838-investment-pulse v1838-investments-pulse"><div><div class="v1838-kicker">📈 investment command ledger</div><h3>📈 Investments</h3><p>Stocks, brokerage cash, outside managers, and your personal firm stay in one scroll-friendly command desk. Custom money fields now show the playable max beside them.</p></div><div class="v1838-pulse-rail">' +
-      '<span><b>' + esc(compactMoney(snap.total || totalInvested())) + '</b><em>💰 Total invested</em></span>' +
+      '<span><b>' + esc(compactMoney(snap.total || totalInvested())) + '</b><em>💰 Total invested</em></span>' + mix +
       '<span><b>' + esc(compactMoney(snap.liquid)) + '</b><em>💵 Liquid available</em></span>' +
       '<span><b>' + esc(compactMoney(snap.brokerage)) + '</b><em>🏦 Brokerage cash</em></span>' +
       '<span><b>' + esc(compactMoney(snap.stocks)) + '</b><em>📊 Real stocks</em></span>' +
@@ -381,6 +390,7 @@
       ".hub-overlay.hub-brokerage .v1838-kicker{font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.18em;color:#e6c178;font-size:9px}",
       ".hub-overlay.hub-brokerage .v1838-pulse-rail{display:flex;gap:9px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;padding:13px 2px 3px;margin-top:8px}",
       ".hub-overlay.hub-brokerage .v1838-pulse-rail span{flex:0 0 154px;scroll-snap-align:start;border:1px solid rgba(255,255,255,.12);border-radius:13px;background:rgba(255,255,255,.055);padding:10px;min-width:0}",
+      ".hub-overlay.hub-brokerage .v1838-pulse-rail .v1838-chart-tile{flex-basis:240px;padding:8px}.hub-overlay.hub-brokerage .v1838-donut-wrap{display:grid;grid-template-columns:82px 1fr;gap:6px;align-items:center}.hub-overlay.hub-brokerage .v1838-donut-wrap .biz1862-donut{width:82px;height:82px}.hub-overlay.hub-brokerage .v1838-donut-wrap .biz1861-legend{display:grid;gap:3px}.hub-overlay.hub-brokerage .v1838-donut-wrap .biz1861-legend span{border:0;background:transparent;padding:0;font-size:8px;line-height:1.25}",
       ".hub-overlay.hub-brokerage .v1838-pulse-rail b{display:block;color:#f2d089;font-size:20px;overflow-wrap:anywhere}.hub-overlay.hub-brokerage .v1838-pulse-rail em{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-style:normal;text-transform:uppercase;letter-spacing:.08em;font-size:8px;margin-top:4px}.hub-overlay.hub-brokerage .v1838-pulse-rail .good b{color:#b9dc8a}.hub-overlay.hub-brokerage .v1838-pulse-rail .bad b{color:#e9927d}",
       ".hub-overlay.hub-brokerage .v1838-money-readout{border:1px solid rgba(143,196,215,.38);border-radius:12px;background:linear-gradient(135deg,rgba(23,37,41,.92),rgba(44,35,22,.88));color:#dcecf0;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.04em;line-height:1.25;padding:9px 10px;min-height:38px;text-align:left;white-space:normal;overflow-wrap:anywhere;cursor:pointer}.hub-overlay.hub-brokerage .v1838-money-readout:disabled{opacity:.55;cursor:not-allowed}.hub-overlay.hub-brokerage .v1838-money-readout:hover:not(:disabled){border-color:rgba(240,202,123,.62);color:#f6dfaa}",
       ".hub-overlay.hub-brokerage .v18-input-row,.hub-overlay.hub-brokerage .v1829-custom-row{display:grid!important;grid-template-columns:minmax(150px,1fr) minmax(140px,auto) auto auto!important;gap:8px!important;align-items:stretch!important}.hub-overlay.hub-brokerage .v18-input-row input,.hub-overlay.hub-brokerage .v1829-custom-row input{min-width:0!important}",

@@ -103,6 +103,101 @@
     return clampN(0.21 - num(plan.rateCut), 0.08, 0.21);
   }
 
+  var DAY_TRADE_TICKERS_V1874 = [
+    { id: "LGR", name: "Ledger Robotics", sector: "Automation", base: 42, vol: 0.085 },
+    { id: "NVA", name: "Nova Chips", sector: "Semiconductors", base: 88, vol: 0.105 },
+    { id: "HLX", name: "Helix Health", sector: "Biotech", base: 31, vol: 0.125 },
+    { id: "GRD", name: "GridCloud", sector: "Infrastructure", base: 56, vol: 0.075 },
+    { id: "VNT", name: "VentureMart", sector: "Consumer", base: 24, vol: 0.095 },
+    { id: "SPK", name: "Spark Media", sector: "Media", base: 17, vol: 0.115 }
+  ];
+  function tradeDefV1874(id) {
+    return DAY_TRADE_TICKERS_V1874.find(function (x) { return x.id === id; }) || DAY_TRADE_TICKERS_V1874[0];
+  }
+  function tradeStateV1874() {
+    var B = initBiz();
+    if (!B.dayTradingV1874 || typeof B.dayTradingV1874 !== "object") B.dayTradingV1874 = {};
+    var T = B.dayTradingV1874;
+    T.positions = Array.isArray(T.positions) ? T.positions : [];
+    T.prices = T.prices && typeof T.prices === "object" ? T.prices : {};
+    T.history = T.history && typeof T.history === "object" ? T.history : {};
+    T.realized = round(T.realized || 0);
+    if (T.tradeYear !== age()) { T.tradeYear = age(); T.tradesThisYear = 0; }
+    T.tradesThisYear = Math.max(0, round(T.tradesThisYear || 0));
+    DAY_TRADE_TICKERS_V1874.forEach(function (d) {
+      if (!T.prices[d.id]) T.prices[d.id] = d.base;
+      if (!Array.isArray(T.history[d.id]) || !T.history[d.id].length) T.history[d.id] = [d.base * 0.94, d.base * 0.98, d.base];
+    });
+    return T;
+  }
+  function tradePositionV1874(T, id) {
+    return (T.positions || []).find(function (p) { return p.id === id; }) || null;
+  }
+  function tradeMarketValueV1874(T) {
+    return (T.positions || []).reduce(function (sum, p) { return sum + num(p.shares) * num(T.prices[p.id]); }, 0);
+  }
+  function tradeCostBasisV1874(T) {
+    return (T.positions || []).reduce(function (sum, p) { return sum + num(p.shares) * num(p.avg); }, 0);
+  }
+  function tradeLimitLeftV1874(T) {
+    return Math.max(0, 12 - num(T.tradesThisYear));
+  }
+  function tradeSpendV1874(id, amount) {
+    var T = tradeStateV1874();
+    if (tradeLimitLeftV1874(T) <= 0) { toast("Day-trading desk is capped at 12 actions per age."); return; }
+    var d = tradeDefV1874(id), px = Math.max(0.01, num(T.prices[d.id], d.base));
+    var amt = amount === "max" ? wealth() : Math.max(0, round(amount));
+    amt = Math.min(amt, Math.max(0, round(wealth())));
+    if (amt <= 0) { toast("No cash available for that trade."); return; }
+    var shares = amt / px;
+    var p = tradePositionV1874(T, d.id);
+    if (!p) { p = { id: d.id, shares: 0, avg: px }; T.positions.push(p); }
+    var oldCost = num(p.shares) * num(p.avg);
+    p.shares = num(p.shares) + shares;
+    p.avg = (oldCost + amt) / p.shares;
+    S().money = round(wealth() - amt);
+    T.tradesThisYear++;
+    log("Day trade buy: " + d.id + " for " + moneyText(amt) + " at " + priceTextV1862(px) + ".", { money: -amt });
+    saveGame(); rerender();
+  }
+  function tradeSellV1874(id, pct) {
+    var T = tradeStateV1874();
+    if (tradeLimitLeftV1874(T) <= 0) { toast("Day-trading desk is capped at 12 actions per age."); return; }
+    var d = tradeDefV1874(id), p = tradePositionV1874(T, d.id);
+    if (!p || num(p.shares) <= 0) { toast("No position in " + d.id + "."); return; }
+    pct = pct === "all" ? 1 : clampN(pct, 0, 1);
+    var sh = num(p.shares) * pct;
+    var px = Math.max(0.01, num(T.prices[d.id], d.base));
+    var proceeds = round(sh * px);
+    var gain = round((px - num(p.avg)) * sh);
+    S().money = round(wealth() + proceeds);
+    T.realized = round(num(T.realized) + gain);
+    p.shares = Math.max(0, num(p.shares) - sh);
+    if (p.shares <= 0.000001) T.positions = T.positions.filter(function (x) { return x !== p; });
+    T.tradesThisYear++;
+    log("Day trade sell: " + d.id + " for " + moneyText(proceeds) + " (" + (gain >= 0 ? "+" : "") + moneyText(gain) + " realized).", { money: proceeds });
+    saveGame(); rerender();
+  }
+  function tradeAdvanceV1874() {
+    var T = tradeStateV1874();
+    if (tradeLimitLeftV1874(T) <= 0) { toast("Day-trading desk is capped at 12 actions per age."); return; }
+    DAY_TRADE_TICKERS_V1874.forEach(function (d) {
+      var px = Math.max(0.01, num(T.prices[d.id], d.base));
+      var drift = (Math.random() - 0.48) * d.vol;
+      var shock = Math.random() < 0.08 ? (Math.random() - 0.5) * d.vol * 2.4 : 0;
+      var next = Math.max(1, px * (1 + drift + shock));
+      T.prices[d.id] = Math.round(next * 100) / 100;
+      T.history[d.id].push(T.prices[d.id]);
+      T.history[d.id] = T.history[d.id].slice(-36);
+    });
+    T.tradesThisYear++;
+    log("Day-trading desk rolled the tape. Watchlist prices moved.");
+    saveGame(); rerender();
+  }
+  window.bizDayTradeBuyV1874 = tradeSpendV1874;
+  window.bizDayTradeSellV1874 = tradeSellV1874;
+  window.bizDayTradeTapeV1874 = tradeAdvanceV1874;
+
   var BIZ_MODEL_INFO = {
     saas:       { name:'SaaS / Subscription', emoji:'🔄', desc:'Monthly recurring revenue. Predictable. Churn kills you slowly.', kpis:['MRR','Churn%','NRR'] },
     d2c:        { name:'Direct-to-Consumer',  emoji:'🛒', desc:'Sell products or services directly. CAC/LTV ratio is survival.', kpis:['CAC','LTV','Conv%'] },
@@ -654,6 +749,9 @@
   }
   // Inline-SVG area/line sparkline from a numeric series (own min/max scale).
   function sparkSVG(values, color) {
+    if (window.LedgerChartsV1874 && typeof window.LedgerChartsV1874.sparkSVG === "function") {
+      return window.LedgerChartsV1874.sparkSVG(values, { color: color, className: "biz1861-spark", empty: '<div class="biz1861-spark-empty">Age the company up to chart this.</div>' });
+    }
     var v = (values || []).map(function (x) { return num(x); });
     if (v.length < 2) return '<div class="biz1861-spark-empty">Age the company up to chart this.</div>';
     var W = 240, H = 46, pad = 3;
@@ -693,6 +791,9 @@
   }
   // Donut/pie chart for a spend/allocation breakdown (SVG ring + legend).
   function donutSVG(segments, centerLabel) {
+    if (window.LedgerChartsV1874 && typeof window.LedgerChartsV1874.donutSVG === "function") {
+      return window.LedgerChartsV1874.donutSVG(segments, { centerLabel: centerLabel, wrapClass: "biz1862-donut-wrap", svgClass: "biz1862-donut", legendClass: "biz1861-legend", empty: '<div class="biz1861-spark-empty">Nothing allocated yet.</div>' });
+    }
     var segs = (segments || []).filter(function (s) { return num(s.value) > 0; });
     var total = segs.reduce(function (s, x) { return s + num(x.value); }, 0);
     if (total <= 0) return '<div class="biz1861-spark-empty">Nothing allocated yet.</div>';
@@ -776,6 +877,9 @@
   }
   // Public entry: candlestick chart straight from an array of yearly closing prices.
   window.candleChartFromClosesV1862 = function (closes, id, opts) {
+    if (window.LedgerChartsV1874 && typeof window.LedgerChartsV1874.candleFromClosesSVG === "function") {
+      return window.LedgerChartsV1874.candleFromClosesSVG(closes, id || "x", opts || {});
+    }
     try { return candleChartSVGV1862(monthlyCandlesV1862(closes, id || "x", 12), opts || {}); } catch (e) { return ""; }
   };
 
@@ -890,7 +994,7 @@
     rerender();
   }
   window.bizSetActiveV1861 = setActiveBiz;
-  var DASHBOARD_PANELS_V1862 = ["overview", "product", "growth", "team", "funding", "budget", "legal", "public", "exit"];
+  var DASHBOARD_PANELS_V1862 = ["overview", "product", "growth", "team", "funding", "budget", "legal", "trading", "public", "exit"];
   function dashboardPanelV1862(biz) {
     var B = initBiz();
     var p = String(B.activePanelV1862 || "overview").toLowerCase();
@@ -978,6 +1082,7 @@
       ["funding", "Funding"],
       ["budget", "Budget"],
       ["legal", "Legal"],
+      ["trading", "Trading"],
       ["public", "Public Market"],
       ["exit", "Exit"]
     ];
@@ -1413,6 +1518,46 @@
   function renderFundingPanelV1862(biz) {
     return '<div class="biz1862-panel"><div class="biz1861-control-grid">' + renderFounderPayControlsV1862(biz) + renderCapitalControlsV1862(biz) + renderFundingControlsV1862(biz) + '</div>' + renderFundingHistoryV1862(biz) + renderBizGraphsV1861(biz, "funding") + '</div>';
   }
+  function renderTradingPanelV1874(biz) {
+    var T = tradeStateV1874();
+    var value = tradeMarketValueV1874(T);
+    var basis = tradeCostBasisV1874(T);
+    var unrealized = round(value - basis);
+    var left = tradeLimitLeftV1874(T);
+    var chart = window.LedgerChartsV1874 && typeof window.LedgerChartsV1874.candleFromClosesSVG === "function"
+      ? function (series, id) { return window.LedgerChartsV1874.candleFromClosesSVG(series, id, { w: 320, h: 88, max: 32, className: "biz1862-candles" }); }
+      : function (series, id) { return window.candleChartFromClosesV1862 ? window.candleChartFromClosesV1862(series, id, { w: 320, h: 88, max: 32 }) : ""; };
+    var cards = DAY_TRADE_TICKERS_V1874.map(function (d) {
+      var px = num(T.prices[d.id], d.base);
+      var hist = T.history[d.id] || [d.base];
+      var prev = hist.length > 1 ? num(hist[hist.length - 2]) : px;
+      var move = prev ? (px - prev) / prev : 0;
+      var p = tradePositionV1874(T, d.id);
+      var pos = p ? num(p.shares) * px : 0;
+      var pnl = p ? (px - num(p.avg)) * num(p.shares) : 0;
+      return '<div class="biz1874-trade-card">' +
+        '<div class="biz1874-trade-head"><div><b>' + escH(d.id) + '</b><span>' + escH(d.name) + ' · ' + escH(d.sector) + '</span></div><strong>' + escH(priceTextV1862(px)) + '<em class="' + (move >= 0 ? "good" : "bad") + '">' + (move >= 0 ? "+" : "") + (move * 100).toFixed(1) + '%</em></strong></div>' +
+        chart(hist, d.id) +
+        '<div class="biz1874-trade-foot"><span>Position ' + escH(moneyText(pos)) + '</span><span class="' + (pnl >= 0 ? "good" : "bad") + '">P/L ' + (pnl >= 0 ? "+" : "") + escH(moneyText(pnl)) + '</span></div>' +
+        '<div class="biz1861-actions">' +
+          actionBtn("Buy $1K", "bizDayTradeBuyV1874('" + d.id + "',1000)", "green", left <= 0 || wealth() < 1000) +
+          actionBtn("Buy $10K", "bizDayTradeBuyV1874('" + d.id + "',10000)", "green", left <= 0 || wealth() < 10000) +
+          actionBtn("Sell 25%", "bizDayTradeSellV1874('" + d.id + "',0.25)", "", left <= 0 || !p) +
+          actionBtn("Sell all", "bizDayTradeSellV1874('" + d.id + "','all')", "red", left <= 0 || !p) +
+        '</div></div>';
+    }).join("");
+    return '<div class="biz1862-panel biz1874-trading-panel">' +
+      '<div class="biz1862-callout"><span>Day-trading desk</span><b>Short-term trades use personal cash and stay separate from long-term brokerage holdings. Max 12 trading actions per age.</b></div>' +
+      '<div class="biz1861-metric-grid">' +
+        metric("Trading positions", moneyText(value), "Market value of open day trades.", value > 0 ? "blue" : "gold") +
+        metric("Unrealized P/L", (unrealized >= 0 ? "+" : "") + moneyText(unrealized), "Open position mark-to-market.", unrealized >= 0 ? "green" : "bad") +
+        metric("Realized P/L", (num(T.realized) >= 0 ? "+" : "") + moneyText(T.realized), "Closed day-trade results.", num(T.realized) >= 0 ? "green" : "bad") +
+        metric("Trades left", String(left), "Resets when you age up.", left > 3 ? "good" : left ? "gold" : "bad") +
+      '</div>' +
+      '<div class="biz1861-actions" style="margin:8px 0 10px">' + actionBtn("Roll trading tape", "bizDayTradeTapeV1874()", "blue", left <= 0) + '</div>' +
+      '<div class="biz1874-trade-grid">' + cards + '</div>' +
+      '</div>';
+  }
   function renderLegalPanelV1872(biz) {
     var legal = legalStateV1872(biz);
     var plan = bizTaxAttorneyPlanV1872(biz);
@@ -1450,6 +1595,7 @@
     if (panel === "funding") return renderFundingPanelV1862(biz);
     if (panel === "budget") return renderBudgetPanelV1862(biz);
     if (panel === "legal") return renderLegalPanelV1872(biz);
+    if (panel === "trading") return renderTradingPanelV1874(biz);
     if (panel === "public") return '<div class="biz1862-panel">' + renderPublicDeskV1861(biz) + '</div>';
     if (panel === "exit") return '<div class="biz1862-panel">' + renderExitDeskV1861(biz) + '</div>';
     return renderOverviewPanelV1862(biz);
@@ -2483,7 +2629,8 @@
         ".biz1862-roster{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px;margin-top:8px}.biz1862-emp{display:flex;flex-direction:column;gap:8px;border:1px solid rgba(255,255,255,.10);border-radius:10px;background:rgba(255,255,255,.04);padding:11px;min-width:0}.biz1862-emp.founder{border-color:rgba(216,173,109,.35);background:rgba(216,173,109,.06)}.biz1862-emp-top{display:flex;align-items:center;gap:9px;min-width:0}.biz1862-emp-avatar{flex:none;width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;background:rgba(126,160,172,.16);border:1px solid rgba(126,160,172,.4);color:#cfe0e6;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700}.biz1862-emp-avatar.gold{background:rgba(216,173,109,.16);border-color:rgba(216,173,109,.45);color:#e9cf9c}.biz1862-emp-id{min-width:0;flex:1}.biz1862-emp-id b{display:block;color:#fff3df;font-family:'Fraunces',Georgia,serif;font-size:15px;line-height:1.15;overflow-wrap:anywhere}.biz1862-emp-id span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;margin-top:3px;overflow-wrap:anywhere}.biz1862-emp .money-btn{flex:none;padding:4px 9px;font-size:10px}",
         ".biz1862-perf{height:6px;border-radius:99px;background:rgba(0,0,0,.3);overflow:hidden}.biz1862-perf-bar{height:100%;border-radius:99px;background:#7ea0ac}.biz1862-perf-bar.good{background:#9fd07d}.biz1862-perf-bar.gold{background:#d8b16e}.biz1862-perf-bar.bad{background:#e9927d}.biz1862-emp-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}.biz1862-emp-foot span{color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:10px;min-width:0;overflow-wrap:anywhere}.biz1862-emp-foot i.warn{color:#e9927d;font-style:normal}.biz1862-emp-foot em{color:#d8b16e;font-family:'JetBrains Mono',monospace;font-size:11px;font-style:normal;flex:none}",
         // dashboard 2.0 — color pass: semantic per-section accents + gradient pop
-        ".biz1861-active{--acc:216,173,109}.biz1862-accent-overview{--acc:216,173,109}.biz1862-accent-product{--acc:126,160,172}.biz1862-accent-growth{--acc:159,208,125}.biz1862-accent-team{--acc:195,155,211}.biz1862-accent-funding{--acc:216,173,109}.biz1862-accent-legal{--acc:120,170,185}.biz1862-accent-public{--acc:120,170,185}.biz1862-accent-exit{--acc:233,146,125}",
+        ".biz1861-active{--acc:216,173,109}.biz1862-accent-overview{--acc:216,173,109}.biz1862-accent-product{--acc:126,160,172}.biz1862-accent-growth{--acc:159,208,125}.biz1862-accent-team{--acc:195,155,211}.biz1862-accent-funding{--acc:216,173,109}.biz1862-accent-legal{--acc:120,170,185}.biz1862-accent-trading{--acc:143,196,215}.biz1862-accent-public{--acc:120,170,185}.biz1862-accent-exit{--acc:233,146,125}",
+        ".biz1874-trade-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}.biz1874-trade-card{border:1px solid rgba(143,196,215,.25);border-radius:12px;background:linear-gradient(160deg,rgba(21,33,35,.82),rgba(24,20,16,.92));padding:10px;min-width:0}.biz1874-trade-head,.biz1874-trade-foot{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.biz1874-trade-head b{display:block;color:#fff3df;font-size:15px}.biz1874-trade-head span,.biz1874-trade-foot span{display:block;color:#b9a98e;font-family:'JetBrains Mono',monospace;font-size:9px;line-height:1.35}.biz1874-trade-head strong{color:#f2d089;text-align:right}.biz1874-trade-head strong em{display:block;font-size:9px;font-style:normal;margin-top:2px}.biz1874-trade-card .biz1862-candles{width:100%;height:86px;margin:8px 0;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(0,0,0,.18)}",
         // semantic gradient tint on metric cards so status strips read in color, not grey
         ".biz1861-metric.good,.biz1861-metric.green{background:linear-gradient(135deg,rgba(159,208,125,.16),rgba(255,255,255,.025));border-color:rgba(159,208,125,.32)}.biz1861-metric.bad,.biz1861-metric.red{background:linear-gradient(135deg,rgba(233,146,125,.16),rgba(255,255,255,.025));border-color:rgba(233,146,125,.32)}.biz1861-metric.gold{background:linear-gradient(135deg,rgba(216,173,109,.16),rgba(255,255,255,.025));border-color:rgba(216,173,109,.32)}.biz1861-metric.blue{background:linear-gradient(135deg,rgba(126,160,172,.16),rgba(255,255,255,.025));border-color:rgba(126,160,172,.32)}",
         // section accent: panel wash, valuation badge, tabs, next-milestone, section labels
@@ -2510,6 +2657,8 @@
     getActiveBiz: getActiveBiz,
     taxAttorneyByIdV1872: taxAttorneyByIdV1872,
     bizEffectiveTaxRateV1872: bizEffectiveTaxRateV1872,
+    tradeStateV1874: tradeStateV1874,
+    tradeMarketValueV1874: tradeMarketValueV1874,
     newBizObj: _newBizObj,
     genCompetitors: _genCompetitors,
     shim: { S: S, num: num, round: round, clampN: clampN, rnd: rnd, pick: pickOne, age: age, smarts: smarts, karma: karma, fame: fame, wealth: wealth, fin: fin, moneyText: moneyText, currencySymbol: currencySymbol }
@@ -2520,7 +2669,7 @@
       id: "entrepreneur",
       file: "pages/systems/entrepreneur.js",
       status: "active-port",
-      globals: ["EntrepreneurV1861", "renderEntrepreneurHubV1861", "runEntrepreneurYearV1861", "migrateOldBusinessesV1861", "repairDuplicateBusinessesV1861", "oldBusinessCheckV1861"],
+      globals: ["EntrepreneurV1861", "renderEntrepreneurHubV1861", "runEntrepreneurYearV1861", "migrateOldBusinessesV1861", "repairDuplicateBusinessesV1861", "oldBusinessCheckV1861", "bizDayTradeBuyV1874", "bizDayTradeSellV1874", "bizDayTradeTapeV1874"],
       notes: "Phases A-E complete: ported Verdant catalogs + business factory + founder state, 6-step wizard, yearly engine, modular hub render owns the Business route, and legacy retirement — old businesses migrate into bizV1860 with full legacy stage mapping, legacy yearly/income hooks are gated against migrated firms (no double-tick), and duplicate-company repair tooling is available from the Old Business Check card."
     });
   }

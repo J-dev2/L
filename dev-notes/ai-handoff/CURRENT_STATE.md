@@ -69,6 +69,24 @@ active `pages/patches` script tags, and `docs/build-report.json` has no patch sc
 `cdp/no-patches.js` as a future browser guard and updated `dev-notes/PATCH_AUDIT.md`. The browser guard itself was
 not run because the app rejected starting a temporary headless Edge session due usage limits; static checks passed.
 
+2026-06-29 update: **Checkpoint 62** finished the no-patches browser guard and CP26 property fold-in follow-up.
+`cdp/no-patches.js` passed 2/2 in a browser. Legacy rental purchases now create current Real Estate portfolio
+entries instead of new `state.rentals` entries, and `renderHome()` no longer computes/exposes the old rental catalog
+UI. `cdp/property.js` now covers that compatibility path and passed 80/80 after rebuild.
+
+2026-06-29 update: **Checkpoint 63** re-verified backlog items 3 and 4. Trust Envelop / Family Office holdings are
+green (`trust-holdings` 12/12 and `family-office` 23/23), including titled property, titled founder-company holdings,
+net-worth neutrality, protected-assets increase, and succession carry. Entrepreneurship Legal / tax attorney is green
+(`entrepreneur-legal` 11/11), including the Legal tab, counsel fees, reduced effective corporate tax rate, and yearly
+tax savings.
+
+2026-06-29 update: **Checkpoint 64** shipped the Life page polish and Entrepreneurship backlog. Life activity popups
+for Body & Mind, Fun, and Side Money now use card-style layouts; luxury/experience pricing and Status thresholds were
+tuned upward. Entrepreneurship now has a Day-trading dashboard panel, a shared chart module
+(`pages/systems/charts.js`) used by Stocks and Entrepreneurship, and CDP coverage for the existing hiring/interview
+flow plus the likely regular-stock and founder-own-share sell paths. Verified by `cdp/life.js` 22/22,
+`cdp/entrepreneur-backlog.js` 13/13, `cdp/stock.js` 30/30, `cdp/dashboard.js` 32/32, and `cdp/no-patches.js` 2/2.
+
 Property-specific context from **Checkpoint 29 (2026-06-22)**: `pages/systems/property-estate.js` is now **v18.66**.
 CP27 added property class/prestige tiers (Economy→Prestige, net-worth-gated); CP28 fixed the Flip-plan
 button (real flip project) and added **tenant screening / background checks**; CP29 added **tenant
@@ -83,9 +101,10 @@ migrates the legacy `state.car` once. CP33 grew the catalog to **100 cars (emoji
 colour-coded classes** (added Off-Road + Electric), added **tenant persona emojis**, **class-coloured
 card accents** across both systems, and a **tenant Evict** action (`reEvictTenantV1866`). The property system is well ahead of the older
 notes (CP26 says v18.62; source was already v18.63 before CP27) — **verify source, not the notes**. CP27–CP32
-`dist` rebuild and CDP debt is now paid down by CP60: `cdp/property.js` 78/78 and `cdp/cars.js` 23/23. CP26 #4
-(fully fold the legacy
-`homes`/`rentals` catalogs into the property system) is the main remaining property item. CP34 split
+`dist` rebuild and CDP debt is now paid down by CP62: `cdp/property.js` 80/80 and `cdp/cars.js` 23/23. CP26 #4
+(fold the legacy
+`homes`/`rentals` catalogs into the property system) is shipped for rentals: legacy rental buys now enter
+`finance.reV1863.portfolio`, `state.rentals` stays empty, and the old rental catalog UI path is hidden. CP34 split
 **Vehicles into its own hub/page** (out of Real Estate) and renamed the leftover **"Home" hub label to
 "Real Estate"** across the active nav/title sources (15/14/11 patches + runtime + More menu). Future
 backlog (logged, not built): **Entrepreneurship team hiring** — interview + hire role-based staff

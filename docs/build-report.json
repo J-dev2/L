@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-06-29T06:19:47.617Z",
+  "builtAt": "2026-06-29T17:16:47.036Z",
   "source": "outputs/ledger18_modular_v18_35",
   "entries": [
     {
@@ -23,7 +23,7 @@
         },
         {
           "src": "pages/runtime/00-core-app-runtime.js?v=20260628-absorbedpatches1",
-          "bytes": 1681487
+          "bytes": 1681636
         },
         {
           "src": "state/state-map.js",
@@ -62,8 +62,12 @@
           "bytes": 19024
         },
         {
+          "src": "pages/systems/charts.js?v=20260629-shared1",
+          "bytes": 7462
+        },
+        {
           "src": "pages/systems/stocks-investing.js",
-          "bytes": 25350
+          "bytes": 26512
         },
         {
           "src": "pages/systems/tax-legal.js?v=20260627-percompany2",
@@ -99,7 +103,7 @@
         },
         {
           "src": "pages/systems/entrepreneur.js?v=20260627-legal1",
-          "bytes": 208807
+          "bytes": 219074
         },
         {
           "src": "pages/systems/save-recovery.js?v=20260628-recovery2",
@@ -127,7 +131,7 @@
         },
         {
           "src": "pages/systems/life-rebuild.js?v=20260626-liferebuild12",
-          "bytes": 45857
+          "bytes": 47209
         },
         {
           "src": "pages/systems/family-office.js?v=20260628-familyoffice7",
@@ -186,7 +190,7 @@
           "bytes": 15386
         }
       ],
-      "bytes": 3432480
+      "bytes": 3452949
     },
     {
       "entry": "index.html",

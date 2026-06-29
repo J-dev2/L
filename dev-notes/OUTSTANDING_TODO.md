@@ -1,5 +1,4 @@
 # Outstanding work / TODO — handoff for a fresh session
-
 > Single consolidated list of everything still open, written so a new chat can start cold.
 > Detail for finished work lives in `SESSION_SUMMARY.md` (checkpoints, latest on top).
 > Last updated 2026-06-29.
@@ -14,30 +13,32 @@ finished the current Family Office request and verified `cdp/family-office.js` 2
 fallback follow-ups, with `cdp/money-mobile.js` 10/10, `cdp/platform-compat.js` 8/8, and `cdp/flicker.js` 18/18.
 The Life rebuild probe exists and is green (`cdp/life.js` 19/19 after rebuild). Remaining verification debt below
 is for older non-Family-Office modules.
-
 **Checkpoint 59 (2026-06-29):** CP49 trust/death and older Entrepreneurship/core verification are now green on the
 current build. Passed: `cdp/death.js` 20/20, `cdp/networth-genetics.js` 9/9, `cdp/trust.js` 18/18,
 `cdp/estate-trust.js` 4/4, `cdp/trust-nav.js` 2/2, `cdp/wayback.js` 11/11, `cdp/separation.js` 20/20,
 `cdp/features.js` 17/17, `cdp/ipo.js` 17/17, `cdp/dashboard.js` 32/32, `cdp/founderpay.js` 24/24,
 `cdp/stock.js` 30/30, and `cdp/entrepreneur-legal.js` 11/11 after syntax checks and rebuild.
-
 **Checkpoint 60 (2026-06-29):** Property/Vehicles verification is now green on the current build. Passed:
 `cdp/property.js` 78/78 and `cdp/cars.js` 23/23 after syntax checks and rebuild.
-
 **Checkpoint 61 (2026-06-29):** Patch cleanup audit is current. `pages/patches/` is empty, `play.html` has no active
 `pages/patches` script tags, and `docs/build-report.json` has no patch script entries. Added `cdp/no-patches.js` as
-a future browser guard. The browser guard was not run because the app rejected starting a temporary headless Edge
-session due usage limits; static checks passed.
-
+a future browser guard.
+**Checkpoint 62 (2026-06-29):** The no-patches browser guard and CP26 property fold-in are now green. Passed:
+`cdp/no-patches.js` 2/2 and `cdp/property.js` 80/80 after `node --check` and rebuild. The legacy `buyRental`
+compatibility path now writes to the current Real Estate portfolio instead of `state.rentals`, and the Home/Real Estate
+page no longer computes or exposes the old rental catalog UI.
+**Checkpoint 64 (2026-06-29):** Life polish and the requested Entrepreneurship backlog are now green. Passed:
+`cdp/life.js` 22/22, `cdp/entrepreneur-backlog.js` 13/13, `cdp/stock.js` 30/30, `cdp/dashboard.js` 32/32, and
+`cdp/no-patches.js` 2/2 after syntax checks and rebuild. The exact "Sell button doesn't sell" screen/button was
+not provided, but the likely regular-stock custom sell and public-founder own-share custom sell paths are now covered.
+Historical note only: the sandbox/Node warning below was from an older session and is retired by CP62. Current
+status: the old verification-debt checklist is paid down; start new sessions from fresh user repros or the backlog.
 The sandbox/Node was **down the entire last session**, so NONE of the recent JS was `node --check`'d or
 rebuilt into `dist/`. The game runs live from `play.html` (source), but the built files are stale.
-
-**Do first:**
-
+**Retired historical checklist (do not treat as current):**
 2026-06-29 note: Life rebuild verification is paid down. `pages/systems/life-wellbeing.js`,
 `pages/systems/life-rebuild.js`, `pages/systems/life-command.js`, and `cdp/life.js` passed `node --check`; the
 bundle rebuilt; `cdp/life.js` passed 19/19.
-
 1. `node --check` every file touched recently:
    - `pages/systems/entrepreneur.js`  (huge changes — see §A)
    - `pages/runtime/00-core-app-runtime.js`  (cents formatter `priceText18` + `stockCard18`)
@@ -52,19 +53,15 @@ bundle rebuilt; `cdp/life.js` passed 19/19.
    present with static checks clean but still needs a browser run when CDP is available. `cdp/life.js`,
    `cdp/death.js`, `cdp/networth-genetics.js`, the main Entrepreneurship/core probes, `cdp/property.js`, and
    `cdp/cars.js` are present and green; remaining debt should move to fresh user repros or lower-priority cleanup.
-
 Cache-stamps currently in `play.html` (bump again after any further edit): `entrepreneur.js?v=…-bizdeck13`,
 `00-core-app-runtime.js?v=…-cents`, `life-wellbeing.js?v=…-wb3`, `ledger-ui.css?v=…-navdock5`,
 `life-rebuild.js?v=…-liferebuild12`, `tax-legal.js?v=…-trustprotect1`, `finance-ledger.js?v=…-trustprotect1`.
-
 Note: the 4 `dist/*.html` files got the nav-dock CSS patched in by hand but are otherwise STALE (missing all the
 entrepreneurship + wellbeing work). A clean rebuild fixes that.
-
 Mobile Money height note from user (2026-06-28, corrected) - SHIPPED CP57: The Money page used the wrong mobile
 height and could extend under browser chrome/bottom UI. Fixed in `pages/systems/money-banking.js` with dynamic
 viewport height, safe-area-aware bottom padding, and internal Money-body scrolling. Verified by `cdp/money-mobile.js`
 10/10 after rebuild.
-
 Emoji/platform QA note from user (2026-06-28) - SHIPPED CP57: Added `pages/systems/platform-compat.js` to detect
 iOS/Android/desktop, check emoji rendering, and swap key emoji icons to readable symbol text when needed. Verified by
 `cdp/platform-compat.js` 8/8 after rebuild.
@@ -76,12 +73,10 @@ iOS/Android/desktop, check emoji rendering, and swap key emoji icons to readable
 2026-06-29 verification update: this is now verified. `cdp/life.js` covers route rendering, popups, Decompress,
 luxury/experience pure sinks, yearly status perk, and overflow smoke. Re-run result: 19/19 after `node --check`
 and rebuild.
-
 Done in `pages/systems/life-rebuild.js` (v18.71), wired into `play.html` after `life-wellbeing.js`. Full detail
 in `SESSION_SUMMARY.md` **Checkpoint 48**. Popup-driven Life hub + luxury/experiences/status money-sinks, all
 reusing the existing action openers. Verification is complete for the current Life rebuild. Original spec kept below
 for reference.
-
 Full spec in `SESSION_SUMMARY.md` **Checkpoint 47**. Summary:
 - Clean, **popup-driven** Life page (save screen space, more dynamic). Compact status header
   (Health/Stress/Mental/Energy/Happiness/Money) + a tidy grid of popup-category buttons that **reuse the
@@ -104,7 +99,6 @@ Full spec in `SESSION_SUMMARY.md` **Checkpoint 47**. Summary:
 `cdp/trust.js` 18/18, `cdp/trust-holdings.js` 12/12, and `cdp/family-office.js` 23/23. Keep this section as
 historical context for the original repair/carry bug and only reopen it if the user can reproduce a fresh
 repair/carry failure on the current build.
-
 **Update CP49 (2026-06-27):** root cause found + fix applied (untested). The titled business was left OUT of the
 estate-tax shield (`protectedAssets()` / `legalProtectedValue` omitted `trustBusinessCarryValueV1846`), so it got
 taxed + probated on death every succession. Fixed in `tax-legal.js protectedAssets()` (+ a Finance-page display
@@ -112,7 +106,6 @@ match in `finance-ledger.js`). Both are display + death-tax-calc only, capped at
 phantom cash). **Verified 2026-06-29:** `cdp/death.js`, `cdp/trust.js`, `cdp/networth-genetics.js`,
 `cdp/estate-trust.js`, and `cdp/trust-nav.js` are green on the current build. Full detail in `SESSION_SUMMARY.md`
 CP49 and CP59.
-
 **Also check (related paths, NOT changed in CP49 — keep as future audit notes, not current blockers):**
 - `personalInheritanceCashV1846` (the continue-as-heir CASH path) uses a protection % (`trustProt`), not
   `protectedAssets()` — confirm it handles the titled business consistently so there isn't a second leak there.
@@ -120,7 +113,6 @@ CP49 and CP59.
   protection flows through `protectedAssets()` — dead var; remove or route through it for clarity.
 - Re-verify `repairLegacyCarryV1847` after the fix — with the leak closed it should now correctly report
   "already as large as the best recoverable source" instead of perpetually finding a bigger backup.
-
 User has ~$500B titled into the family trust (business is 100% in trust for tax benefit). The bug: repair/carry
 balance appears lost / "never recovers" across years/succession. Treated as HIGH-RISK (do not blind-fix — could
 wipe/duplicate the trust). Visibility was improved (CP41: "Under trust (total)" display). The deeper persistence
@@ -130,34 +122,30 @@ fix needs a tested environment. Key code in `pages/systems/tax-legal.js`: `trust
 
 ---
 
-## 3. Trust envelop: title Property + Entrepreneurship portfolios into the trust  (task #22 — NOW UNBLOCKED, verify #2 first)
+## 3. Trust envelop: title Property + Entrepreneurship portfolios into the trust  (task #22 - SHIPPED + VERIFIED CP63)
 
-**2026-06-29 update:** The current Family Office/trust-envelop path is implemented and verified for titled property,
-per-company founder-company titling, net-worth-neutral protection, succession carry, operator carry, and operator
-salary/fee negotiation. See `SESSION_SUMMARY.md` Checkpoints 53 and 56. Keep future work here only for new trust
-asset categories or fresh repro bugs.
-
-Full design in `dev-notes/TRUST_ENVELOP_PLAN.md`. Mark property + entrepreneurship portfolios as
-trust-protected WITHOUT re-adding them to net worth (avoid double-count). **#2's protection fix shipped in CP49**,
-so this is no longer hard-blocked — but verify #2 on the tested side (net worth unchanged on titling, heir keeps
-value across death) BEFORE pouring property + venture value in, so it's built on a foundation that holds value.
-Mirror the business-titling pattern (`setBusinessTrustPercentV1840`); extend `protectedAssets()` (which now
-already includes titled businesses), the death settlement, and `applyLegacyCarryV1846` — never the net-worth total.
+**2026-06-29 update:** Re-verified in CP63. The current Family Office/trust-envelop path is implemented and verified
+for titled property, per-company founder-company titling, net-worth-neutral protection, succession carry, operator carry, and operator
+salary/fee negotiation. Passed `cdp/trust-holdings.js` 12/12 and `cdp/family-office.js` 23/23. Keep future work here
+only for new trust asset categories or fresh repro bugs.
+Historical design is in `dev-notes/TRUST_ENVELOP_PLAN.md`. The shipped version follows the no-double-count rule:
+property and entrepreneurship holdings are trust-protected WITHOUT re-adding them to net worth.
+CP63 verifies net worth unchanged on titling, protected assets increasing, and heir carry across death.
 
 ---
 
-## 4. Entrepreneurship: Legal tab + tax attorney  (task #36 — FUTURE)
+## 4. Entrepreneurship: Legal tab + tax attorney  (task #36 - SHIPPED + VERIFIED CP63)
 
-Add a **Legal** tab to the entrepreneurship hub with a **tax-attorney** hire that legally lowers the company's
-**corporate tax** (deductions / structuring). Corporate tax is now a real 21% line in the budget engine
-(`entrepreneur.js`, see §A), so the attorney would reduce the effective rate.
+Implemented in `pages/systems/entrepreneur.js` and re-verified 2026-06-29. The Legal tab lets a founder company
+retain tax counsel, pays upfront and annual legal fees from company cash, lowers the effective corporate tax rate,
+and records yearly tax savings. Passed `cdp/entrepreneur-legal.js` 11/11 in CP63.
 
-**Entrepreneurship backlog (from CP14 / CURRENT_STATE — requested, not yet built):**
-- **Day-trading desk** — live/short-term trading of select stocks (the natural home for a real candlestick chart).
-- **Team hiring** — interview + hire role-based staff (mirror the tenant-screening pattern) in `entrepreneur.js`.
-- **Shared chart module** — extract the SVG charts into a reusable `charts.js` used by Stocks + Entrepreneurship.
-- **"Sell button doesn't sell" repro** — Sell All works in `cdp/stock.js`; needs the exact screen/button from the
-  user to reproduce.
+**Entrepreneurship backlog (from CP14 / CURRENT_STATE) - SHIPPED + VERIFIED CP64:**
+- **Day-trading desk** - added to the Entrepreneurship dashboard Trading panel.
+- **Team hiring** - existing interview + hire role-based staff flow confirmed and covered.
+- **Shared chart module** - added `pages/systems/charts.js`; used by Stocks + Entrepreneurship.
+- **"Sell button doesn't sell" repro** - exact screen/button still unknown, but regular-stock custom sell and
+  public-founder own-share custom sell now have CDP coverage in `cdp/entrepreneur-backlog.js`.
 
 ---
 
@@ -169,26 +157,26 @@ the CP26 legacy fold-in item below.
 
 ---
 
-## 6. Property: fold legacy `homes` / `rentals` into the property system  (CP26 #4)
+## 6. Property: fold legacy `homes` / `rentals` into the property system  (CP26 #4 - SHIPPED + VERIFIED CP62)
 
-`pages/systems/property-estate.js` is the real property system, but the legacy `homes` / `rentals` catalogs in
-the runtime still exist in parallel. Fully fold them into the property system so there's one source of truth — no
-duplicate living-situation / rental UIs, no double-counted equity.
+Verified 2026-06-29. The legacy catalogs remain only for save compatibility / migration, but rental purchases now
+land in `finance.reV1863.portfolio` and leave `state.rentals` empty. `renderHome()` no longer computes or exposes
+the old rental catalog UI. `cdp/property.js` covers the compatibility path and passed 80/80 after rebuild.
 
 ---
 
-## 7. Life-page leftovers (from the CP48–49 session)
+## 7. Life-page leftovers (from the CP48-49 session) - SHIPPED + VERIFIED CP64
 
-- **Card-ify the activity popups** — Body & Mind / Fun / Side Money popups still use plain `.row` lists; give them
-  the same horizontal `.life71-lux-card` treatment as Luxury / Experiences so all the Life popups match.
-- **More economy / balance tuning** — luxury/experience pricing + Status thresholds (`statusLabel` /
-  `statusYearlyPerk` in `life-rebuild.js`) are a first pass; tune if it feels off in play.
+- **Card-ify the activity popups** - Body & Mind / Fun / Side Money now use `.life71-lux-card` activity cards.
+- **More economy / balance tuning** - luxury/experience pricing and Status thresholds were tuned upward.
+- Verified by `cdp/life.js` 22/22 after syntax checks and rebuild.
 
 ---
 
 ## P. PARKED IDEAS (captured, NOT scheduled — don't build without the user re-greenlighting)
 
 ### Outside-capital venture / fund firm — "a better version of the Personal Firm"
+
 User's early idea (was never written down — capturing it here so it isn't lost). Today the **Personal Firm**
 investment office (`state.finance.personalFirm` / managed capital + trainable Advisor/Analyst/Risk staff, grows
 ~Super Saver APY + staff edge, screenshot ~$11.1B managed @ 7.7%) only compounds **your own** money. The idea:
@@ -197,7 +185,6 @@ let it run on **outside capital** — i.e. a real fund / venture firm:
 - deploy it into investments (ventures, stocks, deals),
 - earn **management + performance fees** on other people's capital (the real-world fund model),
 - effectively an expanded, "better version" of the current Personal Firm.
-
 **Status: PARKED by the user (2026-06-27).** Rationale (theirs): it's a large build that depends on several
 systems that aren't developed yet, so it's "not worth the risk right now." Revisit only when those foundations
 exist and the user explicitly asks. Natural home: extend `personalFirm` (stocks-investing.js) rather than a new
@@ -227,3 +214,4 @@ All in `pages/systems/entrepreneur.js` unless noted. Details in `SESSION_SUMMARY
   `.gitignore`.
 
 ---
+
