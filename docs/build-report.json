@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-06-30T16:24:16.602Z",
+  "builtAt": "2026-06-30T21:05:46.837Z",
   "source": "outputs/ledger18_modular_v18_35",
   "entries": [
     {
@@ -70,8 +70,8 @@
           "bytes": 26573
         },
         {
-          "src": "pages/systems/stocks-engine.js?v=20260630-investments21a",
-          "bytes": 154441
+          "src": "pages/systems/stocks-engine.js?v=20260630-investments21e",
+          "bytes": 167203
         },
         {
           "src": "pages/systems/tax-legal.js?v=20260627-percompany2",
@@ -194,7 +194,7 @@
           "bytes": 15386
         }
       ],
-      "bytes": 3622621
+      "bytes": 3635383
     },
     {
       "entry": "index.html",

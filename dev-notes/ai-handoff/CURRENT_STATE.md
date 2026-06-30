@@ -137,6 +137,14 @@ timer only after the real Investments overlay is inserted, and stops ticks when 
 Verification is green: `cdp/investments-stock-engine.js` 26/26, `cdp/entrepreneur-backlog.js` 17/17, `cdp/stock.js`
 30/30, and `cdp/dashboard.js` 32/32 after rebuild.
 
+2026-06-30 stabilization: **Checkpoint 75** addressed the later Edge/base-game crash report where the game could
+freeze after page load, picking a life, or normal life actions even before opening Investments. `stocks-engine.js`
+no longer calls `ensureShape()` at script load; age-up processing is gated by real personal Investments activity; live
+ticks check whether the Investments overlay is open before touching stock state; and founder IPO holdings marked by
+Entrepreneurship are preserved for public-company controls but excluded from personal Investments value/sell-all/net-worth
+sync. Current cache stamp: `stocks-engine.js?v=20260630-investments21e`. Syntax checks and rebuild passed; Edge CDP
+verification is still blocked because Edge did not expose the requested remote-debugging port in this environment.
+
 Property-specific context from **Checkpoint 29 (2026-06-22)**: `pages/systems/property-estate.js` is now **v18.66**.
 CP27 added property class/prestige tiers (Economy→Prestige, net-worth-gated); CP28 fixed the Flip-plan
 button (real flip project) and added **tenant screening / background checks**; CP29 added **tenant

@@ -5,6 +5,125 @@
 
 ---
 
+## Checkpoint 75 - 2026-06-30 (Codex) - Investments lazy startup + founder-stock isolation
+
+Followed up after the user reported the game now crashes even before opening Investments in Edge, including after picking a life / normal play, and noticed Entrepreneurship public-company stock rows still living in the Investments save bucket.
+
+Changed:
+
+- `pages/systems/stocks-engine.js`
+  - Removed the startup `ensureShape()` call. Loading `play.html` no longer initializes or migrates the full 51-stock Investments engine by itself.
+  - Kept the Investments render override, but made engine state initialize only when Investments renders or a real stock action/API explicitly needs it.
+  - Gated the age-up wrapper with `stockEngineHasUserActivity(...)`; normal life age-up no longer runs the Investments market-year processor for saves that only have unrelated/entrepreneurship stock rows.
+  - Moved the live tick's `isInvestmentsOpen()` check before `store()/ensureShape()` so a stray timer shuts itself off instead of migrating/ticking stocks in the background.
+  - Added raw-state helpers and `tradableHoldings(...)` so personal Investments values exclude founder IPO holdings marked by Entrepreneurship (`_entrepreneurV1861`) while preserving those rows for the Entrepreneurship/public-company controls.
+  - Synced lightweight finance totals (`stocksV18.marketValue`, `finance.stockValue`, etc.) from personal live positions, annual positions, and short equity only, preventing founder shares from being double-counted with public-company net worth.
+  - Bumped engine version to `investments-v21-stocks5`.
+- `play.html`
+  - Bumped the Investments cache stamp to `20260630-investments21e`.
+
+Verification:
+
+- `node --check pages\systems\stocks-engine.js`
+- `node --check pages\systems\stocks-investing.js`
+- `node --check pages\runtime\00-core-app-runtime.js`
+- `node --check cdp\investments-stock-engine.js`
+- `node build\build-ledger18.js`
+
+Browser verification status:
+
+- Attempted to launch Microsoft Edge headless with a workspace temp profile and `--remote-debugging-port=9350`.
+- Edge created profile/process artifacts but did not expose `http://127.0.0.1:9350/json/version`; existing user Edge processes were left alone.
+- `Get-CimInstance Win32_Process` for command-line filtering was denied, so no broad Edge cleanup was attempted. The created temp profile was removed safely afterward.
+
+Likely fixed issue:
+
+- The crash path no longer runs the heavy Investments migration/timer/year-tick work during page load or unrelated life actions. If a save only has Entrepreneurship founder stock rows, those rows are preserved for Entrepreneurship but ignored by personal Investments value/sell-all calculations.
+
+---
+
+## Checkpoint 74 - 2026-06-30 (Codex) - Edge crash hardening for Investments live tape
+
+Followed up after the user reported that the Investments localhost flow works in ChatGPT/local browser tooling but crashes completely in Microsoft Edge.
+
+Changed:
+
+- `pages/systems/stocks-engine.js`
+  - Added `MAX_VOLUME = 2,000,000,000` and `safeVolume(...)`.
+  - Repaired old saves with absurd finite volume values such as `1e80`, not only `NaN`/missing values.
+  - Capped future live-tick volume drift so stock volume can no longer grow into scientific-notation/extreme values that can stress Edge rendering.
+  - Reduced live DOM work: `updateLiveDom()` now updates only rendered stock/ticker/holding DOM ids instead of scanning all 51 stocks and querying the DOM for each one every second.
+  - Bumped engine version to `investments-v21-stocks4`.
+- `play.html`
+  - Bumped the Investments cache stamp to `20260630-investments21d`.
+- `cdp/investments-stock-engine.js`, `cdp/README.md`
+  - Added regression checks for runaway volume repair and capped live-tick volume. Probe count is now 45.
+
+Verification:
+
+- `node --check pages\systems\stocks-engine.js`
+- `node --check cdp\investments-stock-engine.js`
+- `node --check pages\runtime\00-core-app-runtime.js`
+- `node build\build-ledger18.js`
+
+Browser verification status:
+
+- Local static server could serve `play.html` from the shell.
+- Direct Edge launch with remote debugging did not expose a DevTools port in this environment.
+- Bundled Playwright package exists, but `playwright-core` is missing from the bundled node modules, so Playwright smoke could not launch Edge.
+- Cleaned temporary server/profile files after the attempt.
+
+Likely fixed issue:
+
+- The earlier screenshot already showed runaway volume (`e+23` style values). This pass clamps and repairs that path, which is a strong candidate for Edge's crash/freeze after the live tape runs.
+
+---
+
+## Checkpoint 73 - 2026-06-30 (Codex) - Investments 2.1 part 2 market brief
+
+Continued the approved Investments 2.1 plan after CP72.
+
+Changed:
+
+- `pages/systems/stocks-engine.js`
+  - Added a selected-stock market brief under the main Stocks desk chart.
+  - The brief now shows annual read/signal, dividend estimate, available float/shares, annual range, risk reasons, and ticker-specific news/catalysts.
+  - Added `stockRiskReasons`, `signalScore`, `annualDecision`, `recentStockNews`, `stockDividendEstimate`, `stockLiquidity`, `adjustStockLiquidity`, and `availableShares` helpers.
+  - Added `Best signal` sorting.
+  - Made available float real enough for this pass: live and annual buys reduce ticker liquidity, sells restore it, and every ticker still repairs to at least `$1B` of available float on migration/shape repair.
+  - Added ticker-specific news actions: `generateCompanyActionForStockV21(symbol)` and `generateAnalystRatingForStockV21(symbol)`.
+  - Reworded the Investments hero to `Investments 2.1` and removed the technical live tick count from the hero market chip.
+- `play.html`
+  - Bumped the Investments engine cache stamp to `20260630-investments21b`.
+- `cdp/investments-stock-engine.js`, `cdp/README.md`
+  - Added checks for the market brief, risk reasons, available float, liquidity buy/sell movement, and ticker-specific news. Probe count is now 43.
+
+Verification:
+
+- `node --check pages\systems\stocks-engine.js`
+- `node --check cdp\investments-stock-engine.js`
+- `node --check pages\runtime\00-core-app-runtime.js`
+- `node --check pages\systems\charts.js`
+- `node build\build-ledger18.js`
+
+Browser verification status:
+
+- Tried to use the in-app browser as requested. The browser connector reported no controllable existing tabs.
+- Opening a new `file://` sandbox tab is blocked by browser policy.
+- Started a temporary local HTTP server on `127.0.0.1:8127`; the shell could fetch `play.html` successfully, but the in-app browser still reported `ERR_CONNECTION_REFUSED` for both `127.0.0.1` and `localhost`.
+- Stopped the temp server and removed its helper file. Browser smoke still needs rerun when the browser connector can access local pages again.
+
+Still future/backlog:
+
+- Full news popup/drawer.
+- Deeper selected-stock risk reason weighting.
+- Full mobile redesign.
+- Public-company takeover/control after buying enough shares.
+- Yearly investment recap popup.
+- Venture-firm career/fund-track expansion.
+
+---
+
 ## Approved plan - 2026-06-30 (Codex) - Investments 2.1 stocks desk
 
 User approved the Investments 2.1 plan. This is the implementation spec for the next pass.

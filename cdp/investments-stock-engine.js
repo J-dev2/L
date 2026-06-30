@@ -19,6 +19,7 @@
       prices: { AAPL: 200 },
       history: { AAPL: [150, 175, 200] },
       candles: {},
+      volumes: { AAPL: 1e80 },
       liveV18: { enabled: true, ticks: 0, trends: {} }
     };
     if (typeof window.ensureStockEngineV2 === "function") window.ensureStockEngineV2(state);
@@ -28,6 +29,7 @@
     ok("engine_exports_present", typeof window.ensureStockEngineV2 === "function" && typeof window.getStockUniverse === "function" && typeof window.tickLiveStockMarket === "function");
     ok("expanded_universe_loaded", window.getStockUniverse().length >= 45, "count=" + window.getStockUniverse().length);
     ok("old_holding_preserved", state.finance.stocksV18.holdings.some(function (h) { return h.id === "AAPL" && num(h.shares) === 2; }));
+    ok("runaway_volume_repaired", num(state.finance.stocksV18.volumes.AAPL) > 0 && num(state.finance.stocksV18.volumes.AAPL) <= 2000000000);
     ok("personal_firm_preserved", state.finance.personalFirm.hired === true && num(state.finance.personalFirm.cash) === 12345 && num(state.finance.managedPortfolio) === 0);
     ok("live_defaults_on", state.finance.stocksV18.liveV18 && state.finance.stocksV18.liveV18.enabled === true);
     ok("live_timer_deferred_before_hub_open", !window.__ledgerStockEngineV20Timer);
@@ -84,6 +86,18 @@
         /Live Return/.test(app.innerHTML) &&
         /Protection/.test(app.innerHTML);
     })());
+    ok("stocks_tab_has_market_brief", (function () {
+      var app = document.getElementById("app");
+      var detail = window.getStockDetail("AAPL");
+      return !!document.querySelector("[data-v20-market-brief]") &&
+        /Risk Reasons/.test(app.innerHTML) &&
+        /Available Float/.test(app.innerHTML) &&
+        /News \/ Catalysts/.test(app.innerHTML) &&
+        detail && Array.isArray(detail.riskReasons) && detail.riskReasons.length >= 1 &&
+        num(detail.liquidity) >= 1000000000 &&
+        num(detail.availableShares) > 0;
+    })());
+    ok("stock_sort_and_news_exports_present", typeof window.setStockSortV21 === "function" && typeof window.generateCompanyActionForStockV21 === "function" && typeof window.generateAnalystRatingForStockV21 === "function");
     ok("select_stock_switches_focus", (function () {
       window.selectStockV20("NVDA");
       var focus = document.querySelector("[data-v20-focus-desk]");
@@ -99,9 +113,11 @@
     window.fundInvestmentCash(100000);
     ok("funding_moves_checking_to_investment_cash", num(state.money) === 900000 && num(state.finance.brokerage) === 100000);
     var cashBeforeBuy = num(state.finance.brokerage);
+    var liquidityBeforeBuy = num(window.getStockDetail("AAPL").liquidity);
     window.buyStockV18("AAPL", 50000);
     var h = state.finance.stocksV18.holdings.find(function (x) { return x.id === "AAPL"; });
     ok("buy_amount_uses_investment_cash", !!h && num(h.shares) > 2 && num(state.finance.brokerage) === cashBeforeBuy - 50000, "shares=" + num(h && h.shares) + " cash=" + num(state.finance.brokerage));
+    ok("buy_reduces_available_float", num(window.getStockDetail("AAPL").liquidity) === liquidityBeforeBuy - 50000);
     var meta = state.finance.stocksV18.livePositionsV21.AAPL;
     ok("live_position_meta_tracks_entry", !!meta && num(meta.entryValue) > 0 && num(meta.entryPrice) > 0);
     window.setStopLossV21("AAPL", "trailing", 10);
@@ -110,6 +126,7 @@
     var cashBeforeSell = num(state.finance.brokerage);
     window.sellStockV18("AAPL", 10000);
     ok("sell_amount_returns_investment_cash", num(state.finance.brokerage) > cashBeforeSell && (typeof window.stockValue18 === "function" ? num(window.stockValue18()) : 0) < valueBeforeSell);
+    ok("sell_restores_available_float", num(window.getStockDetail("AAPL").liquidity) > liquidityBeforeBuy - 50000);
 
     var cashBeforeAnnual = num(state.finance.brokerage);
     window.buyAnnualStockV21("VOO", 25000);
@@ -146,6 +163,7 @@
     var priceAfter = num(state.finance.stocksV18.prices.AAPL);
     ok("live_tick_moves_prices", priceAfter !== priceBefore && (state.finance.stocksV18.history.AAPL || []).length > 3, priceBefore + " -> " + priceAfter);
     ok("live_tick_adds_candles", (state.finance.stocksV18.candles.AAPL || []).length > 0);
+    ok("live_tick_volume_stays_capped", num(state.finance.stocksV18.volumes.AAPL) <= 2000000000);
     ok("portfolio_summary_matches_stock_value", num(window.getPortfolioSummary().stockValue) === num(window.stockValue18()));
 
     reset();
@@ -155,6 +173,10 @@
     window.generateSectorNewsV20();
     window.generateAnalystRatingV20();
     ok("events_populate_tapes", state.finance.stocksV18.earnings.length >= 1 && state.finance.stocksV18.news.length >= 2);
+    var beforeTickerNews = state.finance.stocksV18.news.length;
+    window.generateCompanyActionForStockV21("NVDA");
+    window.generateAnalystRatingForStockV21("NVDA");
+    ok("ticker_specific_news_populates_brief", state.finance.stocksV18.news.length >= beforeTickerNews + 2 && window.getStockDetail("NVDA").recentNews.length >= 1);
 
     reset();
     var activeBefore = state.finance.stocksV18.accounts.active;

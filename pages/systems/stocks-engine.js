@@ -8,11 +8,12 @@
   if (window.__ledgerStocksEngineV20Loaded) return;
   window.__ledgerStocksEngineV20Loaded = true;
 
-  var ENGINE_VERSION = "investments-v21-stocks1";
+  var ENGINE_VERSION = "investments-v21-stocks5";
   var TICK_MS = 1000;
   var MAX_CANDLES = 140;
   var MAX_HISTORY = 280;
   var MAX_LOG = 48;
+  var MAX_VOLUME = 2000000000;
 
   var STOCKS = [
     { id:"VOO", name:"Vanguard S&P 500 ETF", sector:"Index", icon:"IDX", price:510, beta:.75, volatility:.07, dividend:.014, style:"core", desc:"Broad market anchor. Slow, diversified, and hard to beat." },
@@ -114,7 +115,8 @@
     dividend:"Dividend yield",
     volatilityHigh:"High volatility",
     volatilityLow:"Low volatility",
-    riskHigh:"Highest risk"
+    riskHigh:"Highest risk",
+    signalBest:"Best signal"
   };
   var FILTER_MODES = {
     all:"All",
@@ -159,6 +161,13 @@
     var decimals = a >= 1000 ? 2 : a >= 1 ? 2 : 4;
     return (v < 0 ? "-$" : "$") + a.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   }
+  function shareText(v) {
+    v = Math.max(0, n(v));
+    if (v >= 1000000000) return (v / 1000000000).toFixed(1) + "B";
+    if (v >= 1000000) return (v / 1000000).toFixed(1) + "M";
+    if (v >= 1000) return (v / 1000).toFixed(1) + "K";
+    return v.toFixed(v >= 100 ? 0 : 2);
+  }
   function signedMoney(v) {
     v = round(v);
     if (!v) return "$0";
@@ -178,6 +187,85 @@
     try { if (window.state) return window.state; } catch (e) {}
     try { if (typeof state !== "undefined" && state) return state; } catch (e2) {}
     return null;
+  }
+  function rawStocksState() {
+    var s = stateNow();
+    var f = s && s.finance;
+    var m = f && f.stocksV18;
+    return m && typeof m === "object" && !Array.isArray(m) ? m : null;
+  }
+  function isEntrepreneurHolding(h) {
+    return !!(h && (h._entrepreneurV1861 || h.entrepreneurV1861 || h.founderStockV1861 || h.source === "entrepreneurship" || h.source === "founder-ipo"));
+  }
+  function isKnownPersonalHolding(h) {
+    var id = String(h && (h.id || h.symbol) || "").toUpperCase();
+    return !!(id && STOCK_INDEX[id] && !isEntrepreneurHolding(h) && n(h && h.shares) > .000001);
+  }
+  function tradableHoldings(m) {
+    return ((m && m.holdings) || []).filter(isKnownPersonalHolding);
+  }
+  function rawPersonalStockValue(m) {
+    m = m || rawStocksState();
+    if (!m) return 0;
+    return Math.round(tradableHoldings(m).reduce(function (sum, h) {
+      var id = String(h.id || h.symbol || "").toUpperCase();
+      var stock = STOCK_INDEX[id];
+      var price = Math.max(.0001, n(m.prices && m.prices[id], stock ? stock.price : n(h.avgCost, 0)));
+      return sum + n(h.shares) * price;
+    }, 0));
+  }
+  function rawAnnualValue(m) {
+    m = m || rawStocksState();
+    if (!m || !Array.isArray(m.annualPositionsV21)) return 0;
+    return Math.round(m.annualPositionsV21.reduce(function (sum, p) {
+      var id = String(p && (p.id || p.symbol) || "").toUpperCase();
+      if (!STOCK_INDEX[id]) return sum;
+      return sum + Math.max(0, n(p.shares) * Math.max(.0001, n(p.markPrice, n(p.entryPrice, STOCK_INDEX[id].price))));
+    }, 0));
+  }
+  function rawShortEquity(m) {
+    m = m || rawStocksState();
+    if (!m || !Array.isArray(m.shortPositions)) return 0;
+    return Math.round(m.shortPositions.reduce(function (sum, p) {
+      var id = String(p && (p.id || p.symbol) || "").toUpperCase();
+      var stock = STOCK_INDEX[id];
+      if (!stock || n(p.shares) <= .000001) return sum;
+      var price = Math.max(.0001, n(m.prices && m.prices[id], stock.price));
+      var opened = n(p.openedValue, n(p.shares) * n(p.avgPrice, price));
+      var current = n(p.shares) * price;
+      return sum + Math.max(0, n(p.collateral) + opened - current);
+    }, 0));
+  }
+  function syncFinanceStockTotals(m, f) {
+    var s = stateNow();
+    f = f || (s && s.finance) || {};
+    m = m || f.stocksV18 || rawStocksState();
+    if (!m) return 0;
+    var live = rawPersonalStockValue(m);
+    var annual = rawAnnualValue(m);
+    var shortEq = rawShortEquity(m);
+    var total = Math.max(0, round(live + annual + shortEq));
+    m.personalMarketValueV21 = live;
+    m.annualMarketValueV21 = annual;
+    m.shortEquityV21 = shortEq;
+    m.marketValue = total;
+    m.value = total;
+    f.stockValue = total;
+    f.realStocksValue = total;
+    f.marketValue = total;
+    return total;
+  }
+  function stockEngineHasUserActivity(m) {
+    var s = stateNow();
+    var f = (s && s.finance) || {};
+    if (n(f.brokerage) > 0) return true;
+    m = m || rawStocksState();
+    if (!m) return false;
+    if (m.userOpenedV21 || n(m.realizedGain) || n(m.lastDividends) || n(m.personalMarketValueV21) || n(m.annualMarketValueV21)) return true;
+    if (tradableHoldings(m).length) return true;
+    if (Array.isArray(m.annualPositionsV21) && m.annualPositionsV21.some(function (p) { return STOCK_INDEX[String(p && (p.id || p.symbol) || "").toUpperCase()] && n(p.shares) > .000001; })) return true;
+    if (Array.isArray(m.shortPositions) && m.shortPositions.some(function (p) { return STOCK_INDEX[String(p && (p.id || p.symbol) || "").toUpperCase()] && n(p.shares) > .000001; })) return true;
+    return false;
   }
   function engineReady(m) {
     return !!(m && typeof m === "object" && !Array.isArray(m) &&
@@ -258,6 +346,7 @@
     if (!m.activeTabV20) m.activeTabV20 = "overview";
     if (m.activeTabV20 === "live" || m.activeTabV20 === "annual" || m.activeTabV20 === "watchlist" || m.activeTabV20 === "news") m.activeTabV20 = "stocks";
     if (m.activeTabV20 === "history" || m.activeTabV20 === "guide" || m.activeTabV20 === "earnings" || m.activeTabV20 === "dividends") m.activeTabV20 = "overview";
+    m.userOpenedV21 = !!m.userOpenedV21;
     if (!m.searchV20) m.searchV20 = "";
     if (m.returnModeV20 !== "annual") m.returnModeV20 = "live";
     if (m.activeStocksModeV21 !== "annual") m.activeStocksModeV21 = m.returnModeV20 === "annual" ? "annual" : "live";
@@ -275,7 +364,7 @@
       m.history[stock.id] = m.history[stock.id].map(Number).filter(function (x) { return x > 0; }).slice(-MAX_HISTORY);
       seedCandles(stock.id);
       if (!m.analystRatings[stock.id]) m.analystRatings[stock.id] = defaultRating(stock);
-      if (!Number.isFinite(Number(m.volumes[stock.id]))) m.volumes[stock.id] = seedVolume(stock);
+      m.volumes[stock.id] = safeVolume(m.volumes[stock.id], stock);
       if (!Number.isFinite(Number(m.liquidityV21[stock.id])) || Number(m.liquidityV21[stock.id]) < 1000000000) m.liquidityV21[stock.id] = seedLiquidity(stock);
     });
     m.holdings.forEach(function (h) {
@@ -322,7 +411,8 @@
         "VOO";
     }
     seedCandles(m.selectedStockV20);
-    if (f.brokerage > 0 || m.holdings.length) f.brokerageOpened = true;
+    if (f.brokerage > 0 || tradableHoldings(m).length || rawAnnualValue(m) || rawShortEquity(m)) f.brokerageOpened = true;
+    syncFinanceStockTotals(m, f);
     return s;
   }
   function store() {
@@ -455,7 +545,7 @@
   function stockValue() {
     var m = store();
     if (!m) return 0;
-    return Math.round(m.holdings.reduce(function (sum, h) { return sum + holdingValue(h); }, 0));
+    return Math.round(tradableHoldings(m).reduce(function (sum, h) { return sum + holdingValue(h); }, 0));
   }
   function annualPositionValue(p) {
     return Math.max(0, n(p && p.shares) * Math.max(.0001, n(p && p.markPrice)));
@@ -473,7 +563,7 @@
   function investedCost() {
     var m = store();
     if (!m) return 0;
-    return Math.round(m.holdings.reduce(function (sum, h) { return sum + n(h.shares) * n(h.avgCost); }, 0));
+    return Math.round(tradableHoldings(m).reduce(function (sum, h) { return sum + n(h.shares) * n(h.avgCost); }, 0));
   }
   function liquidCash(includeSavings) {
     var s = ensureShape();
@@ -529,7 +619,10 @@
   }
   function seedVolume(stock) {
     var base = stock.sector === "Crypto" ? 900000 : stock.sector === "Index" ? 600000 : stock.style === "speculative" || stock.style === "meme" ? 450000 : 260000;
-    return Math.round(base * (.7 + Math.random() * .8));
+    return Math.min(MAX_VOLUME, Math.round(base * (.7 + Math.random() * .8)));
+  }
+  function safeVolume(v, stock) {
+    return clamp(n(v, seedVolume(stock || {})), 1000, MAX_VOLUME);
   }
   function seedLiquidity(stock) {
     var base = 1000000000;
@@ -538,6 +631,29 @@
     else if (stock.sector === "Crypto") base = 12000000000;
     else if (stock.style === "speculative" || stock.style === "meme") base = 3000000000;
     return Math.max(1000000000, Math.round(base * (.85 + Math.random() * .45)));
+  }
+  function stockLiquidity(id) {
+    var stock = stockById(id);
+    if (!stock) return 0;
+    var m = store();
+    var current = n((m.liquidityV21 || {})[stock.id]);
+    if (!current || current < 1000000000) {
+      current = seedLiquidity(stock);
+      m.liquidityV21[stock.id] = current;
+    }
+    return Math.max(0, round(current));
+  }
+  function adjustStockLiquidity(id, amount) {
+    var stock = stockById(id);
+    if (!stock) return 0;
+    var m = store();
+    var next = Math.max(0, stockLiquidity(stock.id) + round(amount));
+    m.liquidityV21[stock.id] = next;
+    return next;
+  }
+  function availableShares(id) {
+    var price = Math.max(.0001, getPrice(id));
+    return stockLiquidity(id) / price;
   }
   function defaultRating(stock) {
     var score = 55;
@@ -771,13 +887,12 @@
     m.prices[id] = next;
     m.history[id] = (Array.isArray(m.history[id]) ? m.history[id] : [old]).concat([next]).filter(function (x) { return n(x) > 0; }).slice(-MAX_HISTORY);
     appendCandle(id, old, next, move);
-    m.volumes[id] = Math.max(1000, Math.round(n(m.volumes[id], seedVolume(stock)) * (.92 + Math.random() * .22) * (1 + Math.min(2, Math.abs(move) * 8))));
+    var volumeDrift = (.94 + Math.random() * .12) * (1 + Math.min(.65, Math.abs(move) * 4));
+    m.volumes[id] = safeVolume(Math.round(safeVolume(m.volumes[id], stock) * volumeDrift), stock);
     if (reason && Math.abs(move) > .06) addMarketNews(stock, reason, move, "move");
     return { old:old, next:next, move:move };
   }
   function tickLiveStockMarket() {
-    var m = store();
-    if (!m || !m.liveV18 || !m.liveV18.enabled) return false;
     if (!isInvestmentsOpen()) {
       if (window.__ledgerStockEngineV20Timer) {
         try { clearInterval(window.__ledgerStockEngineV20Timer); } catch (e) {}
@@ -785,6 +900,8 @@
       }
       return false;
     }
+    var m = store();
+    if (!m || !m.liveV18 || !m.liveV18.enabled) return false;
     var before = stockValue();
     STOCKS.forEach(function (stock) {
       updatePrice(stock, liveMove(stock, getPrice(stock.id)), "live tape");
@@ -796,6 +913,7 @@
     if (m.liveV18.ticks % 7 === 0) maybeGenerateTapeEvent();
     if (m.liveV18.ticks % 19 === 0) generateAnalystRating(null, true);
     m.lastMarketGain = Math.round(stockValue() - before);
+    syncFinanceStockTotals(m, (stateNow() || {}).finance);
     snapshotPortfolio("live");
     updateLiveDom();
     if (m.liveV18.ticks % 10 === 0) save();
@@ -858,6 +976,7 @@
     }
     var after = stockValue();
     m.lastMarketGain = round(after - before);
+    syncFinanceStockTotals(m, s.finance);
     s.market.index = Math.max(100, round(n(s.market.index, 1000) * (1 + cycle.yearly)));
     s.market.mood = cycle.label;
     s.market.lastReturn = cycle.yearly;
@@ -992,6 +1111,7 @@
     options = options || {};
     amount = Math.max(0, round(amount));
     if (!amount) return toast("Enter an amount to buy.");
+    if (amount > stockLiquidity(stock.id)) return toast(stock.id + " only has " + money(stockLiquidity(stock.id)) + " available right now.");
     var source = options.source || "brokerage";
     var fromChecking = 0;
     var fromBrokerage = 0;
@@ -1020,6 +1140,7 @@
     var paid = fromBrokerage + fromChecking;
     var price = getPrice(stock.id);
     var shares = paid / price;
+    adjustStockLiquidity(stock.id, -paid);
     var h = getHolding(stock.id, true);
     var oldCost = n(h.shares) * n(h.avgCost, price);
     h.shares = n(h.shares) + shares;
@@ -1027,6 +1148,7 @@
     h.invested = n(h.shares) * h.avgCost;
     syncLivePositionMeta(stock.id, h);
     s.finance.brokerageOpened = true;
+    syncFinanceStockTotals(s.finance.stocksV18, s.finance);
     addTrade({ side:"buy", symbol:stock.id, name:stock.name, amount:paid, shares:shares, price:price, source:source });
     log("Bought " + stock.id + " with " + money(paid) + (source === "checking" ? " from checking." : " of investment cash."), { money:-fromChecking, brokerage:-fromBrokerage });
     save();
@@ -1053,6 +1175,7 @@
     h.shares = Math.max(0, n(h.shares) - shares);
     h.invested = Math.max(0, n(h.shares) * n(h.avgCost, price));
     s.finance.brokerage = brokerageCash() + proceeds;
+    adjustStockLiquidity(stock.id, proceeds);
     var m = s.finance.stocksV18;
     m.realizedGain = round(n(m.realizedGain) + proceeds - costBasis);
     if (h.shares < .000001) {
@@ -1061,6 +1184,7 @@
     } else {
       syncLivePositionMeta(stock.id, h);
     }
+    syncFinanceStockTotals(m, s.finance);
     addTrade({ side:"sell", symbol:stock.id, name:stock.name, amount:proceeds, shares:shares, price:price, gain:Math.round(proceeds - costBasis), source:"brokerage" });
     log("Sold " + stock.id + " for " + money(proceeds) + ". Cash returned to Investment Cash.", { brokerage:proceeds });
     save();
@@ -1069,7 +1193,7 @@
   }
   function sellAllStocks() {
     var m = store();
-    var ids = (m.holdings || []).map(function (h) { return h.id; });
+    var ids = tradableHoldings(m).map(function (h) { return h.id; });
     if (!ids.length) return toast("No stock holdings to sell.");
     ids.forEach(function (id) {
       var h = getHolding(id, false);
@@ -1094,6 +1218,7 @@
     p.openedValue = n(p.openedValue) + amount;
     s.finance.brokerage = cash - amount;
     s.finance.brokerageOpened = true;
+    syncFinanceStockTotals(s.finance.stocksV18, s.finance);
     addTrade({ side:"short", symbol:stock.id, name:stock.name, amount:amount, shares:shares, price:price, source:"brokerage" });
     log("Shorted " + stock.id + " with " + money(amount) + " collateral.", { brokerage:-amount });
     save();
@@ -1128,6 +1253,7 @@
     if (p.shares < .000001 || p.collateral < 1) s.finance.stocksV18.shortPositions = (s.finance.stocksV18.shortPositions || []).filter(function (row) { return row !== p; });
     s.finance.brokerage = brokerageCash() + returned;
     s.finance.stocksV18.realizedGain = round(n(s.finance.stocksV18.realizedGain) + gain);
+    syncFinanceStockTotals(s.finance.stocksV18, s.finance);
     addTrade({ side:"cover", symbol:stock.id, name:stock.name, amount:Math.round(cost), shares:shares, price:price, gain:Math.round(gain), source:"brokerage" });
     log("Covered " + stock.id + " short. Collateral returned " + money(returned) + ", P/L " + signedMoney(gain) + ".", { brokerage:returned });
     save();
@@ -1152,8 +1278,10 @@
     if (!amount) return toast("Enter an amount for the annual position.");
     var cash = brokerageCash();
     if (cash < amount) return toast("Not enough Investment Cash for that annual bet.");
+    if (amount > stockLiquidity(stock.id)) return toast(stock.id + " only has " + money(stockLiquidity(stock.id)) + " available right now.");
     var price = getPrice(stock.id);
     var shares = amount / price;
+    adjustStockLiquidity(stock.id, -amount);
     var p = getAnnualPosition(stock.id, true);
     var oldCost = n(p.shares) * n(p.entryPrice, price);
     p.shares = n(p.shares) + shares;
@@ -1163,6 +1291,7 @@
     p.entryAge = p.entryAge || round(s.age || 0);
     s.finance.brokerage = cash - amount;
     s.finance.brokerageOpened = true;
+    syncFinanceStockTotals(s.finance.stocksV18, s.finance);
     addTrade({ side:"annual buy", symbol:stock.id, name:stock.name, amount:amount, shares:shares, price:price, source:"brokerage" });
     log("Opened annual " + stock.id + " position with " + money(amount) + ".", { brokerage:-amount });
     save();
@@ -1185,8 +1314,10 @@
     p.shares = Math.max(0, n(p.shares) - shares);
     p.invested = Math.max(0, n(p.shares) * n(p.entryPrice, price));
     s.finance.brokerage = brokerageCash() + proceeds;
+    adjustStockLiquidity(stock.id, proceeds);
     s.finance.stocksV18.realizedGain = round(n(s.finance.stocksV18.realizedGain) + proceeds - costBasis);
     if (p.shares < .000001) s.finance.stocksV18.annualPositionsV21 = (s.finance.stocksV18.annualPositionsV21 || []).filter(function (row) { return row !== p; });
+    syncFinanceStockTotals(s.finance.stocksV18, s.finance);
     addTrade({ side:"annual sell", symbol:stock.id, name:stock.name, amount:proceeds, shares:shares, price:price, gain:Math.round(proceeds - costBasis), source:"brokerage" });
     log("Sold annual " + stock.id + " position for " + money(proceeds) + ".", { brokerage:proceeds });
     save();
@@ -1308,7 +1439,7 @@
     var shortOpenGain = totalShortUnrealized();
     var shortEq = totalShortEquity();
     var sectors = {};
-    var holdings = (m.holdings || []).map(function (h) {
+    var holdings = tradableHoldings(m).map(function (h) {
       var stock = stockById(h.id) || { id:h.id, name:h.id, sector:"Other", style:"unknown" };
       var value = holdingValue(h);
       sectors[stock.sector] = n(sectors[stock.sector]) + value;
@@ -1388,7 +1519,12 @@
       annualGain:annual ? annualPositionValue(annual) - n(annual.invested) : 0,
       liveSummary:liveSummary,
       stopRule:(store().stopLossRulesV21 || {})[stock.id] || null,
-      liquidity:n((store().liquidityV21 || {})[stock.id], seedLiquidity(stock)),
+      liquidity:stockLiquidity(stock.id),
+      availableShares:availableShares(stock.id),
+      riskReasons:stockRiskReasons(stock),
+      dividendEstimate:stockDividendEstimate(stock, h, annual),
+      recentNews:recentStockNews(stock.id),
+      decision:annualDecision(stock),
       pattern:trendPattern(stock.id),
       rating:(store().analystRatings || {})[stock.id] || defaultRating(stock)
     };
@@ -1451,6 +1587,24 @@
     if (stock.style === "defensive" || stock.style === "income") score -= 8;
     return clamp(score, 3, 100);
   }
+  function stockRiskReasons(stock) {
+    var m = store();
+    var profile = annualReturnProfile(stock);
+    var reasons = [];
+    if (n(stock.volatility) >= .45) reasons.push("Extreme volatility can move the position violently.");
+    else if (n(stock.volatility) >= .25) reasons.push("High volatility means wide swings are normal.");
+    if (n(stock.beta, 1) >= 1.6) reasons.push("High beta magnifies market moves.");
+    if (stock.sector === "Crypto" || stock.sector === "Speculative" || stock.style === "meme") reasons.push("Speculative tape can spike or gap down without warning.");
+    if (m.cycle === "crash" || m.cycle === "bear" || m.cycle === "recession") reasons.push((CYCLES[m.cycle] || CYCLES.normal).label + " makes risk assets harder to hold.");
+    if (profile.expected < 0) reasons.push("Annual model is currently negative.");
+    if (n(stock.dividend) > .03) reasons.push("Dividend support helps, but price risk still matters.");
+    if (!reasons.length) reasons.push("Risk is mostly ordinary market movement right now.");
+    return reasons.slice(0, 4);
+  }
+  function signalScore(stock) {
+    var profile = annualReturnProfile(stock);
+    return profile.expected * 100 - stockRiskScore(stock) * .28 + n(stock.dividend) * 120;
+  }
   function stockSignal(stock) {
     var profile = annualReturnProfile(stock);
     var risk = stockRiskScore(stock);
@@ -1460,6 +1614,28 @@
     if (risk > 68) return "Watch";
     if (profile.expected >= .06) return "Hold";
     return "Trim";
+  }
+  function annualDecision(stock) {
+    var profile = annualReturnProfile(stock);
+    var risk = stockRiskScore(stock);
+    var signal = stockSignal(stock);
+    if (signal === "Buy") return "Favorable annual setup if you can handle the risk.";
+    if (signal === "Sell") return "Weak annual setup. Selling or waiting is reasonable.";
+    if (signal === "Hedge") return "High-risk setup. Keep size small or protect the trade.";
+    if (signal === "Watch") return "Watch the next earnings/news before sizing up.";
+    if (signal === "Hold") return "Balanced setup for an existing position.";
+    return risk > 55 ? "Trim size unless the thesis improves." : "Modest setup; position size matters.";
+  }
+  function recentStockNews(id) {
+    id = String(id || "").toUpperCase();
+    return (store().news || []).filter(function (row) {
+      return String(row.symbol || "").toUpperCase() === id || (!row.symbol && stockById(id) && row.sector === stockById(id).sector);
+    }).slice(0, 3);
+  }
+  function stockDividendEstimate(stock, holding, annual) {
+    var liveIncome = holding ? holdingValue(holding) * n(stock.dividend) : 0;
+    var annualIncome = annual ? annualPositionValue(annual) * n(stock.dividend) : 0;
+    return round(liveIncome + annualIncome);
   }
   function setTab(tab) {
     var m = store();
@@ -1530,7 +1706,7 @@
     var live = !!(m.liveV18 && m.liveV18.enabled);
     var firm = personalFirmSummary();
     return '<section class="v20-hero">' +
-      '<div><div class="v20-kicker">INVESTMENTS 2.0 STOCK ENGINE</div><h2>Investments</h2><p>Live stocks, personal holdings, outside managers, and your existing personal firm now sit in one trading desk.</p><div class="v20-hero-actions">' +
+      '<div><div class="v20-kicker">INVESTMENTS 2.1 STOCK ENGINE</div><h2>Investments</h2><p>Live stocks, annual positions, risk signals, outside managers, and your existing personal firm sit in one trading desk.</p><div class="v20-hero-actions">' +
       action("Fund $10K", "green", "fundInvestmentCash(10000)", summary.checking < 10000) +
       action("Fund $100K", "green", "fundInvestmentCash(100000)", summary.checking < 100000) +
       action("Fund Max", "green", "fundInvestmentCash('max')", summary.checking <= 0) +
@@ -1543,7 +1719,7 @@
       metric("Investment Cash", money(summary.investmentCash), "Uninvested brokerage cash.", "gold") +
       metric("Stocks", money(summary.stockValue), "Live market value.", summary.unrealized >= 0 ? "good" : "bad") +
       metric("Unrealized", signedMoney(summary.unrealized), "Realized " + money(summary.realized) + ".", summary.unrealized >= 0 ? "good" : "bad") +
-      metric("Market", cycle.label, live ? "Live: ON, tick " + round(m.liveV18.ticks) : cycle.desc, live ? "blue" : "") +
+      metric("Market", cycle.label, live ? "Live tape running." : cycle.desc, live ? "blue" : "") +
       metric("Personal Firm", money(firm.total), firm.status + " / staff Lv " + firm.skill.toFixed(1), firm.total ? "good" : "") +
       '</div></section>';
   }
@@ -1615,6 +1791,7 @@
       if (sort === "volatilityHigh") return n(b.volatility) - n(a.volatility);
       if (sort === "volatilityLow") return n(a.volatility) - n(b.volatility);
       if (sort === "riskHigh") return stockRiskScore(b) - stockRiskScore(a);
+      if (sort === "signalBest") return signalScore(b) - signalScore(a);
       return 0;
     });
     return list;
@@ -1717,6 +1894,21 @@
       action("Generate Earnings", "gold", "generateEarningsV20()", false) +
       '</div></div>';
   }
+  function renderMarketBrief(stock, detail, mode) {
+    var profile = annualReturnProfile(stock);
+    var news = detail.recentNews || [];
+    var reasons = detail.riskReasons || [];
+    var available = detail.availableShares || 0;
+    var liquidityNote = money(detail.liquidity || 0) + " / " + shareText(available) + " sh";
+    return '<div class="v20-market-brief" data-v20-market-brief="' + esc(stock.id) + '">' +
+      '<div class="v20-brief-card"><span>Annual Read</span><b>' + esc(stockSignal(stock)) + '</b><p>' + esc(detail.decision || annualDecision(stock)) + '</p></div>' +
+      '<div class="v20-brief-card"><span>Dividend</span><b>' + money(detail.dividendEstimate || 0) + '</b><p>' + (n(stock.dividend) ? esc((stock.dividend * 100).toFixed(1) + "% yield on held live/annual value.") : 'No dividend income from this ticker.') + '</p></div>' +
+      '<div class="v20-brief-card"><span>Available Float</span><b>' + esc(liquidityNote) + '</b><p>Buys use the remaining available market float for this pass.</p></div>' +
+      '<div class="v20-brief-card"><span>Annual Range</span><b>' + pct(profile.low) + ' to ' + pct(profile.high) + '</b><p>Expected ' + pct(profile.expected) + ' in the current ' + esc(profile.cycle.label.toLowerCase()) + '.</p></div>' +
+      '<div class="v20-brief-card v20-brief-wide"><span>Risk Reasons</span><div class="v20-reason-list">' + reasons.map(function (row) { return '<em>' + esc(row) + '</em>'; }).join("") + '</div></div>' +
+      '<div class="v20-brief-card v20-brief-wide"><span>News / Catalysts</span><div class="v20-mini-news">' + (news.length ? news.map(function (row) { return '<em class="' + (n(row.impact) >= 0 ? "up" : "down") + '">' + esc(row.title || "Market note") + ' - ' + pct(row.impact || 0) + '</em>'; }).join("") : '<em>No recent ticker-specific news.</em>') + '</div><div class="v20-inline-actions">' + action("Company News", "blue", "generateCompanyActionForStockV21('" + esc(stock.id) + "')", false) + action("Analyst Note", "gold", "generateAnalystRatingForStockV21('" + esc(stock.id) + "')", false) + '</div></div>' +
+      '</div>';
+  }
   function renderFocusDesk(stock, mode, list, totalMatches, limitToWatchlist) {
     var detail = getStockDetail(stock.id);
     var summary = portfolioSummary();
@@ -1733,8 +1925,9 @@
       '<div class="v20-focus-desk" data-v20-focus-desk data-v20-focus-id="' + esc(stock.id) + '">' +
       '<div class="v20-focus-chart-panel"><div class="v20-focus-head"><div class="v20-stock-id"><i>' + esc(stock.icon || stock.id.slice(0, 3)) + '</i><div><div class="v18-ticker" data-v20-focus-symbol>' + esc(stock.id) + '</div><div class="v18-stock-name">' + esc(stock.name) + '</div></div></div><div class="v20-focus-price"><b data-v20-focus-price>' + priceText(displayPrice) + '</b><span data-v20-focus-change class="' + changeCls + '">' + pct(displayChange) + '</span></div></div>' +
       '<div class="v20-focus-chart" data-v20-focus-chart data-stock18-chart="' + esc(stock.id) + '">' + candleSVG(stock.id, false, true) + '</div>' +
-      '<div class="v20-focus-meta"><span>Pattern <b data-v20-focus-pattern>' + esc(detail.pattern) + '</b></span><span>Annual model <b data-v20-focus-annual>' + pct(profile.expected) + '</b></span><span>Volume <b data-v20-focus-volume>' + money(store().volumes[stock.id] || 0) + '</b></span></div>' +
+      '<div class="v20-focus-meta"><span>Pattern <b data-v20-focus-pattern>' + esc(detail.pattern) + '</b></span><span>Annual model <b data-v20-focus-annual>' + pct(profile.expected) + '</b></span><span>Available <b data-v20-focus-liquidity>' + money(detail.liquidity || 0) + '</b></span></div>' +
       '</div><div class="v20-focus-side">' + renderFocusStats(stock, detail, summary, mode) + (mode === "annual" ? renderAnnualFocus(stock, detail, summary, inputId) : renderLiveFocus(stock, detail, summary, inputId)) + '</div></div>' +
+      renderMarketBrief(stock, detail, mode) +
       renderTickerRail(list, stock.id, totalMatches) +
       '</section>';
   }
@@ -2004,6 +2197,8 @@
   function renderInvestmentsHub() {
     try {
       var m = store();
+      m.userOpenedV21 = true;
+      syncFinanceStockTotals(m, (stateNow() || {}).finance);
       scheduleLiveTimer();
       return '<div class="v20-investments-hub v18-brokerage-hub v17-brokerage-hub">' + renderHero() + renderTabs(m) + '<div class="v20-tab-body">' + renderActiveTab() + '</div></div>';
     } catch (e) {
@@ -2024,7 +2219,14 @@
   function updateLiveDom() {
     var m = store();
     try {
-      STOCKS.forEach(function (stock) {
+      var visibleIds = {};
+      document.querySelectorAll("[data-stock18-id],[data-v20-ticker-id],[data-stock18-holding-chart]").forEach(function (el) {
+        var id = el.getAttribute("data-stock18-id") || el.getAttribute("data-v20-ticker-id") || el.getAttribute("data-stock18-holding-chart");
+        if (id) visibleIds[String(id).toUpperCase()] = true;
+      });
+      Object.keys(visibleIds).forEach(function (id) {
+        var stock = stockById(id);
+        if (!stock) return;
         var detail = getStockDetail(stock.id);
         var h = detail.holding;
         var p = detail.shortPosition;
@@ -2071,7 +2273,7 @@
         });
         document.querySelectorAll("[data-v20-focus-pattern]").forEach(function (el) { el.textContent = selectedDetail.pattern; });
         document.querySelectorAll("[data-v20-focus-annual]").forEach(function (el) { el.textContent = pct(profile.expected); });
-        document.querySelectorAll("[data-v20-focus-volume]").forEach(function (el) { el.textContent = money(m.volumes[selected.id] || 0); });
+        document.querySelectorAll("[data-v20-focus-liquidity]").forEach(function (el) { el.textContent = money(selectedDetail.liquidity || 0); });
         if (activeMode !== "annual") document.querySelectorAll("[data-v20-focus-chart]").forEach(function (el) { el.innerHTML = candleSVG(selected.id, false, true); });
         document.querySelectorAll("[data-v20-live-entry]").forEach(function (el) { el.textContent = priceText(live.entryPrice || selectedDetail.price); });
         document.querySelectorAll("[data-v20-live-current]").forEach(function (el) { el.textContent = money(live.value || 0); });
@@ -2100,9 +2302,9 @@
     } catch (e) {}
   }
   function ensureLiveTimer() {
+    if (!isInvestmentsOpen()) return;
     var m = store();
     if (!m || !m.liveV18 || !m.liveV18.enabled) return;
-    if (!isInvestmentsOpen()) return;
     if (window.__ledgerLiveMarketTimer18) {
       try { clearInterval(window.__ledgerLiveMarketTimer18); } catch (e) {}
       window.__ledgerLiveMarketTimer18 = null;
@@ -2160,10 +2362,11 @@
     var wrapped = function () {
       var s = stateNow();
       var beforeAge = s && s.age;
+      var shouldProcessStocks = stockEngineHasUserActivity(rawStocksState());
       var out = prev.apply(this, arguments);
       try {
         var after = stateNow();
-        if (after && after.age !== beforeAge) {
+        if (after && after.age !== beforeAge && shouldProcessStocks) {
           processStockMarketYear({ mode:"ageup", skipLegacy:true });
           save();
         }
@@ -2226,13 +2429,14 @@
       ".v20-focus-stats,.v20-annual-band{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px}.v20-focus-copy{border:1px solid rgba(255,255,255,.08);border-radius:11px;background:rgba(0,0,0,.14);padding:10px;margin-bottom:10px}.v20-focus-copy span{display:block;color:#d8b16e;font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.12em;text-transform:uppercase}.v20-focus-copy p{margin:4px 0 0;color:#cdbf9e;font-family:'JetBrains Mono',monospace;font-size:9px;line-height:1.5}",
       ".v20-position-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:0 0 10px}.v20-position-strip span,.v20-action-group>b{display:block;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.035);padding:8px;color:#a89472;font-family:'JetBrains Mono',monospace;font-size:8px;text-transform:uppercase;letter-spacing:.08em;min-width:0}.v20-position-strip b{display:block;margin-top:3px;color:#f0cf86;font-size:10px;letter-spacing:0;text-transform:none;overflow-wrap:anywhere}.v20-action-group{display:grid;gap:6px}.v20-action-group>b{background:transparent;border-color:rgba(216,177,110,.18);padding:6px 8px;color:#d8b16e}",
       ".v20-trade-box{display:grid;gap:8px}.v20-trade-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.v20-stop-row{display:grid;grid-template-columns:minmax(110px,1fr) repeat(3,minmax(0,auto));gap:7px;align-items:center}.v20-trade-actions .money-btn,.v20-stop-row .money-btn{min-width:0}.money-btn.bad{border-color:rgba(214,91,91,.45)!important;background:rgba(214,91,91,.12)!important;color:#ffd2c8!important}",
+      ".v20-market-brief{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}.v20-brief-card{border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(255,255,255,.035);padding:10px;min-width:0}.v20-brief-card span{display:block;color:#d8b16e;font-family:'JetBrains Mono',monospace;font-size:8px;text-transform:uppercase;letter-spacing:.12em}.v20-brief-card b{display:block;margin-top:4px;color:#fff3df;font-family:'JetBrains Mono',monospace;font-size:14px;overflow-wrap:anywhere}.v20-brief-card p,.v20-reason-list em,.v20-mini-news em{display:block;margin:5px 0 0;color:#b9a98d;font-family:'JetBrains Mono',monospace;font-size:9px;line-height:1.45;font-style:normal}.v20-brief-wide{grid-column:span 2}.v20-reason-list,.v20-mini-news{display:grid;gap:5px;margin-top:4px}.v20-mini-news .up{color:#b9dc8a}.v20-mini-news .down{color:#e9927d}",
       ".v20-ticker-rail{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px;margin-top:12px}.v20-ticker-pill{border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(255,255,255,.035);padding:9px;text-align:left;cursor:pointer;min-width:0}.v20-ticker-pill.active{border-color:rgba(216,177,110,.72);background:rgba(216,177,110,.12);box-shadow:inset 3px 0 0 #d8b16e}.v20-ticker-pill b{display:block;color:#fff3df;font-family:'JetBrains Mono',monospace;font-size:12px}.v20-ticker-pill span{display:block;color:#f0cf86;font-family:'JetBrains Mono',monospace;font-size:10px;margin-top:2px}.v20-ticker-pill em,.v20-ticker-pill small{display:block;font-family:'JetBrains Mono',monospace;font-style:normal;font-size:8.5px;margin-top:2px}.v20-ticker-pill small{color:#a89472;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
       ".v20-stock-list{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(285px,1fr))!important;overflow:visible!important;padding:2px!important}.v20-stock-card{display:grid;gap:9px;flex:auto!important}.v20-stock-id{display:flex;gap:9px;align-items:start}.v20-stock-id i{display:grid;place-items:center;width:36px;height:36px;border:1px solid rgba(216,177,110,.32);border-radius:10px;background:rgba(216,177,110,.10);color:#f0cf86;font-family:'JetBrains Mono',monospace;font-size:10px;font-style:normal;font-weight:900}",
       ".v20-candle-wrap{min-height:88px}.v20-chip-row{display:flex;gap:6px;flex-wrap:wrap}.v20-card-actions{margin-top:0}.v20-input-row{display:grid!important;grid-template-columns:minmax(130px,1fr) auto auto auto!important;gap:7px!important;align-items:center!important}",
       ".v20-account-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}.v20-account-card{border:1px solid rgba(255,255,255,.11);border-radius:12px;background:rgba(255,255,255,.04);padding:11px;display:grid;gap:8px}.v20-account-card.active{border-color:rgba(185,220,138,.55);background:rgba(185,220,138,.08)}.v20-account-card b{display:block;color:#fff3df}.v20-account-card span,.v20-account-card em,.v20-account-card p,.v20-account-card li{font-family:'JetBrains Mono',monospace;color:#b9a98d;font-size:9px;line-height:1.45}.v20-account-card ul{margin:0 0 0 16px;padding:0}",
       ".v20-firm-staff{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:10px 0}.v20-firm-staff>div,.v20-guide-grid>div,.v20-risk-list>div,.v20-mini-list button{border:1px solid rgba(255,255,255,.10);border-radius:11px;background:rgba(255,255,255,.04);padding:10px;text-align:left}.v20-firm-staff b,.v20-guide-grid b,.v20-mini-list b{display:block;color:#fff3df}.v20-firm-staff span,.v20-guide-grid span,.v20-mini-list span,.v20-mini-list em,.v20-risk-list>div{display:block;color:#b9a98d;font-family:'JetBrains Mono',monospace;font-size:9px;line-height:1.45;font-style:normal}",
       ".v20-guide-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}.v20-mini-list button{cursor:pointer}.v20-mini-list em{color:#f0cf86}",
-      "@media(max-width:900px){.v20-hero,.v20-grid-main,.v20-focus-desk,.v20-return-switch{grid-template-columns:1fr}.v20-filter-row,.v20-input-row,.v20-transfer-row,.v20-trade-actions,.v20-stop-row{grid-template-columns:1fr!important}.v20-stock-list{grid-template-columns:1fr!important}.v20-panel-head,.v20-focus-head{align-items:flex-start}.v20-panel-head strong,.v20-focus-price{text-align:left}.v20-hero h2{font-size:28px}.v20-focus-chart{height:220px}.v20-focus-meta,.v20-focus-stats,.v20-annual-band,.v20-position-strip{grid-template-columns:1fr}.v20-sort-search{display:grid;grid-template-columns:1fr;align-items:stretch}.v20-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}}"
+      "@media(max-width:900px){.v20-hero,.v20-grid-main,.v20-focus-desk,.v20-return-switch,.v20-market-brief{grid-template-columns:1fr}.v20-filter-row,.v20-input-row,.v20-transfer-row,.v20-trade-actions,.v20-stop-row{grid-template-columns:1fr!important}.v20-stock-list{grid-template-columns:1fr!important}.v20-panel-head,.v20-focus-head{align-items:flex-start}.v20-panel-head strong,.v20-focus-price{text-align:left}.v20-hero h2{font-size:28px}.v20-focus-chart{height:220px}.v20-focus-meta,.v20-focus-stats,.v20-annual-band,.v20-position-strip{grid-template-columns:1fr}.v20-brief-wide{grid-column:auto}.v20-sort-search{display:grid;grid-template-columns:1fr;align-items:stretch}.v20-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}}"
     ].join("\n");
     document.head.appendChild(style);
   }
@@ -2269,12 +2473,22 @@
   window.generateEarningsV20 = function () { generateEarnings(false); };
   window.generateAnalystRatingV20 = function () { generateAnalystRating(null, false); };
   window.generateCompanyActionV20 = function () { generateCompanyAction(); };
+  window.generateAnalystRatingForStockV21 = function (id) { generateAnalystRating(id, false); };
+  window.generateCompanyActionForStockV21 = function (id) { generateCompanyAction(id); };
   window.allocatePersonalFirmV20 = allocatePersonalFirm;
   window.withdrawPersonalFirmV20 = withdrawPersonalFirm;
 
-  window.stockValue18 = stockValue;
+  window.stockValue18 = function () {
+    if (!stockEngineHasUserActivity(rawStocksState())) return 0;
+    return stockValue();
+  };
   window.stockShortEquityV20 = totalShortEquity;
-  window.brokerageTotal18 = function () { return brokerageCash() + stockValue() + annualValue() + totalShortEquity(); };
+  window.brokerageTotal18 = function () {
+    if (!stockEngineHasUserActivity(rawStocksState())) {
+      return Math.max(0, round(((stateNow() || {}).finance || {}).brokerage));
+    }
+    return brokerageCash() + stockValue() + annualValue() + totalShortEquity();
+  };
   window.buyStockV18 = function (id, mode, inputId) {
     var cash = brokerageCash();
     var amount = mode === "all" ? cash : mode === "custom" ? readAmount(inputId, cash) : Math.max(0, round(mode));
@@ -2343,7 +2557,6 @@
   try { fundStockCashV18 = window.fundStockCashV18; runMarketYearV18 = window.runMarketYearV18; liveMarketTickV18 = window.liveMarketTickV18; toggleLiveMarketV18 = window.toggleLiveMarketV18; stopLiveMarketV18 = window.stopLiveMarketV18; } catch (e4) {}
 
   installStyles();
-  ensureShape();
   installRenderOverride();
   wrapAgeUp();
 
@@ -2353,7 +2566,7 @@
       file: "pages/systems/stocks-engine.js",
       status: "active",
       globals: ["ensureStockEngineV2", "getStockUniverse", "tickLiveStockMarket", "buyStockAmount", "sellStockAmount", "renderInvestmentsHubV20"],
-      notes: "Investments 2.0 stock engine: expanded live market, candles, amount trading, watchlist/news/earnings/risk/accounts, and existing personal firm preservation under state.finance.stocksV18."
+      notes: "Investments 2.0 stock engine: lazy-loaded market state, expanded live market, candles, amount trading, watchlist/news/earnings/risk/accounts, and existing personal firm preservation under state.finance.stocksV18."
     });
   }
 })();
