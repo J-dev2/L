@@ -112,8 +112,30 @@ funding, buying `$1K` AAPL, starting live ticks, visible tick status, and stoppi
 stock runtime now stores OHLC candle history under `state.finance.stocksV18.candles`, renders candlestick mini charts
 and pattern labels per stock, and adds `Buy Max` so all current Investment Cash can go into one stock. Live ticks now
 model momentum, pullback/rebound pressure, random breakouts/selloffs, and larger Bitcoin/speculative-stock spikes.
-`play.html` cache stamps are `20260629-livecandle1`. Full Investments 2.0 is still backlog: rebuild around an Asset
-Summary and separated Live Trading, manager, personal firm, and fund-economics sections.
+`play.html` cache stamps are `20260629-livecandle1`. At that checkpoint, Full Investments 2.0 was still backlog:
+rebuild around an Asset Summary and separated Live Trading, manager, personal firm, and fund-economics sections.
+
+2026-06-30 update: **Checkpoint 69** shipped the Investments 2.0 stock engine as a Ledger-native module in
+`pages/systems/stocks-engine.js`, loaded by `play.html` after the existing Investments wrapper. The old
+`state.finance.stocksV18` save home remains in place, old holdings/prices/history migrate safely, live mode defaults
+on with a single timer, fresh saves seed OHLC candles, amount-based buy/sell plus Buy Max and explicit Buy Checking
+are active, and personal firm/fund state is preserved in a separate Personal Firm tab. Verification is green:
+`cdp/investments-stock-engine.js` 21/21, `cdp/entrepreneur-backlog.js` 17/17, `cdp/stock.js` 30/30, and
+`cdp/dashboard.js` 32/32 after rebuild.
+
+2026-06-30 follow-up: **Checkpoint 70** addressed the reported Investments open-freeze path. `stocks-engine.js` now
+uses a fast shape-ready path so helper calls do not rerun the full 51-stock migration loop, and the live market timer
+is deferred until the Investments hub renders instead of starting on page load. `play.html` now loads
+`stocks-engine.js?v=20260630-investments2b`; system map and hub metadata now point at `pages/systems/stocks-engine.js`
+and use the visible `Investments` label. Syntax checks and rebuild passed. Final browser/CDP replay is pending because
+the environment usage limit blocked the rerun.
+
+2026-06-30 second follow-up: **Checkpoint 71** fixed the remaining Investments freeze path. `stocks-engine.js` now has
+a safe fallback render with `Reset View`, caps the saved Live Trading tab to 18 visible cards by default, starts the live
+timer only after the real Investments overlay is inserted, and stops ticks when the overlay closes. `play.html` now loads
+`stocks-engine.js?v=20260630-investments2c`, and `PAGES.md` points Investments at `pages/systems/stocks-engine.js`.
+Verification is green: `cdp/investments-stock-engine.js` 26/26, `cdp/entrepreneur-backlog.js` 17/17, `cdp/stock.js`
+30/30, and `cdp/dashboard.js` 32/32 after rebuild.
 
 Property-specific context from **Checkpoint 29 (2026-06-22)**: `pages/systems/property-estate.js` is now **v18.66**.
 CP27 added property class/prestige tiers (Economy→Prestige, net-worth-gated); CP28 fixed the Flip-plan

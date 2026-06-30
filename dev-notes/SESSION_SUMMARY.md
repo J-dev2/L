@@ -5,6 +5,202 @@
 
 ---
 
+## Approved plan - 2026-06-30 (Codex) - Investments 2.1 stocks desk
+
+User approved the Investments 2.1 plan. This is the implementation spec for the next pass.
+
+Planned first pass:
+
+- Rework Investments navigation around a clearer `Stocks` desk instead of separate crowded `Live Trading`, `Annual Returns`, `News`, and `History` tabs.
+- Put `Live Trading` and `Annual Trading` inside the Stocks screen as a mode switch.
+- Move `History` into Overview and move News into a stock-screen market brief/drawer.
+- Add live-updating selected-position P/L: entry value, current value, dollar gain/loss, percent return, entry price, current price, shares, and held time/stopwatch.
+- Add a player-facing market cycle chip instead of technical `Live: ON / tick ####` language.
+- Add stop-loss controls for live positions: fixed stop and trailing percent stop.
+- Separate annual trading from live holdings: annual positions update only on age-up / market-year, not every live tick.
+- Add stock filters/sorts near the ticker grid: owned, watchlist, sector, dividend, highest/worst live return, highest/worst annual return, highest dividend, highest/lowest volatility, highest risk, best signal.
+- Restore stronger risk analysis: selected-stock risk reasons plus portfolio risk.
+- Make dividend stocks obvious and show estimated dividend income.
+- Add stock liquidity/available shares, with at least `$1B` available per stock.
+- Show Personal Firm expected return and clarify Funds/client-capital separately.
+- Keep the full mobile redesign, public-company control, yearly investment recap, and venture firm career as future backlog.
+
+Implementation constraints:
+
+- Existing `state.finance.stocksV18.holdings` remain live-trading holdings.
+- New annual positions should live separately under `state.finance.stocksV18`.
+- Stop loss applies to live trading only for this pass.
+- Do not replace the existing personal firm or fund state.
+- Do not double-count net worth.
+- Preserve existing stock saves and old globals.
+
+---
+
+## Checkpoint 72 - 2026-06-30 (Codex) - Investments 2.1 first implementation slice
+
+Implemented the approved Investments 2.1 first slice.
+
+Changed:
+
+- `pages/systems/stocks-engine.js`
+  - Condensed Investments navigation to `Overview`, `Stocks`, `Risk`, `Personal Firm`, `Funds`, and `Accounts`.
+  - Moved live and annual stock trading into one `Stocks` desk with a `Live Trading` / `Annual Trading` mode switch.
+  - Removed the old large stock-card preview from Overview; Overview now carries asset summary, holdings, trades, alerts, and news.
+  - Added selected-position live P/L strip with entry, current value, gain/loss, and stop-loss status.
+  - Added player-facing market-cycle copy instead of technical tick-forward language.
+  - Added filters and sort controls near the ticker rail.
+  - Added annual positions under `state.finance.stocksV18.annualPositionsV21`; they update on market-year processing, not live ticks.
+  - Added live-position metadata under `livePositionsV21` and stop-loss rules under `stopLossRulesV21`.
+  - Added fixed stop and trailing-percent stop controls for live holdings.
+  - Kept personal firm and fund/client capital separate from personal stock positions.
+- `play.html`
+  - Bumped the Investments engine cache stamp to `20260630-investments21a`.
+- `cdp/investments-stock-engine.js`, `cdp/README.md`
+  - Updated the focused Investments probe to the new condensed Stocks-desk contract. Probe count is now 38.
+
+Verification:
+
+- `node --check pages\systems\stocks-engine.js`
+- `node --check cdp\investments-stock-engine.js`
+- `node --check pages\runtime\00-core-app-runtime.js`
+- `node --check pages\systems\charts.js`
+- `node build\build-ledger18.js`
+
+Blocked verification:
+
+- Browser/CDP replay did not run successfully in this turn. Chrome exited before opening a DevTools port, Edge also did not expose the port, and the in-app browser blocked opening a new `file://` sandbox tab by policy. Re-run `cdp/investments-stock-engine.js` when local browser automation is available.
+
+Still future/backlog:
+
+- Full mobile redesign for Investments.
+- Public-company takeover/control after buying enough shares.
+- Yearly investment recap popup.
+- Venture-firm career/fund-track expansion.
+- Deeper selected-stock risk reason panel and richer news popup/drawer.
+
+---
+
+## User-reported follow-ups - 2026-06-30 (not fixed yet)
+
+Logged only per user request; do not fix until the user finishes checking Investments.
+
+- Emoji/platform fallback regression: emoji icons render correctly on first load, but after navigating back and forth between hubs they stop rendering as emoji and fall back to the symbol/alt labels. This is not the initial emoji-support failure case; investigate whether the platform compatibility layer or hub re-render path is reapplying fallback mode too aggressively after DOM replacement.
+- Investments navigation visibility: Investments is not present in the main bottom nav on the starting Life screen. The visible nav shows Life, People, Job, Finance, Money, Law, and More; Investments can be reached indirectly from inside Life/a hub and then appears in the hub/overlay. Need decide whether Investments should be a direct bottom-nav item or be consistently discoverable from More/Finance without requiring the Life route first.
+
+---
+
+## Checkpoint 71 - 2026-06-30 (Codex) - Investments freeze second pass
+
+Followed up after the user confirmed the Investments bug still existed after CP70.
+
+Changed:
+
+- `pages/systems/stocks-engine.js`
+  - Added a safe Investments render fallback with `Reset View` and `Stop Live` actions, so a bad save/render edge case cannot freeze the whole game.
+  - Limited the Live Trading tab to 18 visible stock cards by default and 24 after search, with copy telling the player to search/watchlist the remaining tickers. This prevents old saves that reopen directly into Live Trading from rendering the full 51-card candlestick board at once.
+  - Made the live market timer hub-aware: string renders do not start the timer, the actual Investments route starts it after the overlay is inserted, and ticks stop themselves if the Investments overlay is closed.
+  - Added `resetInvestmentsViewV20()` to clear the active tab/search and stop live mode if a save gets stuck.
+- `play.html`
+  - Bumped the engine cache stamp to `20260630-investments2c`.
+- `PAGES.md`
+  - Updated the Investments edit pointer to `pages/systems/stocks-engine.js`, with `stocks-investing.js` noted as the decorator.
+- `cdp/investments-stock-engine.js`, `cdp/README.md`
+  - Updated the route/timer checks and added coverage for saved `activeTabV20="live"` opening with a capped card count. Probe count is now 26.
+
+Verification:
+
+- `node --check pages\systems\stocks-engine.js`
+- `node --check cdp\investments-stock-engine.js`
+- `node --check pages\runtime\00-core-app-runtime.js`
+- `node --check pages\systems\00-system-map.js`
+- `node --check pages\hubs\stocks.js`
+- `node build\build-ledger18.js`
+- Browser/CDP:
+  - `cdp/investments-stock-engine.js` passed 26/26 with no console errors.
+  - `cdp/entrepreneur-backlog.js` passed 17/17 with no console errors.
+  - `cdp/stock.js` passed 30/30 with no console errors.
+  - `cdp/dashboard.js` passed 32/32 with no console errors.
+
+Notes:
+
+- If a user's browser still shows the freeze after this, first confirm it is loading `stocks-engine.js?v=20260630-investments2c`; an older cached `investments2` or `investments2b` script will still have the old behavior.
+
+---
+
+## Checkpoint 70 - 2026-06-30 (Codex) - Investments open freeze follow-up
+
+Followed up after the user reported that opening Investments in Edge made the game stop responding and that Investments was not listed in the main system map correctly.
+
+Changed:
+
+- `pages/systems/stocks-engine.js`
+  - Added a fast `engineReady` path so repeated helper calls do not rerun the full 51-stock migration/seed loop.
+  - Deferred the live market interval until the Investments hub actually renders instead of starting it immediately on script load.
+  - Repaired one-candle old/fresh saves so chart seeding still produces visible OHLC candles.
+- `play.html`
+  - Bumped the engine cache stamp to `20260630-investments2b` to force Edge/GitHub Pages to load the follow-up engine.
+- `pages/systems/00-system-map.js`, `pages/hubs/stocks.js`, `pages/runtime/00-core-app-runtime.js`
+  - Updated metadata/title fallbacks so Investments points at `pages/systems/stocks-engine.js` and renders as `Investments`, not the older `Stocks`/`Brokerage` wording.
+- `cdp/investments-stock-engine.js`, `cdp/README.md`
+  - Added route-open and deferred-live-timer checks. The probe count is now 24.
+
+Verification:
+
+- `node --check pages\systems\stocks-engine.js`
+- `node --check pages\runtime\00-core-app-runtime.js`
+- `node --check pages\systems\00-system-map.js`
+- `node --check pages\hubs\stocks.js`
+- `node --check cdp\investments-stock-engine.js`
+- `node build\build-ledger18.js`
+
+Pending:
+
+- Browser/CDP replay of `cdp/investments-stock-engine.js` after the environment usage limit resets. The previous route-open probe passed before this follow-up, but the final browser rerun was blocked by usage limits.
+
+---
+
+## Checkpoint 69 - 2026-06-30 (Codex) - Investments 2.0 stock engine
+
+Implemented the requested Investments 2.0 upgrade as a Ledger-native system instead of porting the Verdant standalone shell.
+
+Changed:
+
+- `pages/systems/stocks-engine.js`
+  - Added the new Investments 2.0 engine under `state.finance.stocksV18`.
+  - Expanded the stock universe to 51 stock/ETF/crypto/speculative assets with sector, style, volatility, beta, dividend, volume, rating, price history, OHLC candle history, news, earnings, dividends, watchlist, accounts, and trade history.
+  - Preserves old `stocksV18` holdings/prices/history plus existing personal firm/fund state (`finance.personalFirm`, `managedPortfolio`, `fundTrackV189`).
+  - Live market defaults on, runs one safe timer, clears the old duplicate timer if present, and updates stock DOM nodes without rerendering the whole app every second.
+  - Amount-based buy/sell now supports custom dollar inputs, Buy Max, explicit Buy Checking, Sell All, investment-cash funding/withdrawals, realized/unrealized gain tracking, and bad-input guards.
+  - Fresh saves now seed enough candle data for visible OHLC charts immediately.
+  - Personal Firm is integrated as its own Investments tab while staying separate from personal stock holdings.
+  - Margin is visible but locked to avoid hidden debt or net-worth double-counting in this pass.
+  - Added safe-area-aware bottom spacing for the Investments hub on mobile.
+- `play.html`
+  - Loads `pages/systems/stocks-engine.js?v=20260630-investments2` after the existing Investments module.
+- `cdp/investments-stock-engine.js`, `cdp/entrepreneur-backlog.js`, `cdp/README.md`
+  - Added focused Investments 2.0 coverage and updated old backlog assertions for the new tabbed desk.
+
+Verification:
+
+- `node --check pages\systems\stocks-engine.js`
+- `node --check pages\systems\stocks-investing.js`
+- `node --check pages\systems\charts.js`
+- `node --check cdp\investments-stock-engine.js`
+- `node --check cdp\entrepreneur-backlog.js`
+- `node build\build-ledger18.js`
+- Browser/CDP:
+  - `cdp/investments-stock-engine.js` passed 21/21 with no console errors.
+  - `cdp/entrepreneur-backlog.js` passed 17/17 with no console errors.
+  - `cdp/stock.js` passed 30/30 with no console errors.
+  - `cdp/dashboard.js` passed 32/32 with no console errors.
+
+Notes:
+
+- The existing personal firm was preserved and surfaced inside Investments; it was not replaced by the experimental package's firm.
+- The Verdant files were used as inspiration only. The shipped engine uses Ledger state, Ledger save paths, and Ledger globals.
+
+---
+
 ## Checkpoint 68 - 2026-06-29 (Codex) - Default live candles + Buy Max stocks
 
 Updated Real Stocks toward the user's intended live day-trading feel while keeping the larger Investments redesign as a later backlog item.

@@ -9372,7 +9372,7 @@ getSuggestedActions = function(s) {
   window.renderHubContent = renderHubContent;
 
   function titleForHubV11(id) {
-    const titles = { money:"Money", brokerage:"Brokerage", business:"Entrepreneurship", people:"People", school:"School", career:"Career", health:"Health", home:"Real Estate", vehicles:"Vehicles", more:"More", stats:"All Stats", lifehub:"Life" };
+    const titles = { money:"Money", brokerage:"Investments", business:"Entrepreneurship", people:"People", school:"School", career:"Career", health:"Health", home:"Real Estate", vehicles:"Vehicles", more:"More", stats:"All Stats", lifehub:"Life" };
     return titles[id] || id;
   }
   function escAttrV11(s) { return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
@@ -11125,7 +11125,7 @@ getSuggestedActions = function(s) {
   }, true);
 
   function titleForHub16(id) {
-    var titles = { money:"Money", brokerage:"Brokerage", business:"Entrepreneurship", people:"People", school:"School", career:"Career", health:"Health", home:"Real Estate", vehicles:"Vehicles", more:"More", stats:"All Stats", lifehub:"Life" };
+    var titles = { money:"Money", brokerage:"Investments", business:"Entrepreneurship", people:"People", school:"School", career:"Career", health:"Health", home:"Real Estate", vehicles:"Vehicles", more:"More", stats:"All Stats", lifehub:"Life" };
     return titles[id] || id;
   }
   function controls16() {
@@ -11149,6 +11149,7 @@ getSuggestedActions = function(s) {
       var idx = hubs.findIndex(function (h) { return h && h.id === "money"; });
       hubs.splice(idx >= 0 ? idx + 1 : hubs.length, 0, { id:"brokerage", icon:"📈", label:"Stocks", disabled: state && state.age < 13 });
     }
+    hubs.forEach(function (h) { if (h && h.id === "brokerage") h.label = "Investments"; });
     return '<div class="v11-hub-tab-strip" aria-label="Hub tab wheel"><div class="v11-hub-tab-scroll">' + hubs.map(function (h) {
       var disabled = h.disabled ? "disabled" : "";
       return '<button class="v11-tab-btn' + (h.id === activeId ? ' active' : '') + '" ' + disabled + ' onclick="event.preventDefault();event.stopPropagation();setTabV16(\'' + esc(h.id) + '\')"><span class="v11-tab-ico">' + esc(h.icon || "•") + '</span><span class="v11-tab-lbl">' + esc(h.label || titleForHub16(h.id)) + '</span></button>';

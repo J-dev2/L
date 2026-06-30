@@ -49,7 +49,7 @@ game state. So "add a page" = add/extend a `.js` render function, not a new HTML
 | **Family Trust** (trust, child trusts, family fund, succession) | `pages/systems/tax-legal.js` (`renderTrustHub`) |
 | **Shopping / The Mall** (luxury items + art market money sink) | `pages/systems/shopping-mall.js` |
 | **Money** (checking, savings, budget, tax residence) | `pages/systems/money-banking.js` |
-| **Investments / Brokerage** (stocks, funds, personal firm) | `pages/systems/stocks-investing.js` |
+| **Investments / Brokerage** (stocks, funds, personal firm) | `pages/systems/stocks-engine.js` (`stocks-investing.js` still decorates labels/inputs) |
 | **Finance / Net worth** (ledger, assets, debts, charts) | `pages/systems/finance-ledger.js` |
 | **People / Family** (relationships, dating, kids, friends) | `pages/systems/people-family.js` |
 | **Education + Career** (school, IQ, jobs, degrees) | `pages/systems/education-career.js` |

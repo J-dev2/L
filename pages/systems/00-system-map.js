@@ -40,10 +40,10 @@
     rule: "Legal owns accountants, attorneys, tax debt payoff, audit risk, family trusts, child trusts, family fund governance, protected-asset succession, and repair of missed trust/business carries when continuing as an heir."
   });
   register({
-    id: "stocks-investing",
-    targetFile: "pages/systems/stocks-investing.js",
-    currentAnchors: ["renderBrokerageHubV11", "buyStock", "sellStock", "resolveMarketYear"],
-    rule: "Stocks owns brokerage, real stocks, outside managers, personal firm, and market cycle."
+    id: "stocks-engine",
+    targetFile: "pages/systems/stocks-engine.js",
+    currentAnchors: ["ensureStockEngineV2", "renderInvestmentsHubV20", "tickLiveStockMarket", "buyStockAmount", "sellStockAmount", "getPortfolioSummary"],
+    rule: "Investments owns live stocks, brokerage cash, real-stock holdings, watchlist/news/earnings, personal firm placement, and market cycle."
   });
   register({
     id: "business-entities",

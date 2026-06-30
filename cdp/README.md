@@ -40,6 +40,7 @@ only pulls scripts referenced in `play.html` / `index.html`).
 | `founderpay.js` | Founder salary + manual distribution + tax | 24 |
 | `stock.js`      | Share counts, buyback de-list, splits, dividends | 30 |
 | `entrepreneur-backlog.js` | Life/Entrepreneur backlog smoke: shared charts, Investments live trading/funding, candles, hiring, sell paths | 17 |
+| `investments-stock-engine.js` | Investments 2.1 stock engine: condensed Stocks desk, live/annual mode switch, live P/L strip, annual-only positions, stop-loss controls, sort/filter controls, short/cover flow, route open, mobile padding, personal firm preservation | 38 |
 | `trust.js`      | Family trust create/fund, net worth, succession carry, death haircut | 18 |
 | `trust-holdings.js` | Trust Envelop titles Property + Entrepreneurship holdings, carries them without duplicate cash | 12 |
 | `family-office.js` | Family Office popup/operator/per-company founder titling + selected-company succession | 23 |

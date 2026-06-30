@@ -58,11 +58,16 @@
     state.finance.brokerageOpened = true;
     state.finance.brokerage = 5000;
     var invHtml = typeof window.renderHubContent === "function" ? window.renderHubContent("brokerage") : "";
+    var liveHtml = invHtml;
+    if (typeof window.setStockTabV20 === "function") {
+      window.setStockTabV20("live");
+      liveHtml = window.renderHubContent("brokerage");
+    }
     ok("investments_uses_shared_donut_tile", /v1838-chart-tile/.test(invHtml) && /v1838-donut-wrap/.test(invHtml), "len=" + invHtml.length);
     ok("investments_has_base_live_market", /Live Market|Stop Live/.test(invHtml) && typeof window.toggleLiveMarketV18 === "function" && typeof window.liveMarketTickV18 === "function", "len=" + invHtml.length);
-    ok("investments_has_funding_controls", /Fund \$10K/.test(invHtml) && /Fund Max/.test(invHtml) && /data-stock18-live-panel/.test(invHtml), "len=" + invHtml.length);
-    ok("investments_live_defaults_on", /Stop Live/.test(invHtml) && /Live market running/.test(invHtml), "len=" + invHtml.length);
-    ok("investments_has_candles_and_buy_max", /v18-candle-chart/.test(invHtml) && /data-stock18-chart/.test(invHtml) && /Buy Max/.test(invHtml), "len=" + invHtml.length);
+    ok("investments_has_funding_controls", /Fund \$10K/.test(invHtml) && /Fund Max/.test(invHtml) && /data-stock18-live-panel/.test(liveHtml), "len=" + liveHtml.length);
+    ok("investments_live_defaults_on", /Stop Live/.test(invHtml) && /Live market running/.test(liveHtml), "len=" + liveHtml.length);
+    ok("investments_has_candles_and_buy_max", /v18-candle-chart/.test(liveHtml) && /data-stock18-chart/.test(liveHtml) && /Buy Max/.test(liveHtml), "len=" + liveHtml.length);
     if (typeof window.stopLiveMarketV18 === "function") window.stopLiveMarketV18();
     var moneyBeforeFund = num(state.money);
     state.finance.brokerage = 0;
