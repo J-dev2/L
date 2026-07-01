@@ -4,6 +4,21 @@ Started from the v18.34 mechanical split, generated from `../Ledger_18_dynamic_s
 
 AI agents: read `AI_DEV_README.md` first, then `dev-notes/ai-handoff/START_HERE.md`.
 
+For Edge/Chrome, run Ledger through the local server so `index.html` and
+`play.html` share the same browser storage origin:
+
+```powershell
+node build\serve-ledger.js
+```
+
+Then open:
+
+`http://127.0.0.1:4180/`
+
+Opening the raw `file:///.../index.html` files can make Edge treat each page as
+a unique security origin, which breaks save-slot handoff between the landing page
+and the play runtime.
+
 Open `index.html` to enter the Life Stack landing page. It reads save slots without loading the playable runtime.
 
 Open `play.html` only through the landing page. The play entry requires an explicit `?slot=`, `?new=`, or `?sandbox=` boot command, which prevents the old active-slot auto-load bug from dropping you into a random character.

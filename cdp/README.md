@@ -31,6 +31,8 @@ only pulls scripts referenced in `play.html` / `index.html`).
 
 | File | Area | Checks |
 |------|------|--------|
+| `startup-crash.js` | Startup/render diagnostics for sandbox, new-life, existing-slot, and old-save paths | variable |
+| `seed-bloated-save.js` | Seeds slot 5 with oversized history arrays before running `startup-crash.js` | helper |
 | `separation.js` | Entrepreneurship vs Business route + data separation | 20 |
 | `features.js`   | Business models make revenue, wizard, graphs across tabs | 17 |
 | `ipo.js`        | IPO / public company / grants / scale graph | 17 |

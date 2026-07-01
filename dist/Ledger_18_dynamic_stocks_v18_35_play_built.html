@@ -5962,9 +5962,11 @@ body {
 </head>
 <body>
 <main class="app" id="app"></main>
-<script data-source="pages/systems/play-boot.js">
+<script data-source="pages/systems/play-boot.js?v=20260701-edgefirst1">
 /* Play boot command reader. Loaded before the legacy runtime. */
 (function () {
+  var SAVE_SLOT_PREFIX = "ledger-life-slot-";
+
   function slotFrom(raw) {
     var n = Math.round(Number(raw) || 0);
     if (!Number.isFinite(n)) n = 0;
@@ -5988,6 +5990,36 @@ body {
   if (params.has("new")) action = "new";
   if (params.has("sandbox")) action = "sandbox";
 
+  function installEarlySlotGuard() {
+    if (action !== "slot") return;
+    if (window.__ledgerEarlyStorageGuardV1835) return;
+    try {
+      var proto = Object.getPrototypeOf(localStorage);
+      var originalGetItem = proto && proto.getItem;
+      if (typeof originalGetItem !== "function") return;
+      proto.getItem = function (key) {
+        if (this === localStorage && String(key || "").indexOf(SAVE_SLOT_PREFIX) === 0) return null;
+        return originalGetItem.apply(this, arguments);
+      };
+      window.__ledgerEarlyStorageGuardV1835 = {
+        active: true,
+        installedAt: Date.now(),
+        reason: "Shield legacy first render from parsing save slots before recovery loads.",
+        restore: function () {
+          try { proto.getItem = originalGetItem; } catch (e) {}
+          this.active = false;
+          this.restoredAt = Date.now();
+        }
+      };
+    } catch (e) {
+      window.__ledgerEarlyStorageGuardV1835 = {
+        active: false,
+        failedAt: Date.now(),
+        message: e && e.message || String(e)
+      };
+    }
+  }
+
   window.__ledgerPlayBoot = {
     action: action,
     slot: params.has("slot") ? slotFrom(params.get("slot")) : null,
@@ -5995,11 +6027,12 @@ body {
     fromLanding: params.get("from") === "landing",
     missingCommand: !action
   };
+  installEarlySlotGuard();
   applyStylePrefs();
 })();
 
 </script>
-<script data-source="pages/runtime/00-core-app-runtime.js?v=20260629-livecandle1">
+<script data-source="pages/runtime/00-core-app-runtime.js?v=20260701-displaydiag1">
 const $ = (sel) => document.querySelector(sel);
 const SAVE_KEY_PREFIX = "ledger-life-slot-";
 const ACTIVE_SLOT_KEY = "ledger-active-slot";
@@ -17151,7 +17184,7 @@ getSuggestedActions = function(s) {
       var idx = hubs.findIndex(function (h) { return h && h.id === "money"; });
       hubs.splice(idx >= 0 ? idx + 1 : hubs.length, 0, { id:"brokerage", icon:"📈", label:"Stocks", disabled: state && state.age < 13 });
     }
-    hubs.forEach(function (h) { if (h && h.id === "brokerage") h.label = "Investments"; });
+    hubs.forEach(function (h) { if (h && h.id === "brokerage") { h.label = "Investments"; h.disabled = false; } });
     return '<div class="v11-hub-tab-strip" aria-label="Hub tab wheel"><div class="v11-hub-tab-scroll">' + hubs.map(function (h) {
       var disabled = h.disabled ? "disabled" : "";
       return '<button class="v11-tab-btn' + (h.id === activeId ? ' active' : '') + '" ' + disabled + ' onclick="event.preventDefault();event.stopPropagation();setTabV16(\'' + esc(h.id) + '\')"><span class="v11-tab-ico">' + esc(h.icon || "•") + '</span><span class="v11-tab-lbl">' + esc(h.label || titleForHub16(h.id)) + '</span></button>';
@@ -18021,7 +18054,22 @@ getSuggestedActions = function(s) {
       });
     } catch (e) {}
   }
+  function isBrokerageHubOpen18() {
+    try {
+      var overlay = document.querySelector(".hub-overlay.hub-brokerage,[data-hub-id='brokerage']");
+      return !!(overlay && document.body && document.body.contains(overlay));
+    } catch (e) {
+      return false;
+    }
+  }
   function liveMarketTick18() {
+    if (!isBrokerageHubOpen18()) {
+      if (window.__ledgerLiveMarketTimer18) {
+        clearInterval(window.__ledgerLiveMarketTimer18);
+        window.__ledgerLiveMarketTimer18 = null;
+      }
+      return;
+    }
     if (!ensure18()) return;
     var m = state.finance.stocksV18;
     if (!m.liveV18 || !m.liveV18.enabled) return;
@@ -18051,6 +18099,7 @@ getSuggestedActions = function(s) {
     updateLiveMarketDom18();
   }
   function ensureLiveMarketTimer18() {
+    if (!isBrokerageHubOpen18()) return;
     if (!ensure18()) return;
     var m = state.finance.stocksV18;
     if (!m.liveV18 || !m.liveV18.enabled) return;
@@ -19093,7 +19142,7 @@ getSuggestedActions = function(s) {
     var occupied = 0;
     for (var i = 1; i <= NUM_SLOTS; i++) if (readSlotState186(i)) occupied++;
     if (typeof $ !== "function") return previousRenderIntro186 ? previousRenderIntro186.apply(this, arguments) : "";
-    $("#app").innerHTML = '<section class="intro v186-intro"><div class="brand">The<span> &</span> Ledger</div><div class="tagline mono">A Life, Recorded</div><section class="v186-community"><div class="section-label">Community Stack</div><div class="v186-community-grid"><div><b>' + occupied + '/' + NUM_SLOTS + '</b><span>Lives saved</span></div><div><b>' + (localStorage.getItem(ACTIVE_SLOT_KEY) || activeSlot || 1) + '</b><span>Active slot</span></div><div><b>5</b><span>Quick hubs</span></div></div></section>' + slots + '<div class="new-life-block"><div class="section-label">Start in Slot ' + activeSlot + '</div><div class="field"><label>Name</label><input id="name" placeholder="Leave blank for random"></div><div class="grid2"><div class="field"><label>Gender</label><select id="gender"><option value="">Random</option><option value="male">Male</option><option value="female">Female</option></select></div><div class="field"><label>Background</label><select id="background"><option value="">Random</option>' + backgrounds.map(function (b) { return '<option value="' + esc186(b.id) + '">' + esc186(b.name) + '</option>'; }).join("") + '</select></div></div><div class="field"><label>City</label><input id="city" placeholder="Random city"></div><button class="primary" onclick="startGame()">Begin a Life</button><button class="secondary" onclick="startGame(true)">Fully Random</button><button class="secondary" onclick="goSandbox()" style="border-color:var(--accent);color:var(--accent-2)">Sandbox Mode</button></div></section>';
+    $("#app").innerHTML = '<section class="intro v186-intro"><div class="brand">The<span> &</span> Ledger</div><div class="tagline mono">A Life, Recorded</div><section class="v186-community"><div class="section-label">Community Stack</div><div class="v186-community-grid"><div><b>' + occupied + '/' + NUM_SLOTS + '</b><span>Lives saved</span></div><div><b>' + (localStorage.getItem(ACTIVE_SLOT_KEY) || activeSlot || 1) + '</b><span>Active slot</span></div><div><b>5</b><span>Quick hubs</span></div></div></section>' + slots + '<div class="new-life-block"><div class="section-label">Start in Slot ' + activeSlot + '</div><div class="field"><label for="name">Name</label><input id="name" name="name" placeholder="Leave blank for random"></div><div class="grid2"><div class="field"><label for="gender">Gender</label><select id="gender" name="gender" aria-label="Gender"><option value="">Random</option><option value="male">Male</option><option value="female">Female</option></select></div><div class="field"><label for="background">Background</label><select id="background" name="background" aria-label="Background"><option value="">Random</option>' + backgrounds.map(function (b) { return '<option value="' + esc186(b.id) + '">' + esc186(b.name) + '</option>'; }).join("") + '</select></div></div><div class="field"><label for="city">City</label><input id="city" name="city" placeholder="Random city"></div><button class="primary" onclick="startGame()">Begin a Life</button><button class="secondary" onclick="startGame(true)">Fully Random</button><button class="secondary" onclick="goSandbox()" style="border-color:var(--accent);color:var(--accent-2)">Sandbox Mode</button></div></section>';
   };
   window.renderIntro = renderIntro;
 
@@ -29105,7 +29154,7 @@ getSuggestedActions = function(s) {
       var result;
       try { result = old.apply(this, arguments); }
       finally {
-        try { if (rootState()) { migrateState(); if (after) after(beforeDebt); } applyCompactClass(); setTimeout(dedupeDom, 0); } catch (e) { try { console.warn("v18.32 after hook failed", e); } catch(ignore) {} }
+        try { if (rootState()) { migrateState(); if (after) after(beforeDebt); } applyCompactClass(); setTimeout(dedupeDom, 0); } catch (e) {}
       }
       return result;
     };
@@ -29113,16 +29162,11 @@ getSuggestedActions = function(s) {
     window[name] = fn;
     try { eval(name + " = window[name]"); } catch (e) {}
   }
-  wrap("render", function () { computeTaxModel(); });
-  wrap("save", function () { computeTaxModel(); });
-  wrap("loadFromSlot", function () { computeTaxModel(); auditAndReclassifyTax(true); });
-  wrap("ageUp", function (beforeDebt) {
-    var s = migrateState();
-    var afterDebt = n(s.finance && s.finance.taxDebt);
-    if (afterDebt > beforeDebt) auditAndReclassifyTax(true);
-    computeTaxModel(s);
-  });
-  wrap("resolveLifeAndFinanceYear", function () { auditAndReclassifyTax(true); computeTaxModel(); });
+  // Do not run the old cleanup/tax migration after app lifecycle functions.
+  // This v18.32 hook was useful during patch absorption, but it mutates broad
+  // save shape and can enter a noisy render-catch loop on modern modular screens.
+  window.__ledgerPatch1832RenderSaveHooksRetired = true;
+  window.__ledgerPatch1832LifecycleHooksRetired = true;
 
   function injectStyles() {
     if (document.getElementById("ledger-v1832-style")) return;
@@ -29138,13 +29182,25 @@ getSuggestedActions = function(s) {
     ].join("\n");
     document.head.appendChild(style);
   }
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { injectStyles(); migrateState(); applyCompactClass(); dedupeDom(); });
-  else { injectStyles(); migrateState(); applyCompactClass(); setTimeout(dedupeDom, 0); }
+  function safeStartupCleanup() {
+    try { injectStyles(); } catch (e) {}
+    try { migrateState(); } catch (e) {}
+    try { applyCompactClass(); } catch (e) {}
+    try { setTimeout(function () { try { dedupeDom(); } catch (e) {} }, 0); } catch (e) {}
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", safeStartupCleanup);
+  else safeStartupCleanup();
 
   try { window.addEventListener("error", function (event) {
     var msg = String((event && event.error && event.error.message) || (event && event.message) || "");
     if (/undefined|null|length|map|forEach|Cannot read/i.test(msg)) {
-      try { migrateState(); dedupeDom(); toast("v18.32 repaired missing state shape after an error. Try the action again."); } catch (e) {}
+      try {
+        var now = Date.now();
+        if (now - (window.__ledgerPatch1832LastErrorRepair || 0) < 5000) return;
+        window.__ledgerPatch1832LastErrorRepair = now;
+        dedupeDom();
+        toast("A display error was caught. UI cleanup ran; try the action again.");
+      } catch (e) {}
     }
   }); } catch (e) {}
 
@@ -37443,7 +37499,7 @@ getSuggestedActions = function(s) {
 })();
 
 </script>
-<script data-source="pages/systems/stocks-engine.js?v=20260630-investments21e">
+<script data-source="pages/systems/stocks-engine.js?v=20260701-stockguard1">
 /* Investments 2.0 stock engine and trading desk.
  * This adapts the Verdant stock-engine idea into Ledger's existing state:
  * state.finance.stocksV18 remains the save home, and the legacy v18 action
@@ -38338,32 +38394,59 @@ getSuggestedActions = function(s) {
     if (reason && Math.abs(move) > .06) addMarketNews(stock, reason, move, "move");
     return { old:old, next:next, move:move };
   }
-  function tickLiveStockMarket() {
-    if (!isInvestmentsOpen()) {
-      if (window.__ledgerStockEngineV20Timer) {
-        try { clearInterval(window.__ledgerStockEngineV20Timer); } catch (e) {}
-        window.__ledgerStockEngineV20Timer = null;
+  function recordStockEngineError(stage, err) {
+    try {
+      window.__ledgerLastStockEngineErrorV20 = {
+        stage: String(stage || "stock-engine"),
+        message: err && err.message ? String(err.message).slice(0, 220) : String(err || "unknown stock engine issue").slice(0, 220),
+        stack: err && err.stack ? String(err.stack).slice(0, 3000) : "",
+        at: new Date().toISOString()
+      };
+    } catch (e) {}
+    try {
+      if (window.__ledgerStockEngineV20Timer) clearInterval(window.__ledgerStockEngineV20Timer);
+      window.__ledgerStockEngineV20Timer = null;
+    } catch (e2) {}
+    try {
+      var m = rawStocksState();
+      if (m && m.liveV18) {
+        m.liveV18.enabled = false;
+        m.liveV18.userPausedV18 = true;
       }
+    } catch (e3) {}
+  }
+  function tickLiveStockMarket() {
+    try {
+      if (!isInvestmentsOpen()) {
+        if (window.__ledgerStockEngineV20Timer) {
+          try { clearInterval(window.__ledgerStockEngineV20Timer); } catch (e) {}
+          window.__ledgerStockEngineV20Timer = null;
+        }
+        return false;
+      }
+      var m = store();
+      if (!m || !m.liveV18 || !m.liveV18.enabled) return false;
+      var before = stockValue();
+      STOCKS.forEach(function (stock) {
+        updatePrice(stock, liveMove(stock, getPrice(stock.id)), "live tape");
+        var meta = getLivePositionMeta(stock.id, false);
+        if (meta) meta.highPrice = Math.max(n(meta.highPrice, getPrice(stock.id)), getPrice(stock.id));
+      });
+      checkStopLosses();
+      m.liveV18.ticks = Math.max(0, n(m.liveV18.ticks)) + 1;
+      if (m.liveV18.ticks % 7 === 0) maybeGenerateTapeEvent();
+      if (m.liveV18.ticks % 19 === 0) generateAnalystRating(null, true);
+      m.lastMarketGain = Math.round(stockValue() - before);
+      syncFinanceStockTotals(m, (stateNow() || {}).finance);
+      snapshotPortfolio("live");
+      updateLiveDom();
+      if (m.liveV18.ticks % 10 === 0) save();
+      return true;
+    } catch (err) {
+      recordStockEngineError("live-tick", err);
+      try { updateLiveDom(); } catch (e4) {}
       return false;
     }
-    var m = store();
-    if (!m || !m.liveV18 || !m.liveV18.enabled) return false;
-    var before = stockValue();
-    STOCKS.forEach(function (stock) {
-      updatePrice(stock, liveMove(stock, getPrice(stock.id)), "live tape");
-      var meta = getLivePositionMeta(stock.id, false);
-      if (meta) meta.highPrice = Math.max(n(meta.highPrice, getPrice(stock.id)), getPrice(stock.id));
-    });
-    checkStopLosses();
-    m.liveV18.ticks = Math.max(0, n(m.liveV18.ticks)) + 1;
-    if (m.liveV18.ticks % 7 === 0) maybeGenerateTapeEvent();
-    if (m.liveV18.ticks % 19 === 0) generateAnalystRating(null, true);
-    m.lastMarketGain = Math.round(stockValue() - before);
-    syncFinanceStockTotals(m, (stateNow() || {}).finance);
-    snapshotPortfolio("live");
-    updateLiveDom();
-    if (m.liveV18.ticks % 10 === 0) save();
-    return true;
   }
   function processStockMarketYear(options) {
     options = options || {};
@@ -39621,11 +39704,16 @@ getSuggestedActions = function(s) {
     }
   }
   function scheduleLiveTimer() {
-    setTimeout(function () {
+    var start = function () {
       try {
         if (isInvestmentsOpen()) ensureLiveTimer();
-      } catch (e) {}
-    }, 0);
+      } catch (e) {
+        recordStockEngineError("schedule-live", e);
+      }
+    };
+    try { if (typeof requestAnimationFrame === "function") requestAnimationFrame(start); } catch (e2) {}
+    setTimeout(start, 40);
+    setTimeout(start, 240);
   }
   function renderInvestmentsFallback(error) {
     try { stopLiveMarket(); } catch (ignore) {}
@@ -39663,8 +39751,8 @@ getSuggestedActions = function(s) {
     return cycleLabel() + " - live tape is paused. Annual positions only update on age-up or market-year simulation.";
   }
   function updateLiveDom() {
-    var m = store();
     try {
+      var m = store();
       var visibleIds = {};
       document.querySelectorAll("[data-stock18-id],[data-v20-ticker-id],[data-stock18-holding-chart]").forEach(function (el) {
         var id = el.getAttribute("data-stock18-id") || el.getAttribute("data-v20-ticker-id") || el.getAttribute("data-stock18-holding-chart");
@@ -39745,17 +39833,26 @@ getSuggestedActions = function(s) {
       document.querySelectorAll("[data-ledger-money='stock-value']").forEach(function (el) { el.textContent = money(summary.stockValue); });
       var topCash = document.querySelector(".topbar .cash");
       if (topCash) topCash.textContent = money(summary.checking);
-    } catch (e) {}
+    } catch (e) {
+      recordStockEngineError("live-dom", e);
+    }
   }
   function ensureLiveTimer() {
-    if (!isInvestmentsOpen()) return;
-    var m = store();
-    if (!m || !m.liveV18 || !m.liveV18.enabled) return;
-    if (window.__ledgerLiveMarketTimer18) {
-      try { clearInterval(window.__ledgerLiveMarketTimer18); } catch (e) {}
-      window.__ledgerLiveMarketTimer18 = null;
+    try {
+      if (!isInvestmentsOpen()) return;
+      var m = store();
+      if (!m || !m.liveV18 || !m.liveV18.enabled) return;
+      if (window.__ledgerLiveMarketTimer18) {
+        try { clearInterval(window.__ledgerLiveMarketTimer18); } catch (e) {}
+        window.__ledgerLiveMarketTimer18 = null;
+      }
+      if (!window.__ledgerStockEngineV20Timer) {
+        window.__ledgerStockEngineV20Timer = setInterval(tickLiveStockMarket, TICK_MS);
+        tickLiveStockMarket();
+      }
+    } catch (err) {
+      recordStockEngineError("ensure-live", err);
     }
-    if (!window.__ledgerStockEngineV20Timer) window.__ledgerStockEngineV20Timer = setInterval(tickLiveStockMarket, TICK_MS);
   }
   function stopLiveMarket() {
     if (window.__ledgerStockEngineV20Timer) {
@@ -39788,8 +39885,8 @@ getSuggestedActions = function(s) {
     refreshHub();
   }
   function refreshHub() {
-    updateLiveDom();
     try {
+      updateLiveDom();
       var body = document.querySelector(".v16-hub-body") || document.querySelector(".v11-hub-body,.v10-hub-body,.v9-hub-body");
       var overlay = document.querySelector(".hub-overlay");
       var hub = overlay && overlay.dataset ? overlay.dataset.hubId : "";
@@ -39798,7 +39895,9 @@ getSuggestedActions = function(s) {
         try { if (window.decorateMoneyInputsV1838) window.decorateMoneyInputsV1838(); } catch (e) {}
         try { if (window.applyLedgerEmojiFallbackV1875) window.applyLedgerEmojiFallbackV1875(); } catch (e2) {}
       }
-    } catch (e3) {}
+    } catch (e3) {
+      recordStockEngineError("refresh-hub", e3);
+    }
   }
   function wrapAgeUp() {
     if (window.__ledgerStocksEngineV20AgeWrapped) return;
@@ -50199,7 +50298,7 @@ getSuggestedActions = function(s) {
 })();
 
 </script>
-<script data-source="pages/systems/save-recovery.js?v=20260628-recovery2">
+<script data-source="pages/systems/save-recovery.js?v=20260701-edgefirst1">
 /* Save / recovery system bridge plus play-page boot guard. */
 (function () {
   var SYSTEM_META = {
@@ -50209,8 +50308,24 @@ getSuggestedActions = function(s) {
     globals: ["save", "loadFromSlot", "pickSlot", "recoverLedgerSlotV18334", "enterFromSplash"],
     nextMove: "Move the remaining slot loading code fully out of the legacy runtime."
   };
+  var MAX_STARTUP_SAVE_CHARS = 4500000;
 
   if (window.registerLedgerSystem) window.registerLedgerSystem(SYSTEM_META);
+
+  function restoreEarlyStorageGuard() {
+    var guard = window.__ledgerEarlyStorageGuardV1835;
+    if (!guard || !guard.active || typeof guard.restore !== "function") return false;
+    try {
+      guard.restore();
+      return true;
+    } catch (e) {
+      guard.restoreFailedAt = Date.now();
+      guard.restoreError = e && e.message || String(e);
+      return false;
+    }
+  }
+
+  restoreEarlyStorageGuard();
 
   function esc(value) {
     return String(value == null ? "" : value).replace(/[&<>"']/g, function (ch) {
@@ -50264,6 +50379,113 @@ getSuggestedActions = function(s) {
     try { return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
   }
 
+  function startupLoadIssue(reason, idx, raw) {
+    var issue = {
+      at: Date.now(),
+      reason: reason || "unknown",
+      slot: idx || null,
+      rawChars: raw && typeof raw === "string" ? raw.length : 0
+    };
+    window.__ledgerStartupLoadIssueV1835 = issue;
+    try { localStorage.setItem("ledger_v1835_last_startup_load_issue", JSON.stringify(issue)); } catch (e) {}
+    return issue;
+  }
+
+  function rawIsOversized(raw) {
+    return !!(raw && typeof raw === "string" && raw.length > MAX_STARTUP_SAVE_CHARS);
+  }
+
+  function readSlotJson(key, idx, label) {
+    var raw = null;
+    try { raw = localStorage.getItem(key); } catch (e) {
+      startupLoadIssue((label || "slot") + " localStorage read failed", idx, null);
+      return { raw: null, data: null, oversized: false, failed: true };
+    }
+    if (rawIsOversized(raw)) {
+      startupLoadIssue((label || "slot") + " too large to parse safely", idx, raw);
+      return { raw: raw, data: null, oversized: true, failed: true };
+    }
+    return { raw: raw, data: parse(raw), oversized: false, failed: false };
+  }
+
+  function capArray(obj, key, max, keepNewestAtStart) {
+    if (!obj || !Array.isArray(obj[key])) return false;
+    if (obj[key].length <= max) return false;
+    obj[key] = keepNewestAtStart ? obj[key].slice(0, max) : obj[key].slice(-max);
+    return true;
+  }
+
+  function capObjectArrays(obj, max) {
+    var changed = false;
+    if (!obj || typeof obj !== "object") return false;
+    Object.keys(obj).forEach(function (key) {
+      if (Array.isArray(obj[key]) && obj[key].length > max) {
+        obj[key] = obj[key].slice(-max);
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
+  function compactLoadedLife(s, reason) {
+    if (!validLife(s)) return s;
+    var changed = false;
+    changed = capArray(s, "log", 300, true) || changed;
+    changed = capArray(s, "timeSnapshotsV1814", 18, false) || changed;
+    if (s.life && typeof s.life === "object") {
+      changed = capArray(s.life, "memories", 20, true) || changed;
+    }
+    if (s.finance && typeof s.finance === "object") {
+      changed = capArray(s.finance, "cashFlowHistoryV1824", 60, false) || changed;
+      changed = capArray(s.finance, "taxTrueUpsV1824", 30, true) || changed;
+      changed = capArray(s.finance, "fundInvestorLedgerV1825", 40, true) || changed;
+      changed = capArray(s.finance, "legalCasesV1826", 30, true) || changed;
+      changed = capArray(s.finance, "healthClaimsV1826", 30, true) || changed;
+      changed = capArray(s.finance, "relocationHistoryV1826", 30, true) || changed;
+      if (s.finance.businessTaxV1830) changed = capArray(s.finance.businessTaxV1830, "history", 24, true) || changed;
+      if (s.finance.taxCleanupV1832) changed = capArray(s.finance.taxCleanupV1832, "history", 24, true) || changed;
+      if (s.finance.familyTrustV1839) changed = capArray(s.finance.familyTrustV1839, "history", 30, true) || changed;
+      if (s.finance.familyEnterpriseV1846) changed = capArray(s.finance.familyEnterpriseV1846, "history", 20, true) || changed;
+      if (Array.isArray(s.finance.businesses)) {
+        s.finance.businesses.forEach(function (business) {
+          changed = capArray(business, "historyV1830", 24, true) || changed;
+          changed = capArray(business, "historyV1862", 40, false) || changed;
+          changed = capArray(business, "eventHistoryV1850", 20, true) || changed;
+        });
+      }
+      if (s.finance.bizV1860 && Array.isArray(s.finance.bizV1860.businesses)) {
+        s.finance.bizV1860.businesses.forEach(function (business) {
+          changed = capArray(business, "history", 40, false) || changed;
+          changed = capArray(business, "logs", 40, true) || changed;
+          changed = capArray(business, "events", 30, true) || changed;
+        });
+      }
+      if (s.finance.stocksV18 && typeof s.finance.stocksV18 === "object") {
+        var stocks = s.finance.stocksV18;
+        changed = capArray(stocks, "news", 80, true) || changed;
+        changed = capArray(stocks, "watchlist", 80, true) || changed;
+        changed = capObjectArrays(stocks.history, 120) || changed;
+        changed = capObjectArrays(stocks.candles, 120) || changed;
+      }
+    }
+    if (s.careerV1827) {
+      changed = capArray(s.careerV1827, "applications", 24, true) || changed;
+      changed = capArray(s.careerV1827, "offers", 24, true) || changed;
+      changed = capArray(s.careerV1827, "history", 40, true) || changed;
+    }
+    if (s.careerV1828) changed = capArray(s.careerV1828, "interviewHistory", 30, true) || changed;
+    if (s.careerV1832) changed = capArray(s.careerV1832, "history", 40, true) || changed;
+    if (changed) {
+      window.__ledgerStartupCompactionV1835 = {
+        at: Date.now(),
+        reason: reason || "load",
+        message: "Trimmed oversized history arrays before first render."
+      };
+      try { localStorage.setItem("ledger_v1835_last_startup_compaction", JSON.stringify(window.__ledgerStartupCompactionV1835)); } catch (e) {}
+    }
+    return s;
+  }
+
   function normalizeLife(s) {
     if (!validLife(s)) return s;
     s.stats = s.stats && typeof s.stats === "object" && !Array.isArray(s.stats) ? s.stats : {};
@@ -50276,7 +50498,7 @@ getSuggestedActions = function(s) {
     s.timeSnapshotsV1814 = Array.isArray(s.timeSnapshotsV1814) ? s.timeSnapshotsV1814 : [];
     if (!Number.isFinite(Number(s.money))) s.money = 0;
     if (!Number.isFinite(Number(s.savings))) s.savings = 0;
-    return s;
+    return compactLoadedLife(s, "normalize");
   }
 
   function activeSlotIndex() {
@@ -50301,8 +50523,8 @@ getSuggestedActions = function(s) {
   }
 
   function readRecoverySave(label, key, slot, priority) {
-    var data = null;
-    try { data = parse(localStorage.getItem(key)); } catch (e) {}
+    var read = readSlotJson(key, slot || null, label);
+    var data = read.data;
     if (data && data.state && typeof data.state === "object") data = data.state;
     if (!validLife(data)) return null;
     return { label: label, key: key, slot: slot || null, priority: priority || 0, state: normalizeLife(data) };
@@ -50350,10 +50572,11 @@ getSuggestedActions = function(s) {
   }
 
   function currentSlotIsPartial() {
-    var raw = null;
     var parsed = null;
-    try { raw = localStorage.getItem(slotKeyFor(activeSlotIndex())); } catch (e) {}
-    parsed = parse(raw);
+    var active = activeSlotIndex();
+    var read = readSlotJson(slotKeyFor(active), active, "active slot");
+    if (read.oversized) return false;
+    parsed = read.data;
     if (parsed && parsed.state) parsed = parsed.state;
     return partialLife(parsed);
   }
@@ -50462,9 +50685,25 @@ getSuggestedActions = function(s) {
     idx = clampSlot(idx);
     try { activeSlot = idx; } catch (e) {}
     try { localStorage.setItem("ledger-active-slot", String(idx)); } catch (e2) {}
+    var primary = readSlotJson(slotKeyFor(idx), idx, "slot " + idx);
+    if (primary.oversized) return false;
+    var direct = primary.data;
+    if (direct && direct.state && typeof direct.state === "object") direct = direct.state;
+    if (validLife(direct)) {
+      var normalized = normalizeLife(direct);
+      setState(normalized);
+      try { if (typeof ensureStateShape === "function") ensureStateShape(); } catch (ensureError) {}
+      try { localStorage.setItem(slotKeyFor(idx), JSON.stringify(getState() || normalized)); } catch (persistDirectError) {}
+      return true;
+    }
     if (typeof loadFromSlot === "function") {
       try {
-        if (loadFromSlot(idx) && validLife(getState())) return true;
+        if (loadFromSlot(idx) && validLife(getState())) {
+          var live = normalizeLife(getState());
+          setState(live);
+          try { localStorage.setItem(slotKeyFor(idx), JSON.stringify(live)); } catch (persistError) {}
+          return true;
+        }
       } catch (e3) {}
     }
     var saved = null;
@@ -52186,7 +52425,7 @@ getSuggestedActions = function(s) {
 })();
 
 </script>
-<script data-source="pages/systems/more-command.js">
+<script data-source="pages/systems/more-command.js?v=20260701-displaydiag1">
 (function () {
   var VERSION = "v18.49";
   var previousRenderHubContent = window.renderHubContent || (typeof renderHubContent === "function" ? renderHubContent : null);
@@ -52929,8 +53168,29 @@ getSuggestedActions = function(s) {
   // panel (e.g. right after a fund distribution) threw all the way up and froze
   // the whole screen. Now the failing hub shows a recoverable notice instead,
   // and the error is logged so the root cause can be pinpointed.
+  function rememberDisplayErrorV1853(kind, err, extra) {
+    try {
+      var message = err && err.message ? String(err.message).slice(0, 220) : String(err || "unknown display issue").slice(0, 220);
+      window.__ledgerLastRenderErrorV1853 = {
+        kind: kind || "render",
+        hubId: extra && extra.hubId ? String(extra.hubId) : "",
+        message: message,
+        stack: err && err.stack ? String(err.stack).slice(0, 3000) : "",
+        at: new Date().toISOString()
+      };
+    } catch (e) {}
+  }
+
   function hubErrorCardV1853(hubId, err) {
-    try { if (window.console && console.error) console.error("[renderHubContent] hub '" + hubId + "' failed:", err); } catch (e) {}
+    rememberDisplayErrorV1853("hub", err, { hubId: hubId });
+    try {
+      var now = Date.now();
+      window.__ledgerHubCrashGuardV1853LastLog = window.__ledgerHubCrashGuardV1853LastLog || 0;
+      if (now - window.__ledgerHubCrashGuardV1853LastLog > 1500) {
+        window.__ledgerHubCrashGuardV1853LastLog = now;
+        if (window.console && console.warn) console.warn("[display] hub recovered; details stored in __ledgerLastRenderErrorV1853");
+      }
+    } catch (e) {}
     return '<div style="margin:14px;padding:16px 18px;border:1px solid rgba(255,159,140,.4);border-radius:12px;' +
       'background:rgba(40,20,16,.6);color:#f6ead8;font-family:\'JetBrains Mono\',monospace;font-size:12px;line-height:1.6">' +
       '<div style="font-size:14px;color:#ffb09f;margin-bottom:6px">⚠️ This screen hit a snag</div>' +
@@ -52966,9 +53226,14 @@ getSuggestedActions = function(s) {
             return prev.apply(this, arguments);
           } catch (err) {
             try {
-              if (window.console && console.error) console.error("[render] crashed and was caught — UI kept alive:", err);
-              var msg = (err && err.message) ? String(err.message).slice(0, 80) : "unknown";
-              if (typeof window.addToast === "function") window.addToast("Render error (kept alive): " + msg);
+              var message = (err && err.message) ? String(err.message).slice(0, 180) : "unknown display refresh issue";
+              rememberDisplayErrorV1853("render", err, {});
+              window.__ledgerRenderCrashGuardV1853LastLog = window.__ledgerRenderCrashGuardV1853LastLog || 0;
+              var now = Date.now();
+              if (now - window.__ledgerRenderCrashGuardV1853LastLog <= 1500) return;
+              window.__ledgerRenderCrashGuardV1853LastLog = now;
+              if (window.console && console.warn) console.warn("[display] refresh recovered; details stored in __ledgerLastRenderErrorV1853");
+              if (typeof window.addToast === "function") window.addToast("Display refreshed safely: " + message.slice(0, 80));
             } catch (e2) {}
           }
         };
@@ -52977,6 +53242,21 @@ getSuggestedActions = function(s) {
         try { render = guarded; } catch (e3) {}
       }
     } catch (e) {}
+  })();
+
+  (function installGlobalDisplayDiagnosticsV1853() {
+    try {
+      if (window.__ledgerGlobalDisplayDiagnosticsV1853) return;
+      window.__ledgerGlobalDisplayDiagnosticsV1853 = true;
+      function record(kind, err) {
+        try {
+          rememberDisplayErrorV1853(kind, err && err.reason ? err.reason : err, {});
+          window.__ledgerLastGlobalErrorV1853 = window.__ledgerLastRenderErrorV1853;
+        } catch (e) {}
+      }
+      window.addEventListener("error", function (event) { record("global-error", event && (event.error || event.message)); });
+      window.addEventListener("unhandledrejection", function (event) { record("unhandled-rejection", event); });
+    } catch (e2) {}
   })();
 
   function installStyle() {

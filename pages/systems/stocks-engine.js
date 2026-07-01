@@ -892,32 +892,59 @@
     if (reason && Math.abs(move) > .06) addMarketNews(stock, reason, move, "move");
     return { old:old, next:next, move:move };
   }
-  function tickLiveStockMarket() {
-    if (!isInvestmentsOpen()) {
-      if (window.__ledgerStockEngineV20Timer) {
-        try { clearInterval(window.__ledgerStockEngineV20Timer); } catch (e) {}
-        window.__ledgerStockEngineV20Timer = null;
+  function recordStockEngineError(stage, err) {
+    try {
+      window.__ledgerLastStockEngineErrorV20 = {
+        stage: String(stage || "stock-engine"),
+        message: err && err.message ? String(err.message).slice(0, 220) : String(err || "unknown stock engine issue").slice(0, 220),
+        stack: err && err.stack ? String(err.stack).slice(0, 3000) : "",
+        at: new Date().toISOString()
+      };
+    } catch (e) {}
+    try {
+      if (window.__ledgerStockEngineV20Timer) clearInterval(window.__ledgerStockEngineV20Timer);
+      window.__ledgerStockEngineV20Timer = null;
+    } catch (e2) {}
+    try {
+      var m = rawStocksState();
+      if (m && m.liveV18) {
+        m.liveV18.enabled = false;
+        m.liveV18.userPausedV18 = true;
       }
+    } catch (e3) {}
+  }
+  function tickLiveStockMarket() {
+    try {
+      if (!isInvestmentsOpen()) {
+        if (window.__ledgerStockEngineV20Timer) {
+          try { clearInterval(window.__ledgerStockEngineV20Timer); } catch (e) {}
+          window.__ledgerStockEngineV20Timer = null;
+        }
+        return false;
+      }
+      var m = store();
+      if (!m || !m.liveV18 || !m.liveV18.enabled) return false;
+      var before = stockValue();
+      STOCKS.forEach(function (stock) {
+        updatePrice(stock, liveMove(stock, getPrice(stock.id)), "live tape");
+        var meta = getLivePositionMeta(stock.id, false);
+        if (meta) meta.highPrice = Math.max(n(meta.highPrice, getPrice(stock.id)), getPrice(stock.id));
+      });
+      checkStopLosses();
+      m.liveV18.ticks = Math.max(0, n(m.liveV18.ticks)) + 1;
+      if (m.liveV18.ticks % 7 === 0) maybeGenerateTapeEvent();
+      if (m.liveV18.ticks % 19 === 0) generateAnalystRating(null, true);
+      m.lastMarketGain = Math.round(stockValue() - before);
+      syncFinanceStockTotals(m, (stateNow() || {}).finance);
+      snapshotPortfolio("live");
+      updateLiveDom();
+      if (m.liveV18.ticks % 10 === 0) save();
+      return true;
+    } catch (err) {
+      recordStockEngineError("live-tick", err);
+      try { updateLiveDom(); } catch (e4) {}
       return false;
     }
-    var m = store();
-    if (!m || !m.liveV18 || !m.liveV18.enabled) return false;
-    var before = stockValue();
-    STOCKS.forEach(function (stock) {
-      updatePrice(stock, liveMove(stock, getPrice(stock.id)), "live tape");
-      var meta = getLivePositionMeta(stock.id, false);
-      if (meta) meta.highPrice = Math.max(n(meta.highPrice, getPrice(stock.id)), getPrice(stock.id));
-    });
-    checkStopLosses();
-    m.liveV18.ticks = Math.max(0, n(m.liveV18.ticks)) + 1;
-    if (m.liveV18.ticks % 7 === 0) maybeGenerateTapeEvent();
-    if (m.liveV18.ticks % 19 === 0) generateAnalystRating(null, true);
-    m.lastMarketGain = Math.round(stockValue() - before);
-    syncFinanceStockTotals(m, (stateNow() || {}).finance);
-    snapshotPortfolio("live");
-    updateLiveDom();
-    if (m.liveV18.ticks % 10 === 0) save();
-    return true;
   }
   function processStockMarketYear(options) {
     options = options || {};
@@ -2175,11 +2202,16 @@
     }
   }
   function scheduleLiveTimer() {
-    setTimeout(function () {
+    var start = function () {
       try {
         if (isInvestmentsOpen()) ensureLiveTimer();
-      } catch (e) {}
-    }, 0);
+      } catch (e) {
+        recordStockEngineError("schedule-live", e);
+      }
+    };
+    try { if (typeof requestAnimationFrame === "function") requestAnimationFrame(start); } catch (e2) {}
+    setTimeout(start, 40);
+    setTimeout(start, 240);
   }
   function renderInvestmentsFallback(error) {
     try { stopLiveMarket(); } catch (ignore) {}
@@ -2217,8 +2249,8 @@
     return cycleLabel() + " - live tape is paused. Annual positions only update on age-up or market-year simulation.";
   }
   function updateLiveDom() {
-    var m = store();
     try {
+      var m = store();
       var visibleIds = {};
       document.querySelectorAll("[data-stock18-id],[data-v20-ticker-id],[data-stock18-holding-chart]").forEach(function (el) {
         var id = el.getAttribute("data-stock18-id") || el.getAttribute("data-v20-ticker-id") || el.getAttribute("data-stock18-holding-chart");
@@ -2299,17 +2331,26 @@
       document.querySelectorAll("[data-ledger-money='stock-value']").forEach(function (el) { el.textContent = money(summary.stockValue); });
       var topCash = document.querySelector(".topbar .cash");
       if (topCash) topCash.textContent = money(summary.checking);
-    } catch (e) {}
+    } catch (e) {
+      recordStockEngineError("live-dom", e);
+    }
   }
   function ensureLiveTimer() {
-    if (!isInvestmentsOpen()) return;
-    var m = store();
-    if (!m || !m.liveV18 || !m.liveV18.enabled) return;
-    if (window.__ledgerLiveMarketTimer18) {
-      try { clearInterval(window.__ledgerLiveMarketTimer18); } catch (e) {}
-      window.__ledgerLiveMarketTimer18 = null;
+    try {
+      if (!isInvestmentsOpen()) return;
+      var m = store();
+      if (!m || !m.liveV18 || !m.liveV18.enabled) return;
+      if (window.__ledgerLiveMarketTimer18) {
+        try { clearInterval(window.__ledgerLiveMarketTimer18); } catch (e) {}
+        window.__ledgerLiveMarketTimer18 = null;
+      }
+      if (!window.__ledgerStockEngineV20Timer) {
+        window.__ledgerStockEngineV20Timer = setInterval(tickLiveStockMarket, TICK_MS);
+        tickLiveStockMarket();
+      }
+    } catch (err) {
+      recordStockEngineError("ensure-live", err);
     }
-    if (!window.__ledgerStockEngineV20Timer) window.__ledgerStockEngineV20Timer = setInterval(tickLiveStockMarket, TICK_MS);
   }
   function stopLiveMarket() {
     if (window.__ledgerStockEngineV20Timer) {
@@ -2342,8 +2383,8 @@
     refreshHub();
   }
   function refreshHub() {
-    updateLiveDom();
     try {
+      updateLiveDom();
       var body = document.querySelector(".v16-hub-body") || document.querySelector(".v11-hub-body,.v10-hub-body,.v9-hub-body");
       var overlay = document.querySelector(".hub-overlay");
       var hub = overlay && overlay.dataset ? overlay.dataset.hubId : "";
@@ -2352,7 +2393,9 @@
         try { if (window.decorateMoneyInputsV1838) window.decorateMoneyInputsV1838(); } catch (e) {}
         try { if (window.applyLedgerEmojiFallbackV1875) window.applyLedgerEmojiFallbackV1875(); } catch (e2) {}
       }
-    } catch (e3) {}
+    } catch (e3) {
+      recordStockEngineError("refresh-hub", e3);
+    }
   }
   function wrapAgeUp() {
     if (window.__ledgerStocksEngineV20AgeWrapped) return;

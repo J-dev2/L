@@ -7,8 +7,24 @@
     globals: ["save", "loadFromSlot", "pickSlot", "recoverLedgerSlotV18334", "enterFromSplash"],
     nextMove: "Move the remaining slot loading code fully out of the legacy runtime."
   };
+  var MAX_STARTUP_SAVE_CHARS = 4500000;
 
   if (window.registerLedgerSystem) window.registerLedgerSystem(SYSTEM_META);
+
+  function restoreEarlyStorageGuard() {
+    var guard = window.__ledgerEarlyStorageGuardV1835;
+    if (!guard || !guard.active || typeof guard.restore !== "function") return false;
+    try {
+      guard.restore();
+      return true;
+    } catch (e) {
+      guard.restoreFailedAt = Date.now();
+      guard.restoreError = e && e.message || String(e);
+      return false;
+    }
+  }
+
+  restoreEarlyStorageGuard();
 
   function esc(value) {
     return String(value == null ? "" : value).replace(/[&<>"']/g, function (ch) {
@@ -62,6 +78,113 @@
     try { return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
   }
 
+  function startupLoadIssue(reason, idx, raw) {
+    var issue = {
+      at: Date.now(),
+      reason: reason || "unknown",
+      slot: idx || null,
+      rawChars: raw && typeof raw === "string" ? raw.length : 0
+    };
+    window.__ledgerStartupLoadIssueV1835 = issue;
+    try { localStorage.setItem("ledger_v1835_last_startup_load_issue", JSON.stringify(issue)); } catch (e) {}
+    return issue;
+  }
+
+  function rawIsOversized(raw) {
+    return !!(raw && typeof raw === "string" && raw.length > MAX_STARTUP_SAVE_CHARS);
+  }
+
+  function readSlotJson(key, idx, label) {
+    var raw = null;
+    try { raw = localStorage.getItem(key); } catch (e) {
+      startupLoadIssue((label || "slot") + " localStorage read failed", idx, null);
+      return { raw: null, data: null, oversized: false, failed: true };
+    }
+    if (rawIsOversized(raw)) {
+      startupLoadIssue((label || "slot") + " too large to parse safely", idx, raw);
+      return { raw: raw, data: null, oversized: true, failed: true };
+    }
+    return { raw: raw, data: parse(raw), oversized: false, failed: false };
+  }
+
+  function capArray(obj, key, max, keepNewestAtStart) {
+    if (!obj || !Array.isArray(obj[key])) return false;
+    if (obj[key].length <= max) return false;
+    obj[key] = keepNewestAtStart ? obj[key].slice(0, max) : obj[key].slice(-max);
+    return true;
+  }
+
+  function capObjectArrays(obj, max) {
+    var changed = false;
+    if (!obj || typeof obj !== "object") return false;
+    Object.keys(obj).forEach(function (key) {
+      if (Array.isArray(obj[key]) && obj[key].length > max) {
+        obj[key] = obj[key].slice(-max);
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
+  function compactLoadedLife(s, reason) {
+    if (!validLife(s)) return s;
+    var changed = false;
+    changed = capArray(s, "log", 300, true) || changed;
+    changed = capArray(s, "timeSnapshotsV1814", 18, false) || changed;
+    if (s.life && typeof s.life === "object") {
+      changed = capArray(s.life, "memories", 20, true) || changed;
+    }
+    if (s.finance && typeof s.finance === "object") {
+      changed = capArray(s.finance, "cashFlowHistoryV1824", 60, false) || changed;
+      changed = capArray(s.finance, "taxTrueUpsV1824", 30, true) || changed;
+      changed = capArray(s.finance, "fundInvestorLedgerV1825", 40, true) || changed;
+      changed = capArray(s.finance, "legalCasesV1826", 30, true) || changed;
+      changed = capArray(s.finance, "healthClaimsV1826", 30, true) || changed;
+      changed = capArray(s.finance, "relocationHistoryV1826", 30, true) || changed;
+      if (s.finance.businessTaxV1830) changed = capArray(s.finance.businessTaxV1830, "history", 24, true) || changed;
+      if (s.finance.taxCleanupV1832) changed = capArray(s.finance.taxCleanupV1832, "history", 24, true) || changed;
+      if (s.finance.familyTrustV1839) changed = capArray(s.finance.familyTrustV1839, "history", 30, true) || changed;
+      if (s.finance.familyEnterpriseV1846) changed = capArray(s.finance.familyEnterpriseV1846, "history", 20, true) || changed;
+      if (Array.isArray(s.finance.businesses)) {
+        s.finance.businesses.forEach(function (business) {
+          changed = capArray(business, "historyV1830", 24, true) || changed;
+          changed = capArray(business, "historyV1862", 40, false) || changed;
+          changed = capArray(business, "eventHistoryV1850", 20, true) || changed;
+        });
+      }
+      if (s.finance.bizV1860 && Array.isArray(s.finance.bizV1860.businesses)) {
+        s.finance.bizV1860.businesses.forEach(function (business) {
+          changed = capArray(business, "history", 40, false) || changed;
+          changed = capArray(business, "logs", 40, true) || changed;
+          changed = capArray(business, "events", 30, true) || changed;
+        });
+      }
+      if (s.finance.stocksV18 && typeof s.finance.stocksV18 === "object") {
+        var stocks = s.finance.stocksV18;
+        changed = capArray(stocks, "news", 80, true) || changed;
+        changed = capArray(stocks, "watchlist", 80, true) || changed;
+        changed = capObjectArrays(stocks.history, 120) || changed;
+        changed = capObjectArrays(stocks.candles, 120) || changed;
+      }
+    }
+    if (s.careerV1827) {
+      changed = capArray(s.careerV1827, "applications", 24, true) || changed;
+      changed = capArray(s.careerV1827, "offers", 24, true) || changed;
+      changed = capArray(s.careerV1827, "history", 40, true) || changed;
+    }
+    if (s.careerV1828) changed = capArray(s.careerV1828, "interviewHistory", 30, true) || changed;
+    if (s.careerV1832) changed = capArray(s.careerV1832, "history", 40, true) || changed;
+    if (changed) {
+      window.__ledgerStartupCompactionV1835 = {
+        at: Date.now(),
+        reason: reason || "load",
+        message: "Trimmed oversized history arrays before first render."
+      };
+      try { localStorage.setItem("ledger_v1835_last_startup_compaction", JSON.stringify(window.__ledgerStartupCompactionV1835)); } catch (e) {}
+    }
+    return s;
+  }
+
   function normalizeLife(s) {
     if (!validLife(s)) return s;
     s.stats = s.stats && typeof s.stats === "object" && !Array.isArray(s.stats) ? s.stats : {};
@@ -74,7 +197,7 @@
     s.timeSnapshotsV1814 = Array.isArray(s.timeSnapshotsV1814) ? s.timeSnapshotsV1814 : [];
     if (!Number.isFinite(Number(s.money))) s.money = 0;
     if (!Number.isFinite(Number(s.savings))) s.savings = 0;
-    return s;
+    return compactLoadedLife(s, "normalize");
   }
 
   function activeSlotIndex() {
@@ -99,8 +222,8 @@
   }
 
   function readRecoverySave(label, key, slot, priority) {
-    var data = null;
-    try { data = parse(localStorage.getItem(key)); } catch (e) {}
+    var read = readSlotJson(key, slot || null, label);
+    var data = read.data;
     if (data && data.state && typeof data.state === "object") data = data.state;
     if (!validLife(data)) return null;
     return { label: label, key: key, slot: slot || null, priority: priority || 0, state: normalizeLife(data) };
@@ -148,10 +271,11 @@
   }
 
   function currentSlotIsPartial() {
-    var raw = null;
     var parsed = null;
-    try { raw = localStorage.getItem(slotKeyFor(activeSlotIndex())); } catch (e) {}
-    parsed = parse(raw);
+    var active = activeSlotIndex();
+    var read = readSlotJson(slotKeyFor(active), active, "active slot");
+    if (read.oversized) return false;
+    parsed = read.data;
     if (parsed && parsed.state) parsed = parsed.state;
     return partialLife(parsed);
   }
@@ -260,9 +384,25 @@
     idx = clampSlot(idx);
     try { activeSlot = idx; } catch (e) {}
     try { localStorage.setItem("ledger-active-slot", String(idx)); } catch (e2) {}
+    var primary = readSlotJson(slotKeyFor(idx), idx, "slot " + idx);
+    if (primary.oversized) return false;
+    var direct = primary.data;
+    if (direct && direct.state && typeof direct.state === "object") direct = direct.state;
+    if (validLife(direct)) {
+      var normalized = normalizeLife(direct);
+      setState(normalized);
+      try { if (typeof ensureStateShape === "function") ensureStateShape(); } catch (ensureError) {}
+      try { localStorage.setItem(slotKeyFor(idx), JSON.stringify(getState() || normalized)); } catch (persistDirectError) {}
+      return true;
+    }
     if (typeof loadFromSlot === "function") {
       try {
-        if (loadFromSlot(idx) && validLife(getState())) return true;
+        if (loadFromSlot(idx) && validLife(getState())) {
+          var live = normalizeLife(getState());
+          setState(live);
+          try { localStorage.setItem(slotKeyFor(idx), JSON.stringify(live)); } catch (persistError) {}
+          return true;
+        }
       } catch (e3) {}
     }
     var saved = null;

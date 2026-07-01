@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-06-30T21:05:46.837Z",
+  "builtAt": "2026-07-01T15:14:38.054Z",
   "source": "outputs/ledger18_modular_v18_35",
   "entries": [
     {
@@ -11,19 +11,19 @@
           "bytes": 11028
         }
       ],
-      "bytes": 205027
+      "bytes": 205396
     },
     {
       "entry": "play.html",
       "output": "outputs/ledger18_modular_v18_35/dist/Ledger_18_dynamic_stocks_v18_35_play_built.html",
       "scripts": [
         {
-          "src": "pages/systems/play-boot.js",
-          "bytes": 1157
+          "src": "pages/systems/play-boot.js?v=20260701-edgefirst1",
+          "bytes": 2368
         },
         {
-          "src": "pages/runtime/00-core-app-runtime.js?v=20260629-livecandle1",
-          "bytes": 1694040
+          "src": "pages/runtime/00-core-app-runtime.js?v=20260701-displaydiag1",
+          "bytes": 1717923
         },
         {
           "src": "state/state-map.js",
@@ -70,8 +70,8 @@
           "bytes": 26573
         },
         {
-          "src": "pages/systems/stocks-engine.js?v=20260630-investments21e",
-          "bytes": 167203
+          "src": "pages/systems/stocks-engine.js?v=20260701-stockguard1",
+          "bytes": 171271
         },
         {
           "src": "pages/systems/tax-legal.js?v=20260627-percompany2",
@@ -110,8 +110,8 @@
           "bytes": 218896
         },
         {
-          "src": "pages/systems/save-recovery.js?v=20260628-recovery2",
-          "bytes": 18122
+          "src": "pages/systems/save-recovery.js?v=20260701-edgefirst1",
+          "bytes": 25002
         },
         {
           "src": "pages/systems/scroll-stability.js?v=20260628-flicker1",
@@ -126,8 +126,8 @@
           "bytes": 15830
         },
         {
-          "src": "pages/systems/more-command.js",
-          "bytes": 46136
+          "src": "pages/systems/more-command.js?v=20260701-displaydiag1",
+          "bytes": 48981
         },
         {
           "src": "pages/systems/life-wellbeing.js?v=20260626-wb3",
@@ -194,13 +194,13 @@
           "bytes": 15386
         }
       ],
-      "bytes": 3635383
+      "bytes": 3674330
     },
     {
       "entry": "index.html",
       "output": "outputs/ledger18_modular_v18_35/dist/index.html",
       "aliasFor": "Ledger_18_dynamic_stocks_v18_35_landing_built.html",
-      "bytes": 205027
+      "bytes": 205396
     },
     {
       "entry": "play.html",

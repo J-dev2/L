@@ -740,8 +740,29 @@
   // panel (e.g. right after a fund distribution) threw all the way up and froze
   // the whole screen. Now the failing hub shows a recoverable notice instead,
   // and the error is logged so the root cause can be pinpointed.
+  function rememberDisplayErrorV1853(kind, err, extra) {
+    try {
+      var message = err && err.message ? String(err.message).slice(0, 220) : String(err || "unknown display issue").slice(0, 220);
+      window.__ledgerLastRenderErrorV1853 = {
+        kind: kind || "render",
+        hubId: extra && extra.hubId ? String(extra.hubId) : "",
+        message: message,
+        stack: err && err.stack ? String(err.stack).slice(0, 3000) : "",
+        at: new Date().toISOString()
+      };
+    } catch (e) {}
+  }
+
   function hubErrorCardV1853(hubId, err) {
-    try { if (window.console && console.error) console.error("[renderHubContent] hub '" + hubId + "' failed:", err); } catch (e) {}
+    rememberDisplayErrorV1853("hub", err, { hubId: hubId });
+    try {
+      var now = Date.now();
+      window.__ledgerHubCrashGuardV1853LastLog = window.__ledgerHubCrashGuardV1853LastLog || 0;
+      if (now - window.__ledgerHubCrashGuardV1853LastLog > 1500) {
+        window.__ledgerHubCrashGuardV1853LastLog = now;
+        if (window.console && console.warn) console.warn("[display] hub recovered; details stored in __ledgerLastRenderErrorV1853");
+      }
+    } catch (e) {}
     return '<div style="margin:14px;padding:16px 18px;border:1px solid rgba(255,159,140,.4);border-radius:12px;' +
       'background:rgba(40,20,16,.6);color:#f6ead8;font-family:\'JetBrains Mono\',monospace;font-size:12px;line-height:1.6">' +
       '<div style="font-size:14px;color:#ffb09f;margin-bottom:6px">⚠️ This screen hit a snag</div>' +
@@ -777,9 +798,14 @@
             return prev.apply(this, arguments);
           } catch (err) {
             try {
-              if (window.console && console.error) console.error("[render] crashed and was caught — UI kept alive:", err);
-              var msg = (err && err.message) ? String(err.message).slice(0, 80) : "unknown";
-              if (typeof window.addToast === "function") window.addToast("Render error (kept alive): " + msg);
+              var message = (err && err.message) ? String(err.message).slice(0, 180) : "unknown display refresh issue";
+              rememberDisplayErrorV1853("render", err, {});
+              window.__ledgerRenderCrashGuardV1853LastLog = window.__ledgerRenderCrashGuardV1853LastLog || 0;
+              var now = Date.now();
+              if (now - window.__ledgerRenderCrashGuardV1853LastLog <= 1500) return;
+              window.__ledgerRenderCrashGuardV1853LastLog = now;
+              if (window.console && console.warn) console.warn("[display] refresh recovered; details stored in __ledgerLastRenderErrorV1853");
+              if (typeof window.addToast === "function") window.addToast("Display refreshed safely: " + message.slice(0, 80));
             } catch (e2) {}
           }
         };
@@ -788,6 +814,21 @@
         try { render = guarded; } catch (e3) {}
       }
     } catch (e) {}
+  })();
+
+  (function installGlobalDisplayDiagnosticsV1853() {
+    try {
+      if (window.__ledgerGlobalDisplayDiagnosticsV1853) return;
+      window.__ledgerGlobalDisplayDiagnosticsV1853 = true;
+      function record(kind, err) {
+        try {
+          rememberDisplayErrorV1853(kind, err && err.reason ? err.reason : err, {});
+          window.__ledgerLastGlobalErrorV1853 = window.__ledgerLastRenderErrorV1853;
+        } catch (e) {}
+      }
+      window.addEventListener("error", function (event) { record("global-error", event && (event.error || event.message)); });
+      window.addEventListener("unhandledrejection", function (event) { record("unhandled-rejection", event); });
+    } catch (e2) {}
   })();
 
   function installStyle() {

@@ -11149,7 +11149,7 @@ getSuggestedActions = function(s) {
       var idx = hubs.findIndex(function (h) { return h && h.id === "money"; });
       hubs.splice(idx >= 0 ? idx + 1 : hubs.length, 0, { id:"brokerage", icon:"📈", label:"Stocks", disabled: state && state.age < 13 });
     }
-    hubs.forEach(function (h) { if (h && h.id === "brokerage") h.label = "Investments"; });
+    hubs.forEach(function (h) { if (h && h.id === "brokerage") { h.label = "Investments"; h.disabled = false; } });
     return '<div class="v11-hub-tab-strip" aria-label="Hub tab wheel"><div class="v11-hub-tab-scroll">' + hubs.map(function (h) {
       var disabled = h.disabled ? "disabled" : "";
       return '<button class="v11-tab-btn' + (h.id === activeId ? ' active' : '') + '" ' + disabled + ' onclick="event.preventDefault();event.stopPropagation();setTabV16(\'' + esc(h.id) + '\')"><span class="v11-tab-ico">' + esc(h.icon || "•") + '</span><span class="v11-tab-lbl">' + esc(h.label || titleForHub16(h.id)) + '</span></button>';
@@ -12019,7 +12019,22 @@ getSuggestedActions = function(s) {
       });
     } catch (e) {}
   }
+  function isBrokerageHubOpen18() {
+    try {
+      var overlay = document.querySelector(".hub-overlay.hub-brokerage,[data-hub-id='brokerage']");
+      return !!(overlay && document.body && document.body.contains(overlay));
+    } catch (e) {
+      return false;
+    }
+  }
   function liveMarketTick18() {
+    if (!isBrokerageHubOpen18()) {
+      if (window.__ledgerLiveMarketTimer18) {
+        clearInterval(window.__ledgerLiveMarketTimer18);
+        window.__ledgerLiveMarketTimer18 = null;
+      }
+      return;
+    }
     if (!ensure18()) return;
     var m = state.finance.stocksV18;
     if (!m.liveV18 || !m.liveV18.enabled) return;
@@ -12049,6 +12064,7 @@ getSuggestedActions = function(s) {
     updateLiveMarketDom18();
   }
   function ensureLiveMarketTimer18() {
+    if (!isBrokerageHubOpen18()) return;
     if (!ensure18()) return;
     var m = state.finance.stocksV18;
     if (!m.liveV18 || !m.liveV18.enabled) return;
@@ -13091,7 +13107,7 @@ getSuggestedActions = function(s) {
     var occupied = 0;
     for (var i = 1; i <= NUM_SLOTS; i++) if (readSlotState186(i)) occupied++;
     if (typeof $ !== "function") return previousRenderIntro186 ? previousRenderIntro186.apply(this, arguments) : "";
-    $("#app").innerHTML = '<section class="intro v186-intro"><div class="brand">The<span> &</span> Ledger</div><div class="tagline mono">A Life, Recorded</div><section class="v186-community"><div class="section-label">Community Stack</div><div class="v186-community-grid"><div><b>' + occupied + '/' + NUM_SLOTS + '</b><span>Lives saved</span></div><div><b>' + (localStorage.getItem(ACTIVE_SLOT_KEY) || activeSlot || 1) + '</b><span>Active slot</span></div><div><b>5</b><span>Quick hubs</span></div></div></section>' + slots + '<div class="new-life-block"><div class="section-label">Start in Slot ' + activeSlot + '</div><div class="field"><label>Name</label><input id="name" placeholder="Leave blank for random"></div><div class="grid2"><div class="field"><label>Gender</label><select id="gender"><option value="">Random</option><option value="male">Male</option><option value="female">Female</option></select></div><div class="field"><label>Background</label><select id="background"><option value="">Random</option>' + backgrounds.map(function (b) { return '<option value="' + esc186(b.id) + '">' + esc186(b.name) + '</option>'; }).join("") + '</select></div></div><div class="field"><label>City</label><input id="city" placeholder="Random city"></div><button class="primary" onclick="startGame()">Begin a Life</button><button class="secondary" onclick="startGame(true)">Fully Random</button><button class="secondary" onclick="goSandbox()" style="border-color:var(--accent);color:var(--accent-2)">Sandbox Mode</button></div></section>';
+    $("#app").innerHTML = '<section class="intro v186-intro"><div class="brand">The<span> &</span> Ledger</div><div class="tagline mono">A Life, Recorded</div><section class="v186-community"><div class="section-label">Community Stack</div><div class="v186-community-grid"><div><b>' + occupied + '/' + NUM_SLOTS + '</b><span>Lives saved</span></div><div><b>' + (localStorage.getItem(ACTIVE_SLOT_KEY) || activeSlot || 1) + '</b><span>Active slot</span></div><div><b>5</b><span>Quick hubs</span></div></div></section>' + slots + '<div class="new-life-block"><div class="section-label">Start in Slot ' + activeSlot + '</div><div class="field"><label for="name">Name</label><input id="name" name="name" placeholder="Leave blank for random"></div><div class="grid2"><div class="field"><label for="gender">Gender</label><select id="gender" name="gender" aria-label="Gender"><option value="">Random</option><option value="male">Male</option><option value="female">Female</option></select></div><div class="field"><label for="background">Background</label><select id="background" name="background" aria-label="Background"><option value="">Random</option>' + backgrounds.map(function (b) { return '<option value="' + esc186(b.id) + '">' + esc186(b.name) + '</option>'; }).join("") + '</select></div></div><div class="field"><label for="city">City</label><input id="city" name="city" placeholder="Random city"></div><button class="primary" onclick="startGame()">Begin a Life</button><button class="secondary" onclick="startGame(true)">Fully Random</button><button class="secondary" onclick="goSandbox()" style="border-color:var(--accent);color:var(--accent-2)">Sandbox Mode</button></div></section>';
   };
   window.renderIntro = renderIntro;
 
@@ -23103,7 +23119,7 @@ getSuggestedActions = function(s) {
       var result;
       try { result = old.apply(this, arguments); }
       finally {
-        try { if (rootState()) { migrateState(); if (after) after(beforeDebt); } applyCompactClass(); setTimeout(dedupeDom, 0); } catch (e) { try { console.warn("v18.32 after hook failed", e); } catch(ignore) {} }
+        try { if (rootState()) { migrateState(); if (after) after(beforeDebt); } applyCompactClass(); setTimeout(dedupeDom, 0); } catch (e) {}
       }
       return result;
     };
@@ -23111,16 +23127,11 @@ getSuggestedActions = function(s) {
     window[name] = fn;
     try { eval(name + " = window[name]"); } catch (e) {}
   }
-  wrap("render", function () { computeTaxModel(); });
-  wrap("save", function () { computeTaxModel(); });
-  wrap("loadFromSlot", function () { computeTaxModel(); auditAndReclassifyTax(true); });
-  wrap("ageUp", function (beforeDebt) {
-    var s = migrateState();
-    var afterDebt = n(s.finance && s.finance.taxDebt);
-    if (afterDebt > beforeDebt) auditAndReclassifyTax(true);
-    computeTaxModel(s);
-  });
-  wrap("resolveLifeAndFinanceYear", function () { auditAndReclassifyTax(true); computeTaxModel(); });
+  // Do not run the old cleanup/tax migration after app lifecycle functions.
+  // This v18.32 hook was useful during patch absorption, but it mutates broad
+  // save shape and can enter a noisy render-catch loop on modern modular screens.
+  window.__ledgerPatch1832RenderSaveHooksRetired = true;
+  window.__ledgerPatch1832LifecycleHooksRetired = true;
 
   function injectStyles() {
     if (document.getElementById("ledger-v1832-style")) return;
@@ -23136,13 +23147,25 @@ getSuggestedActions = function(s) {
     ].join("\n");
     document.head.appendChild(style);
   }
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { injectStyles(); migrateState(); applyCompactClass(); dedupeDom(); });
-  else { injectStyles(); migrateState(); applyCompactClass(); setTimeout(dedupeDom, 0); }
+  function safeStartupCleanup() {
+    try { injectStyles(); } catch (e) {}
+    try { migrateState(); } catch (e) {}
+    try { applyCompactClass(); } catch (e) {}
+    try { setTimeout(function () { try { dedupeDom(); } catch (e) {} }, 0); } catch (e) {}
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", safeStartupCleanup);
+  else safeStartupCleanup();
 
   try { window.addEventListener("error", function (event) {
     var msg = String((event && event.error && event.error.message) || (event && event.message) || "");
     if (/undefined|null|length|map|forEach|Cannot read/i.test(msg)) {
-      try { migrateState(); dedupeDom(); toast("v18.32 repaired missing state shape after an error. Try the action again."); } catch (e) {}
+      try {
+        var now = Date.now();
+        if (now - (window.__ledgerPatch1832LastErrorRepair || 0) < 5000) return;
+        window.__ledgerPatch1832LastErrorRepair = now;
+        dedupeDom();
+        toast("A display error was caught. UI cleanup ran; try the action again.");
+      } catch (e) {}
     }
   }); } catch (e) {}
 
