@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-07-01T15:14:38.054Z",
+  "builtAt": "2026-07-01T15:36:31.213Z",
   "source": "outputs/ledger18_modular_v18_35",
   "entries": [
     {
@@ -71,7 +71,7 @@
         },
         {
           "src": "pages/systems/stocks-engine.js?v=20260701-stockguard1",
-          "bytes": 171271
+          "bytes": 172699
         },
         {
           "src": "pages/systems/tax-legal.js?v=20260627-percompany2",
@@ -194,7 +194,7 @@
           "bytes": 15386
         }
       ],
-      "bytes": 3674330
+      "bytes": 3675758
     },
     {
       "entry": "index.html",
